@@ -54,11 +54,22 @@ python -m streamsafe --input trailer.mp4 --output review.mp4 --head-dir heads/ -
 
 | Way | OBS side | StreamSafe | Restart of the stream needed? |
 |---|---|---|---|
-| **A. Virtual camera in, window out** | Virtual Camera -> output type *Source* = the game capture; add a *Window Capture* of "StreamSafe Output" and hide the raw game capture; delay game audio with *Sync Offset* | `--input "device:OBS Virtual Camera" --output window` | No (all steps can be done while live; to be confirmed on a real setup) |
+| **A. Virtual camera in, window out** | see the steps below | `--input "device:OBS Virtual Camera" --output window` | No - every step is an ordinary edit OBS allows while live (to be confirmed on a real setup) |
 | **B. SRT in, platform out** | Stream to `srt://127.0.0.1:9000` (Custom service) | `--input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest>/<key>"` | Yes (OBS's stream target changes) |
 | **C. OBS plugin** | planned (fork of the MIT obs-broadcast-delay / censure plugins) | - | Yes (OBS loads plugins at start) |
 
-Audio is not processed by the engine yet: in A it is delayed inside OBS; B passes video only.
+Way A, step by step (the raw game never sits in a scene viewers can see):
+1. New scene **RAW** holding only the game capture. It is never switched to.
+2. Virtual Camera settings (gear icon) -> output type *Scene* = **RAW** -> Start Virtual Camera.
+3. Start StreamSafe: `python -m streamsafe --input "device:OBS Virtual Camera" --output window`.
+4. In the live scene: a full-screen slate image at the bottom, a *Window Capture* of "StreamSafe Output"
+   above it, then webcam and overlays. If StreamSafe stops, its window disappears and viewers see the
+   slate - fail closed.
+5. Delay what is not in the picture by the same amount (`--delay`, 2 s by default): *Sync Offset* on game
+   audio and mic (Advanced Audio Properties), *Render Delay* filter on the webcam.
+
+Audio is not processed by the engine yet: in A it is delayed inside OBS (not muted when the slate shows);
+B passes video only.
 
 ## Settings
 
