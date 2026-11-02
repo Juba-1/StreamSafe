@@ -1,0 +1,100 @@
+"""Turns noisy per-frame eye scores into a stable covered / not-covered state per person.
+
+Rules (thresholds scale with the operating threshold through ``scale = thr / 0.40``):
+  * evidence S = 0.85 * S + w * (logit(p) - logit(thr)), capped at S_CAP so a long-covered person
+    is not stuck for many seconds; w = 0.5 when the person overlaps someone else (mixed crops)
+  * p blends this frame's score with the score of the track's running appearance
+  * COVER when S >= 2, or the raw score >= HARD, or (first 3 looks) p >= the first-look threshold,
+    which is stricter for big close-up people (modest close-ups were the main false covers)
+  * FAST CLEAR when the last two readings are very low (< 0.08 * scale) and never hard-risky
+  * RELEASE otherwise only after 3 clearly-safe decisions AND release_s seconds
+Eye-skipped (stale) readings repeat the last evidence; the release clock keeps running.
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+
+import numpy as np
+
+from streamsafe.analysis.tracks import Track, Tracker, box_iou
+from streamsafe.config import RiskConfig
+from streamsafe.types import Person
+
+HARD = 0.85
+S_CAP = 8.0
+S_COVER = 2.0
+S_SAFE = -3.0
+DECAY = 0.85
+SAFE_RUN_RELEASE = 3
+FIRST_LOOKS = 3
+OVERLAP_IOU = 0.15
+HISTORY = 5
+TINY_H = 20  # people shorter than this use a lower threshold
+
+
+def _logit(q: float) -> float:
+    return float(np.log(max(1e-4, q) / max(1e-4, 1 - q)))
+
+
+class RiskPolicy:
+    def __init__(self, cfg: RiskConfig, base_thr: float, prisk: Callable[[np.ndarray], np.ndarray]) -> None:
+        self.cfg = cfg
+        self.base_thr = base_thr
+        self.scale = base_thr / 0.40
+        self.prisk = prisk
+
+    def update(self, people: list[Person], tracker: Tracker, thr: float, now: float | None = None) -> None:
+        """Set ``person.risky`` for every person of this decision (thr may include the scene prior)."""
+        now = time.perf_counter() if now is None else now
+        for person in people:
+            track = tracker.tracks[person.tid]
+            self._observe(person, track)
+            tracker.observe(person)
+            person.risky = self._decide(person, track, people, tracker, thr, now)
+
+    @staticmethod
+    def _observe(person: Person, track: Track) -> None:
+        r = track.risk
+        r.n_obs += 1
+        if person.stale:
+            person.p = r.history[-1] if r.history else person.p
+        else:
+            r.history = [*r.history, person.p][-HISTORY:]
+            r.max_p = max(r.max_p, person.p)
+
+    def _decide(self, person: Person, track: Track, people: list[Person], tracker: Tracker, thr: float, now: float) -> bool:
+        cfg, scale, r = self.cfg, self.scale, track.risk
+        p_track = float(self.prisk(track.unit_emb[None])[0])
+        p = 0.5 * person.p + 0.5 * p_track
+
+        others = [o for o in people if o is not person]
+        overlap = max([box_iou(person.box, o.box) for o in others] or [0])
+        overlap_risky = max([box_iou(person.box, o.box) for o in others if tracker.tracks[o.tid].risk.risky] or [0])
+        weight = 0.5 if overlap > OVERLAP_IOU else 1.0
+        th = thr if person.height >= TINY_H else min(thr, 0.2 * scale)
+
+        r.evidence = min(S_CAP, DECAY * r.evidence + weight * (_logit(p) - _logit(th)))
+        r.safe_run = r.safe_run + 1 if r.evidence < S_SAFE else 0
+        if r.safe_run == 1:
+            r.safe_since = now
+
+        prior = r.history[:-1]
+        first_look = max(
+            th,
+            cfg.young_k * self.base_thr if person.height >= cfg.young_min_h else self.base_thr,
+            # someone half-hidden behind a covered person: only a clear reading counts
+            0.6 * scale if (overlap_risky > OVERLAP_IOU and prior and max(prior) < 0.2 * scale) else 0,
+        )
+        fast_clear = len(r.history) >= 2 and max(r.history[-2:]) < 0.08 * scale and overlap <= OVERLAP_IOU and r.max_p < HARD
+
+        if fast_clear and r.risky:
+            r.risky = False
+            r.evidence = min(r.evidence, 0)
+        elif r.evidence >= S_COVER or person.p >= HARD or (r.n_obs <= FIRST_LOOKS and p >= first_look):
+            r.risky = True
+            r.safe_run = 0
+        elif r.risky and r.safe_run >= SAFE_RUN_RELEASE and now - r.safe_since >= cfg.release_s:
+            r.risky = False
+        return r.risky
