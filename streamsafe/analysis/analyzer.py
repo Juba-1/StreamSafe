@@ -75,7 +75,7 @@ class Analyzer:
         rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         clock = time.perf_counter()
 
-        people, crops = self._detect(rgb)
+        people, crops = self.detect(rgb)
         timings["detect"], clock = _lap(clock)
 
         st["eye_skipped"].append(self.tracker.motion_hints(people, cut, cfg.eye.eye_every))
@@ -115,7 +115,8 @@ class Analyzer:
             self.diag.append([frame_id, [[p.tid, list(p.box), round(p.p, 3), int(p.risky), int(p.stale)] for p in people]])
         return Decision(frame_id=frame_id, ok=True, layers=layers, n_people=len(people), n_risky=len(risky))
 
-    def _detect(self, rgb: np.ndarray) -> tuple[list[Person], list[np.ndarray]]:
+    def detect(self, rgb: np.ndarray) -> tuple[list[Person], list[np.ndarray]]:
+        """People in an RGB analysis frame and their eye crops (background darkened, as in head training)."""
         people, crops = [], []
         for box, mask in self.models.detector(rgb):
             x1, y1, x2, y2 = box
