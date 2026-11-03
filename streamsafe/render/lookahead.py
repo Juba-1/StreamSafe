@@ -15,13 +15,14 @@ from dataclasses import replace
 
 import cv2
 
-from streamsafe.types import Box, Decision, Layer
+from streamsafe.types import Box, Decision, Layer, MotionRef
 
 MAX_SCALE_JUMP = 2.0  # a box that grew or shrank more than this is not trusted as the same person
 
 
-def moved_layer(layer: Layer, src: Box, dst: Box, scale: float) -> Layer | None:
-    """``layer`` (drawn for a person at ``src``, analysis px) placed onto the same person at ``dst``."""
+def moved_layer(layer: Layer, src: Box, dst: Box, scale: float, motion: MotionRef | None = None) -> Layer | None:
+    """``layer`` (drawn for a person at ``src``, analysis px) placed onto the same person at ``dst``;
+    ``motion``: that person's reference in the earlier frame, so the copy follows them like any garment."""
     sh, dh = src[3] - src[1], dst[3] - dst[1]
     if sh <= 0 or dh <= 0 or not 1 / MAX_SCALE_JUMP <= dh / sh <= MAX_SCALE_JUMP:
         return None
@@ -37,7 +38,7 @@ def moved_layer(layer: Layer, src: Box, dst: Box, scale: float) -> Layer | None:
     y, x = round(dst[1] * scale + oy * k), round(dst[0] * scale + ox * k)
     cy, cx = layer.centroid
     centroid = (dst[1] * scale + (cy - src[1] * scale) * k, dst[0] * scale + (cx - src[0] * scale) * k)
-    return Layer(tid=layer.tid, y=y, x=x, mask=mask, fabric=fabric, centroid=centroid, motion=None)
+    return Layer(tid=layer.tid, y=y, x=x, mask=mask, fabric=fabric, centroid=centroid, motion=motion)
 
 
 def backfill(new: Decision, earlier: list[Decision], scale: float) -> list[Decision]:
@@ -57,7 +58,7 @@ def backfill(new: Decision, earlier: list[Decision], scale: float) -> list[Decis
             m
             for layer in fresh
             if layer.tid not in covered and layer.tid in then
-            for m in [moved_layer(layer, boxes_now[layer.tid], then[layer.tid], scale)]
+            for m in [moved_layer(layer, boxes_now[layer.tid], then[layer.tid], scale, d.refs.get(layer.tid))]
             if m is not None
         ]
         if added:

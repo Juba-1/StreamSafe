@@ -105,7 +105,7 @@ class Analyzer:
 
         safe = [SafePerson(p.mask, p.box, int(p.mask.sum())) for p in people if not p.risky and p.p < SAFE_P * self.scale]
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) if cfg.render.motion else None
-        layers = []
+        layers, refs = [], {}
         for person, mode in plan:
             memory = self.tracker.tracks[person.tid].garment
             layer = self.garments.build(im, person, mode, memory, safe, self.tracker.decision, cut, poses.get(id(person)))
@@ -113,6 +113,11 @@ class Analyzer:
                 if gray is not None:
                     layer.motion = make_motion_ref(gray, person.mask, person.box)
                 layers.append(layer)
+        if gray is not None and cfg.render.lookahead:  # a later decision may cover these people here
+            covered = {layer.tid for layer in layers}
+            for p in people:
+                if p.tid not in covered and (ref := make_motion_ref(gray, p.mask, p.box)) is not None:
+                    refs[p.tid] = ref
         timings["garment"], _ = _lap(clock)
 
         if cfg.output.diag_out:
@@ -124,6 +129,7 @@ class Analyzer:
             n_people=len(people),
             n_risky=len(risky),
             people=[(p.tid, p.box) for p in people],
+            refs=refs,
         )
 
     def detect(self, rgb: np.ndarray, full: np.ndarray | None = None, full_bgr: bool = False) -> tuple[list[Person], list[np.ndarray]]:

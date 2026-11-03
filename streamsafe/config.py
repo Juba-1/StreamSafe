@@ -27,7 +27,7 @@ class EyeConfig:
     head_dir: str = ""  # folder with fast_h6.txt, male_h6.txt, thr_h6.txt
     eye_every: int = 3  # a person followed by motion alone is re-checked every N decisions
     scene_prior: bool = True  # beach / pool scenes lower the threshold slightly
-    full_res_crops: bool = False  # eye crops cut from the native frame instead of the 960x540 analysis frame
+    full_res_crops: bool = True  # eye crops from the native frame (run36: women 63->77%, men 54->47%)
 
 
 @dataclass
