@@ -34,8 +34,8 @@ AnalyzerFactory = Callable[[Config, float], Callable]  # (cfg, output_scale) -> 
 
 
 class AnalyzerWorker:
-    def __init__(self, cfg: Config, factory: AnalyzerFactory, output_scale: float) -> None:
-        w, h = ANALYSIS_SIZE
+    def __init__(self, cfg: Config, factory: AnalyzerFactory, output_scale: float, frame_size: tuple[int, int] = ANALYSIS_SIZE) -> None:
+        w, h = frame_size
         ctx = mp.get_context("spawn")  # CUDA cannot be forked
         self._shm = shared_memory.SharedMemory(create=True, size=N_SLOTS * h * w * 3)
         self._ring = np.ndarray((N_SLOTS, h, w, 3), np.uint8, buffer=self._shm.buf)
@@ -45,7 +45,10 @@ class AnalyzerWorker:
         self._done, self._ready, self._out = ctx.Event(), ctx.Event(), ctx.Queue()
         self._proc = ctx.Process(
             target=_worker_main,
-            args=(cfg, factory, output_scale, self._shm.name, self._slot_fid, self._latest, self._cuts, self._done, self._ready, self._out),
+            args=(
+                *(cfg, factory, output_scale, frame_size, self._shm.name),
+                *(self._slot_fid, self._latest, self._cuts, self._done, self._ready, self._out),
+            ),
             daemon=True,
         )
         self.stats: dict = {}
@@ -61,7 +64,7 @@ class AnalyzerWorker:
                 raise TimeoutError("analyzer process did not become ready")
 
     def submit(self, frame_id: int, frame: np.ndarray, cut: bool) -> None:
-        """Hand an analysis-size BGR frame to the worker (never blocks)."""
+        """Hand a BGR frame of ``frame_size`` to the worker (never blocks)."""
         slot = frame_id % N_SLOTS
         self._slot_fid[slot] = -1  # invalidate while writing
         self._ring[slot] = frame
@@ -99,6 +102,7 @@ def _worker_main(
     cfg: Config,
     factory: AnalyzerFactory,
     output_scale: float,
+    frame_size: tuple[int, int],
     shm_name: str,
     slot_fid: Any,  # multiprocessing shared array / value / event / queue proxies
     latest: Any,
@@ -112,7 +116,7 @@ def _worker_main(
     limit_threads()  # again: the models may have imported torch
     analyzer.warmup()
     ready.set()
-    w, h = ANALYSIS_SIZE
+    w, h = frame_size
     shm = shared_memory.SharedMemory(name=shm_name)
     ring = np.ndarray((N_SLOTS, h, w, 3), np.uint8, buffer=shm.buf)
     last = -1

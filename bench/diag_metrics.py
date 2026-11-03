@@ -142,6 +142,7 @@ def metrics(diag: dict, people: list[list[Box]]) -> dict:
         key=lambda z: z[1],
     )[:25]
     return dict(
+        late_cover=late_cover(diag["dec"]),
         layer_frames=n_layers,
         motion_used=round(n_motion / max(1, n_layers), 3),
         lag_x_p50=q(lag_x, 50),
@@ -155,6 +156,31 @@ def metrics(diag: dict, people: list[list[Box]]) -> dict:
         torso_under80=round(float(np.mean(np.array(torso) < 0.8)), 4) if torso else None,
         size_jump_per10s=round(10 * size_jumps / seconds, 2),
         early_risky_tracks=early_risky,
+    )
+
+
+DELAY_S = 2.0  # the engine's default delay: a late cover inside it can be moved back before viewers see it
+
+
+def late_cover(decisions: list) -> dict:
+    """How late tracks that end up covered were covered: frames between a track's first decision and its
+    first risky decision. All of it was shown uncovered; the part within DELAY_S could be covered by
+    looking ahead in the delay buffer."""
+    first: dict[int, int] = {}
+    first_risky: dict[int, int] = {}
+    for fid, dets in decisions:
+        for tid, _box, _p, risky, _stale in dets:
+            first.setdefault(tid, fid)
+            if risky:
+                first_risky.setdefault(tid, fid)
+    lags = [(first_risky[t] - first[t]) / FPS for t in first_risky]
+    late = [s for s in lags if s > 0]
+    return dict(
+        covered_tracks=len(lags),
+        late_tracks=len(late),
+        late_s_total=round(sum(late), 2),
+        late_s_fixable=round(sum(min(s, DELAY_S) for s in late), 2),
+        late_p50=round(float(np.median(late)), 2) if late else None,
     )
 
 

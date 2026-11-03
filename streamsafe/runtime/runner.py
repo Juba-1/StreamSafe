@@ -102,7 +102,8 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
 # -------------------------------------------------------------------------------------- realtime
 def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, factory: AnalyzerFactory) -> dict[str, Any]:
     rt = cfg.runtime
-    worker = AnalyzerWorker(cfg, factory, _output_scale(source))
+    full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
+    worker = AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE)
     worker.start()
     gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out))
     frames: dict[int, tuple[float, Any]] = {}  # frame id -> (capture time, frame)
@@ -123,7 +124,7 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                         time.sleep(0.0005)
                 cut = cuts(frame)
                 gate.mark_cut(fid, cut)
-                worker.submit(fid, _to_analysis(frame), cut)
+                worker.submit(fid, frame if full_res else _to_analysis(frame), cut)
                 with lock:
                     frames[fid] = (captured, frame)
         except Exception as exc:  # a broken input ends the run; frames already captured are still shown

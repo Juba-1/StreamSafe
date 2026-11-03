@@ -54,12 +54,14 @@ class Analyzer:
         self.models.pose(blank, [(10, 10, 60, 120)])
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
-        """``frame``: BGR, any size (resized to the analysis size)."""
+        """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
+        also supplies the eye crops)."""
         t0 = time.perf_counter()
         timings: dict[str, float] = {}
         im = frame if frame.shape[1::-1] == ANALYSIS_SIZE else cv2.resize(frame, ANALYSIS_SIZE, interpolation=cv2.INTER_AREA)
+        full = frame if self.cfg.eye.full_res_crops and frame.shape[1] > ANALYSIS_SIZE[0] else None
         try:
-            decision = self._analyse(frame_id, im, cut, now, timings)
+            decision = self._analyse(frame_id, im, cut, now, timings, full)
         except Exception as exc:
             decision = Decision(frame_id=frame_id, ok=False)
             self.stats["analyzer_errors"].append(f"{exc!r:.300}")
@@ -70,12 +72,14 @@ class Analyzer:
         self.stats["risky"].append(decision.n_risky)
         return decision
 
-    def _analyse(self, frame_id: int, im: np.ndarray, cut: bool, now: float | None, timings: dict[str, float]) -> Decision:
+    def _analyse(
+        self, frame_id: int, im: np.ndarray, cut: bool, now: float | None, timings: dict[str, float], full: np.ndarray | None
+    ) -> Decision:
         cfg, st = self.cfg, self.stats
         rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         clock = time.perf_counter()
 
-        people, crops = self.detect(rgb)
+        people, crops = self.detect(rgb, None if full is None else cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
         timings["detect"], clock = _lap(clock)
 
         st["eye_skipped"].append(self.tracker.motion_hints(people, cut, cfg.eye.eye_every))
@@ -95,8 +99,8 @@ class Analyzer:
 
         risky = [p for p in people if p.risky]
         plan = [(p, choose_mode(p.height, self.tracker.tracks[p.tid].garment, cfg.garment.small_h)) for p in risky]
-        full = [p for p, mode in plan if mode == "full"]
-        poses = dict(zip(map(id, full), self.models.pose(rgb, [p.box for p in full]), strict=True)) if full else {}
+        dressed = [p for p, mode in plan if mode == "full"]
+        poses = dict(zip(map(id, dressed), self.models.pose(rgb, [p.box for p in dressed]), strict=True)) if dressed else {}
         timings["pose"], clock = _lap(clock)
 
         safe = [SafePerson(p.mask, p.box, int(p.mask.sum())) for p in people if not p.risky and p.p < SAFE_P * self.scale]

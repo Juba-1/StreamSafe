@@ -90,3 +90,17 @@ def test_non_1080p_input_keeps_garments_on_the_person(tmp_path, stub_run):
     red = [changed(o, f)[m].mean() for o, f, (m, _, risky) in zip(sink.frames, src, truth, strict=True) if risky]
     assert report["summary"]["failclosed_frames"] == 0
     assert min(red[3:]) >= 0.97
+
+
+@pytest.mark.parametrize("mode", ["offline", "realtime"])
+def test_full_resolution_eye_crops_cover_the_same_person(tmp_path, stub_run, mode):
+    """FULL_RES_CROPS: native frames reach the analyzer (realtime: through the worker's ring)."""
+    path = str(tmp_path / "walk.mp4")
+    truth = make_video(path)
+    report, sink = stub_run(path, mode, full_res_crops=True)
+    src = source_frames(path)
+    red = [changed(o, f)[m].mean() for o, f, (m, _, risky) in zip(sink.frames, src, truth, strict=True) if risky]
+    green = [changed(o, f)[g].mean() for o, f, (_, g, _) in zip(sink.frames, src, truth, strict=True)]
+    assert report["summary"]["analyzer_errors"] == 0 and report["summary"]["failclosed_frames"] == 0
+    assert min(red[3:]) >= 0.97
+    assert max(green) < 0.05
