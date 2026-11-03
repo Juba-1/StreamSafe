@@ -77,10 +77,12 @@ def make_video(
     flash_at: int | None = None,
     size: tuple[int, int] = (1920, 1080),
     fold_shade: float = 0.8,
+    first_col: tuple[int, int, int] = RED,
 ) -> list[tuple[np.ndarray, np.ndarray, bool]]:
     """Red person walks right (``speed`` px/frame at 1080p); green person static; new background
     at ``cut_at``. ``fold_shade`` 0.8 splits the stub blob into pieces (as in engine2's tests), 0.9
-    keeps it whole. Returns per frame the ground-truth masks (analysis size) of red and green."""
+    keeps it whole. ``first_col`` / ``turn_col`` / ``turn_safe_at``: the walker's outfit before / after
+    a change. Returns per frame the ground-truth masks (analysis size) of red and green."""
     w, h = size
     k = w / 1920
     writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), 30, size)
@@ -90,7 +92,7 @@ def make_video(
         im = np.full((h, w, 3), bg, np.uint8)
         cv2.rectangle(im, (0, int(900 * k)), (w, h), (60, 60, 60), -1)
         cx = 400 + speed * f
-        col = turn_col if (turn_safe_at is not None and f >= turn_safe_at) else RED
+        col = turn_col if (turn_safe_at is not None and f >= turn_safe_at) else first_col
         cv2.ellipse(im, (int(cx * k), int(600 * k)), (int(70 * k), int(230 * k)), 0, 0, 360, col, -1)
         if texture:  # clothing folds, so motion compensation has something to follow
             shade = tuple(int(v * fold_shade) for v in col)

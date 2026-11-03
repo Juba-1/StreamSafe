@@ -71,6 +71,8 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
     cut_since_last, emitted = True, 0
     # a frame is final once every decision that may protect it exists
     horizon = cfg.render.max_gap + rt.step_every
+    if cfg.render.lookahead:  # frames also wait like the realtime delay, so look-ahead can reach them
+        horizon = max(horizon, cfg.render.lookahead_frames + rt.step_every)
 
     def emit(v: int, frame: np.ndarray) -> None:
         nonlocal emitted

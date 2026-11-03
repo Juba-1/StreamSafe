@@ -117,7 +117,14 @@ class Analyzer:
 
         if cfg.output.diag_out:
             self.diag.append([frame_id, [[p.tid, list(p.box), round(p.p, 3), int(p.risky), int(p.stale)] for p in people]])
-        return Decision(frame_id=frame_id, ok=True, layers=layers, n_people=len(people), n_risky=len(risky))
+        return Decision(
+            frame_id=frame_id,
+            ok=True,
+            layers=layers,
+            n_people=len(people),
+            n_risky=len(risky),
+            people=[(p.tid, p.box) for p in people],
+        )
 
     def detect(self, rgb: np.ndarray, full: np.ndarray | None = None) -> tuple[list[Person], list[np.ndarray]]:
         """People in an RGB analysis frame and their eye crops (background darkened, as in head training).

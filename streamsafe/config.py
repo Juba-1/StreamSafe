@@ -54,6 +54,8 @@ class RenderConfig:
     mc_min: float = 0.12  # minimum phase-correlation response to trust a motion estimate
     max_gap: int = 18  # a decision may protect frames at most this far away (same shot only)
     hold: int = 2  # a gap of at most this many frames repeats the last protected frame
+    lookahead: bool = False  # a person turning risky is also covered in the earlier frames still waiting
+    lookahead_frames: int = 60  # how far back (same shot, not yet shown)
 
 
 @dataclass

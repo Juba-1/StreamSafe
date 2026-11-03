@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tests.stubs import BLUE, GREEN, make_video
+from tests.stubs import BLUE, GREEN, RED, make_video
 
 SLATE_BGR = np.array([40, 28, 22])
 
@@ -104,3 +104,21 @@ def test_full_resolution_eye_crops_cover_the_same_person(tmp_path, stub_run, mod
     assert report["summary"]["analyzer_errors"] == 0 and report["summary"]["failclosed_frames"] == 0
     assert min(red[3:]) >= 0.97
     assert max(green) < 0.05
+
+
+@pytest.mark.parametrize("lookahead", [False, True])
+def test_lookahead_covers_a_person_before_the_eye_was_sure(tmp_path, stub_run, lookahead):
+    """Borderline-looking walker (blue) is judged risky from frame 40 on (red): with look-ahead the
+    frames still waiting in the delay are covered too; without it they go out uncovered."""
+    path = str(tmp_path / "late.mp4")
+    truth = make_video(path, n=90, cut_at=500, first_col=BLUE, turn_safe_at=40, turn_col=RED)
+    report, sink = stub_run(path, "offline", lookahead=lookahead)
+    src = source_frames(path)
+    before = [changed(o, f)[m].mean() for o, f, (m, _, _) in list(zip(sink.frames, src, truth, strict=True))[10:40]]
+    green = [changed(o, f)[g].mean() for o, f, (_, g, _) in zip(sink.frames, src, truth, strict=True)]
+    assert report["summary"]["failclosed_frames"] == 0
+    assert max(green) < 0.05, "the safe person is never covered"
+    if lookahead:
+        assert np.mean(before) > 0.9, "frames before the eye was sure are covered by look-ahead"
+    else:
+        assert np.mean(before) < 0.1

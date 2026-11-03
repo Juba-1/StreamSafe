@@ -76,3 +76,5 @@ class Decision:
     layers: list[Layer] = field(default_factory=list)
     n_people: int = 0
     n_risky: int = 0
+    people: list[tuple[int, Box]] = field(default_factory=list)  # (track id, box) of everyone seen
+    backfilled: int = 0  # garments added later by look-ahead

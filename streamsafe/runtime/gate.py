@@ -19,6 +19,7 @@ import numpy as np
 
 from streamsafe.config import RenderConfig
 from streamsafe.render.compositor import DrawLog, compose, usable_decisions
+from streamsafe.render.lookahead import backfill
 from streamsafe.render.slate import make_slate
 from streamsafe.types import ANALYSIS_SIZE, Decision
 
@@ -36,6 +37,7 @@ class OutputGate:
         self._cuts: dict[int, bool] = {}
         self._last: np.ndarray | None = None
         self._held = 0
+        self._shown = -1  # last frame id rendered
 
     @property
     def n_decisions(self) -> int:
@@ -51,6 +53,21 @@ class OutputGate:
             if decision.frame_id not in self._decisions:
                 insort(self._keys, decision.frame_id)
             self._decisions[decision.frame_id] = decision
+            if self.cfg.lookahead and decision.ok and decision.layers:
+                self._look_back(decision)
+
+    def _look_back(self, new: Decision) -> None:
+        """Copy the new decision's garments into earlier decisions of the same shot that can still
+        protect a frame not shown yet (see render/lookahead.py)."""
+        f = new.frame_id
+        earlier = [
+            self._decisions[k]
+            for k in self._keys
+            if f - self.cfg.lookahead_frames <= k < f and k + self.cfg.max_gap > self._shown and not self._cut_between(k, f)
+        ]
+        for d in backfill(new, earlier, self.scale):
+            self._decisions[d.frame_id] = d
+            self.stats["backfilled"].append(d.backfilled)
 
     def forget_before(self, frame_id: int) -> None:
         """Drop decisions and cut flags no future frame can use."""
@@ -68,6 +85,7 @@ class OutputGate:
         """Protected output for frame ``v`` (``frame`` is drawn on in place and may be returned)."""
         t0 = time.perf_counter()
         with self._lock:
+            self._shown = v
             ids = usable_decisions(v, self._keys, self._cut_between, self.cfg.max_gap)
             decisions = [self._decisions[k] for k in ids]
         if not decisions or not all(d.ok for d in decisions):
