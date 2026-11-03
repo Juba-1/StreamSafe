@@ -115,18 +115,18 @@ class Analyzer:
             self.diag.append([frame_id, [[p.tid, list(p.box), round(p.p, 3), int(p.risky), int(p.stale)] for p in people]])
         return Decision(frame_id=frame_id, ok=True, layers=layers, n_people=len(people), n_risky=len(risky))
 
-    def detect(self, rgb: np.ndarray) -> tuple[list[Person], list[np.ndarray]]:
-        """People in an RGB analysis frame and their eye crops (background darkened, as in head training)."""
+    def detect(self, rgb: np.ndarray, full: np.ndarray | None = None) -> tuple[list[Person], list[np.ndarray]]:
+        """People in an RGB analysis frame and their eye crops (background darkened, as in head training).
+
+        ``full``: the same frame at a higher resolution (RGB, same aspect); eye crops are then cut from it,
+        so small people reach the eye with real detail instead of upscaled analysis pixels."""
         people, crops = [], []
         for box, mask in self.models.detector(rgb):
             x1, y1, x2, y2 = box
             if x2 - x1 < MIN_W or y2 - y1 < self.cfg.detector.min_h or mask.sum() < MIN_MASK_PX:
                 continue
-            inside = cv2.dilate(mask[y1:y2, x1:x2].astype(np.uint8), CROP_DILATE).astype(bool)
-            crop = rgb[y1:y2, x1:x2].copy()
-            crop[~inside] = (crop[~inside] * CROP_BACKGROUND).astype(np.uint8)  # isolate the person
             people.append(Person(box=box, mask=mask))
-            crops.append(crop)
+            crops.append(eye_crop(rgb, box, mask) if full is None else eye_crop(full, box, mask, full.shape[1] / rgb.shape[1]))
         return people, crops
 
     def _swim_prior(self, rgb: np.ndarray, cut: bool) -> float:
@@ -137,6 +137,25 @@ class Analyzer:
             self.p_swim = scene.pswim(rgb)
             self._scene_at = time.perf_counter()
         return self.p_swim
+
+
+def eye_crop(image: np.ndarray, box: tuple[int, int, int, int], mask: np.ndarray, scale: float = 1.0) -> np.ndarray:
+    """The person cut out of ``image`` with the background darkened. ``box`` / ``mask`` are in analysis
+    pixels; ``scale`` maps them onto ``image`` (1.0 = the analysis frame itself)."""
+    x1, y1, x2, y2 = box
+    inside = mask[y1:y2, x1:x2].astype(np.uint8)
+    kernel = CROP_DILATE
+    if scale != 1.0:
+        h, w = image.shape[:2]
+        x1, y1 = round(x1 * scale), round(y1 * scale)
+        x2, y2 = min(w, max(x1 + 1, round(x2 * scale))), min(h, max(y1 + 1, round(y2 * scale)))
+        inside = cv2.resize(inside, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
+        k = round(CROP_DILATE.shape[0] * scale) | 1
+        kernel = np.ones((k, k), np.uint8)
+    inside = cv2.dilate(inside, kernel).astype(bool)
+    crop = image[y1:y2, x1:x2].copy()
+    crop[~inside] = (crop[~inside] * CROP_BACKGROUND).astype(np.uint8)  # isolate the person
+    return crop
 
 
 def _lap(start: float) -> tuple[float, float]:
