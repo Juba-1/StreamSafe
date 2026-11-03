@@ -79,7 +79,7 @@ class Analyzer:
         rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         clock = time.perf_counter()
 
-        people, crops = self.detect(rgb, None if full is None else cv2.cvtColor(full, cv2.COLOR_BGR2RGB))
+        people, crops = self.detect(rgb, full, full_bgr=True)
         timings["detect"], clock = _lap(clock)
 
         st["eye_skipped"].append(self.tracker.motion_hints(people, cut, cfg.eye.eye_every))
@@ -126,18 +126,23 @@ class Analyzer:
             people=[(p.tid, p.box) for p in people],
         )
 
-    def detect(self, rgb: np.ndarray, full: np.ndarray | None = None) -> tuple[list[Person], list[np.ndarray]]:
+    def detect(self, rgb: np.ndarray, full: np.ndarray | None = None, full_bgr: bool = False) -> tuple[list[Person], list[np.ndarray]]:
         """People in an RGB analysis frame and their eye crops (background darkened, as in head training).
 
-        ``full``: the same frame at a higher resolution (RGB, same aspect); eye crops are then cut from it,
-        so small people reach the eye with real detail instead of upscaled analysis pixels."""
+        ``full``: the same frame at a higher resolution (same aspect; RGB, or BGR with ``full_bgr``); eye crops
+        are then cut from it, so small people reach the eye with real detail instead of upscaled analysis pixels.
+        A BGR frame is converted per crop, not as a whole."""
         people, crops = [], []
         for box, mask in self.models.detector(rgb):
             x1, y1, x2, y2 = box
             if x2 - x1 < MIN_W or y2 - y1 < self.cfg.detector.min_h or mask.sum() < MIN_MASK_PX:
                 continue
             people.append(Person(box=box, mask=mask))
-            crops.append(eye_crop(rgb, box, mask) if full is None else eye_crop(full, box, mask, full.shape[1] / rgb.shape[1]))
+            if full is None:
+                crops.append(eye_crop(rgb, box, mask))
+            else:
+                crop = eye_crop(full, box, mask, full.shape[1] / rgb.shape[1])
+                crops.append(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) if full_bgr else crop)
         return people, crops
 
     def _swim_prior(self, rgb: np.ndarray, cut: bool) -> float:
