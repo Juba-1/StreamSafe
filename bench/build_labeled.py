@@ -4,7 +4,8 @@ Rounds: ``old`` + ``newcrops`` (label.html, labeled by Ali), video rounds 1-2 an
 Claude; ``LABELS.json`` holds the original codes and the codes after Ali's review, per round and sheet). A crop is kept
 when either labeling makes it R/M/S, so recipes trained on the old and on the corrected labels see the same rows.
 
-usage: python bench/build_labeled.py OUT.npz LABELS.json DATA_DIR NEWCROPS_DIR ROUND1_DIR ROUND2_DIR ROUND3_DIR
+usage: HEAD_DIR=<heads> python -m bench.build_labeled OUT.npz LABELS.json DATA_DIR NEWCROPS_DIR ROUND1_DIR ROUND2_DIR ROUND3_DIR
+  HEAD_DIR      any head folder (the eye needs one to load; the heads are not used here)
   DATA_DIR      holds data/labels.csv + data/crops (streamsafe_data.tar)
   NEWCROPS_DIR  holds newcrops/labels_new.csv (+ crops)
   ROUNDk_DIR    holds the picks csv and <video>_unique.tar files of that round

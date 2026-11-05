@@ -10,7 +10,7 @@ Each photo goes through the engine's own detector and eye crop (full-resolution 
 Photos are never written out; only embeddings and a small audit sheet per class.
 
 usage: python bench/oi_photos.py OUT_DIR
-env:   N_R=1500 N_M=600 N_S=1600 WORKERS=32
+env:   HEAD_DIR=<any head dir, the eye needs one to load>  N_R=1500 N_M=600 N_S=1600 WORKERS=32
 Writes OUT_DIR/photos_emb.npz (X fp16, C, G='old' = training only, SRC='photo', TAG = rule), OUT_DIR/sheet_<C>.jpg.
 """
 
