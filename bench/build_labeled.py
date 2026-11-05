@@ -11,6 +11,8 @@ usage: HEAD_DIR=<heads> python -m bench.build_labeled OUT.npz LABELS.json DATA_D
   ROUNDk_DIR    holds the picks csv and <video>_unique.tar files of that round
 LABELS.json: {"old": {"1": "0:RRUS...;1:...", "2": ..., "3": ...}, "new": {...}}
 Writes X (fp16, unit norm), C_old, C_new ('-' = not R/M/S), G (game family; 'old' = training only), SRC.
+env AUG=K adds K recoloured copies of every revealing (R) crop (SRC 'aug', same family, training only): the clothes
+get new colours, skin and the dark background stay; an audit sheet OUT.aug.jpg shows a sample.
 """
 
 from __future__ import annotations
@@ -18,10 +20,12 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import sys
 import tarfile
 from pathlib import Path
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -29,6 +33,7 @@ from bench.train_heads import family
 from streamsafe.config import Config
 from streamsafe.models import build_models
 
+SOURCES = ("old", "newcrops", "video", "video2", "clubs", "aug")
 ROUNDS = {"1": ("picks.csv", "video"), "2": ("picks2.csv", "video2"), "3": ("picks3.csv", "clubs")}
 
 
@@ -37,6 +42,22 @@ def _ui_class(label: str) -> str:
     if label in ("swim_underwear", "exposed", "revealing"):
         return "R"
     return "M" if label in ("shirtless_male", "revealing_male") else "S"
+
+
+def recolor(rgb: np.ndarray, shift: int) -> np.ndarray:
+    """Clothes in a new colour: saturated non-skin pixels (not red / orange) get their hue rotated by ``shift`` (OpenCV hue units,
+    0-179); pale non-skin pixels (white / light grey clothes) are dyed that hue. Skin and the darkened background
+    stay as they are."""
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    ycc = cv2.cvtColor(rgb, cv2.COLOR_RGB2YCrCb)
+    skin = (ycc[..., 1] >= 133) & (ycc[..., 1] <= 173) & (ycc[..., 2] >= 77) & (ycc[..., 2] <= 127)
+    h, sat, val = hsv[..., 0].astype(np.int16), hsv[..., 1], hsv[..., 2]
+    skin_hue = (h <= 25) | (h >= 165)  # red / orange: lit skin looks like this, so those pixels are never moved
+    vivid = (sat >= 50) & (val >= 50) & ~skin & ~skin_hue
+    pale = (sat < 50) & (val >= 110) & ~skin & ~skin_hue
+    hsv[..., 0] = np.where(vivid, (h + shift) % 180, np.where(pale, shift % 180, h)).astype(np.uint8)
+    hsv[..., 1] = np.where(pale, np.maximum(sat, 110), sat).astype(np.uint8)
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
 
 def _rows(path: Path) -> list[dict[str, str]]:
@@ -82,7 +103,19 @@ def main(argv: list[str]) -> None:
                     j = int(Path(m.name).stem)
                     if j in wanted:
                         add(Image.open(io.BytesIO(tf.extractfile(m).read())), *wanted[j], family(video), src)
-    print("LABELED", len(rows), {s: sum(1 for r in rows if r[3] == s) for s in ("old", "newcrops", "video", "video2", "clubs")}, flush=True)
+    k_aug = int(os.environ.get("AUG", 0))
+    if k_aug:
+        sample = []
+        for i in [i for i, r in enumerate(rows) if r[1] == "R"]:
+            for j in range(k_aug):
+                images.append(recolor(images[i], 180 * (j + 1) // (k_aug + 1)))
+                rows.append(("R", "R", rows[i][2], "aug"))
+                if len(sample) < 48 and j == 0:
+                    sample.append(np.hstack([cv2.resize(images[i], (64, 128)), cv2.resize(images[-1], (64, 128))]))
+        sample += [np.zeros_like(sample[0])] * (-len(sample) % 8)
+        sheet = np.vstack([np.hstack(sample[i : i + 8]) for i in range(0, len(sample), 8)])
+        cv2.imwrite(f"{out}.aug.jpg", cv2.cvtColor(sheet, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
+    print("LABELED", len(rows), {s: sum(1 for r in rows if r[3] == s) for s in SOURCES}, flush=True)
     eye = build_models(Config.from_env(scene_prior=False)).eye
     emb = np.concatenate([eye.embed(images[i : i + 64]) for i in range(0, len(images), 64)])
     c_old, c_new, g, src = (np.array(col) for col in zip(*rows, strict=True))

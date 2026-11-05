@@ -1,17 +1,20 @@
 """Real photos for the eye: people in swimwear / underwear and people in clearly modest clothes, from Open Images.
 
 Open Images V7 (annotations CC BY 4.0, images listed as CC BY 2.0 - DOC-CLAIM) has boxes for Woman / Man and for
-clothing. A person box is labeled from the clothing boxes inside it:
-    woman + Swimwear or Brassiere                          -> R
-    man + Swimwear                                         -> M
-    woman / man + Suit, Coat, Jacket, Jeans or Trousers    -> S   (only when no swimwear / underwear / miniskirt / shorts)
+clothing. A person box is labeled from the clothing boxes inside it (groups, each with its own cap):
+    R   woman + Swimwear or Brassiere
+    M   man + Swimwear (no Brassiere in the photo)
+    SW  woman + a long Dress (down to the feet) or Suit / Coat / Jacket / Jeans / Trousers   -> class S
+    SM  man + Suit / Coat / Jacket / Jeans / Trousers                                       -> class S
+    (S only when no swimwear / underwear / miniskirt / shorts is on that person)
+A person overlapping someone of the other sex (IoU > 0.3) is skipped: the clothing box could be theirs.
 Images with a Girl or Boy box are skipped (no children), as are drawings (IsDepiction) and group boxes (IsGroupOf).
 Each photo goes through the engine's own detector and eye crop (full-resolution path), so the eye sees what it sees live.
 Photos are never written out; only embeddings and a small audit sheet per class.
 
 usage: python bench/oi_photos.py OUT_DIR
-env:   HEAD_DIR=<any head dir, the eye needs one to load>  N_R=1500 N_M=600 N_S=1600 WORKERS=32
-Writes OUT_DIR/photos_emb.npz (X fp16, C, G='old' = training only, SRC='photo', TAG = rule), OUT_DIR/sheet_<C>.jpg.
+env:   HEAD_DIR=<any head dir, the eye needs one to load>  N_R=1500 N_M=600 N_SW=1500 N_SM=500 WORKERS=32
+Writes OUT_DIR/photos_emb.npz (X fp16, C, G='old' = training only, SRC='photo', TAG = group:rule), OUT_DIR/sheet_<group>.jpg.
 """
 
 from __future__ import annotations
@@ -44,6 +47,11 @@ CHILDREN = ("Girl", "Boy")
 REVEALING = ("Swimwear", "Brassiere")
 AMBIGUOUS = ("Miniskirt", "Shorts")
 MODEST = ("Suit", "Coat", "Jacket", "Jeans", "Trousers")
+DRESS = "Dress"
+LONG_DRESS_BOTTOM = 0.12  # the dress ends within this share of the person height from their feet
+LONG_DRESS_SPAN = 0.55  # and covers at least this share of their height
+OTHER_SEX_IOU = 0.3
+GROUP_CLASS = {"R": "R", "M": "M", "SW": "S", "SM": "S"}
 INSIDE = 0.8  # share of a clothing box that must lie inside the person box
 MIN_BOX_H = 0.25  # person box height, share of the image height
 MATCH_IOU = 0.5
@@ -64,11 +72,44 @@ def _inside(c: np.ndarray, p: np.ndarray) -> bool:
     return area > 0 and w * h / area >= INSIDE
 
 
+def _box(row: pd.Series) -> np.ndarray:
+    return row[["XMin", "XMax", "YMin", "YMax"]].to_numpy(float)
+
+
+def _iou_frac(a: np.ndarray, b: np.ndarray) -> float:
+    w = max(0.0, min(a[1], b[1]) - max(a[0], b[0]))
+    h = max(0.0, min(a[3], b[3]) - max(a[2], b[2]))
+    union = (a[1] - a[0]) * (a[3] - a[2]) + (b[1] - b[0]) * (b[3] - b[2]) - w * h
+    return w * h / union if union > 0 else 0.0
+
+
+def _long_dress(d: np.ndarray, p: np.ndarray) -> bool:
+    ph = p[3] - p[2]
+    return d[3] >= p[3] - LONG_DRESS_BOTTOM * ph and d[3] - d[2] >= LONG_DRESS_SPAN * ph
+
+
+def _label(woman: bool, worn: dict[str, list[np.ndarray]], pb: np.ndarray, bra_in_photo: bool) -> tuple[str, str] | None:
+    """(group, rule) for one person, or None when the clothes do not decide it cleanly."""
+    revealing = sorted(set(worn) & set(REVEALING))
+    if revealing:
+        if woman:
+            return "R", "+".join(revealing)
+        return ("M", "Swimwear") if "Swimwear" in worn and not bra_in_photo else None
+    if set(worn) & set(AMBIGUOUS):
+        return None
+    modest = sorted(set(worn) & set(MODEST))
+    if woman and any(_long_dress(d, pb) for d in worn.get(DRESS, [])):
+        modest.append("LongDress")
+    if not modest:
+        return None
+    return ("SW" if woman else "SM"), "+".join(modest)
+
+
 def candidates(work: Path) -> list[tuple[str, str, str, tuple[float, float, float, float]]]:
-    """(image id, class R/M/S, rule tag, person box as XMin,XMax,YMin,YMax fractions)."""
+    """(image id, group R/M/SW/SM, rule tag, person box as XMin,XMax,YMin,YMax fractions)."""
     names = pd.read_csv(_download(CLASSES_URL, work / "classes.csv"), header=None, names=["mid", "name"])
     mid = {n: m for m, n in zip(names["mid"], names["name"], strict=True)}
-    wanted = {mid[n]: n for n in (*PEOPLE, *CHILDREN, *REVEALING, *AMBIGUOUS, *MODEST)}
+    wanted = {mid[n]: n for n in (*PEOPLE, *CHILDREN, *REVEALING, *AMBIGUOUS, *MODEST, DRESS) if n in mid}
     boxes = []
     cols = ["ImageID", "LabelName", "XMin", "XMax", "YMin", "YMax", "IsGroupOf", "IsDepiction"]
     for chunk in pd.read_csv(_download(BOXES_URL, work / "boxes.csv"), usecols=cols, chunksize=2_000_000):
@@ -80,7 +121,7 @@ def candidates(work: Path) -> list[tuple[str, str, str, tuple[float, float, floa
     df = df[~df["ImageID"].isin(kids | drawn) & (df["IsGroupOf"] == 0)]
     rng = random.Random(0)  # only a sample of images is worth the slow per-person matching below
     sample = set()
-    for names_ in (REVEALING, MODEST):
+    for names_ in (REVEALING, MODEST, (DRESS,)):
         ids = sorted(set(df.loc[df["name"].isin(names_), "ImageID"]))
         rng.shuffle(ids)
         sample.update(ids[:SAMPLE_IMAGES])
@@ -90,20 +131,21 @@ def candidates(work: Path) -> list[tuple[str, str, str, tuple[float, float, floa
         people = g[g["name"].isin(PEOPLE)]
         if people.empty:
             continue
-        clothes = g[~g["name"].isin(PEOPLE)]
-        for _, p in people.iterrows():
-            pb = p[["XMin", "XMax", "YMin", "YMax"]].to_numpy(float)
+        clothes = [(c["name"], _box(c)) for _, c in g[~g["name"].isin(PEOPLE)].iterrows()]
+        bra_in_photo = any(n == "Brassiere" for n, _ in clothes)
+        sexed = [(p["name"] == "Woman", _box(p)) for _, p in people.iterrows()]
+        for woman, pb in sexed:
             if pb[3] - pb[2] < MIN_BOX_H:
                 continue
-            worn = {c["name"] for _, c in clothes.iterrows() if _inside(c[["XMin", "XMax", "YMin", "YMax"]].to_numpy(float), pb)}
-            woman = p["name"] == "Woman"
-            if worn & set(REVEALING):
-                if woman:
-                    out.append((image_id, "R", "+".join(sorted(worn & set(REVEALING))), tuple(pb)))
-                elif "Swimwear" in worn:
-                    out.append((image_id, "M", "Swimwear", tuple(pb)))
-            elif worn & set(MODEST) and not worn & set(AMBIGUOUS):
-                out.append((image_id, "S", ("w:" if woman else "m:") + "+".join(sorted(worn & set(MODEST))), tuple(pb)))
+            if any(w != woman and _iou_frac(pb, ob) > OTHER_SEX_IOU for w, ob in sexed):
+                continue
+            worn: dict[str, list[np.ndarray]] = defaultdict(list)
+            for n, cb in clothes:
+                if _inside(cb, pb):
+                    worn[n].append(cb)
+            label = _label(woman, worn, pb, bra_in_photo)
+            if label is not None:
+                out.append((image_id, label[0], label[1], tuple(pb)))
     return out
 
 
@@ -139,7 +181,8 @@ def _iou(a: tuple, b: tuple) -> float:
 def main(argv: list[str]) -> None:
     out = Path(argv[0])
     out.mkdir(parents=True, exist_ok=True)
-    caps = {"R": int(os.environ.get("N_R", 1500)), "M": int(os.environ.get("N_M", 600)), "S": int(os.environ.get("N_S", 1600))}
+    defaults = {"R": 1500, "M": 600, "SW": 1500, "SM": 500}
+    caps = {k: int(os.environ.get(f"N_{k}", v)) for k, v in defaults.items()}
     cands = candidates(out)
     by: dict[str, list] = defaultdict(list)
     for c in cands:
@@ -170,7 +213,7 @@ def _add(analyzer: Analyzer, item: tuple, rgb: np.ndarray | None, xs: list, rows
     """Find the annotated person among the engine's detections and embed the engine's own eye crop."""
     if rgb is None:
         return
-    image_id, cls, tag, pb = item
+    image_id, group, tag, pb = item
     small, full, s, (ox, oy) = _frames(rgb)
     h, w = rgb.shape[:2]
     want = (ox + pb[0] * w * s, oy + pb[2] * h * s, ox + pb[1] * w * s, oy + pb[3] * h * s)
@@ -181,9 +224,9 @@ def _add(analyzer: Analyzer, item: tuple, rgb: np.ndarray | None, xs: list, rows
     if _iou(want, people[j].box) < MATCH_IOU:
         return
     xs.append(analyzer.models.eye.embed([crops[j]])[0])
-    rows.append((cls, tag, image_id))
-    if len(sheet[cls]) < 48:
-        sheet[cls].append(cv2.resize(crops[j], (96, 192), interpolation=cv2.INTER_AREA))
+    rows.append((GROUP_CLASS[group], f"{group}:{tag}", image_id))
+    if len(sheet[group]) < 48:
+        sheet[group].append(cv2.resize(crops[j], (96, 192), interpolation=cv2.INTER_AREA))
 
 
 def _save(out: Path, xs: list, rows: list, sheet: dict, n_picked: int) -> None:

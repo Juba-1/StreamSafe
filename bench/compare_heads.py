@@ -1,19 +1,23 @@
-"""Run 37: retrain the risk heads after Ali's review of the old rounds, with and without real photos.
+"""Compare head-training recipes on the same labeled crops and write the heads of each.
 
-Recipes (all: gated heads, logistic regression C=2 balanced, threshold = 85% women recall in leave-one-game-family-out):
-    old_labels       the earlier rounds as Claude labeled them (+ Ali's hard round)       = today's recipe
-    ali_labels       the same crops after Ali's review
-    ali+photos       + Open Images photos (training only, never in a test fold)
-    ali+photos_half  photos at half weight
-Every recipe is SCORED with Ali's labels, so the numbers compare directly. Photos never enter a test fold.
+Recipes (all: gated heads, logistic regression C=2 balanced, threshold = 85% women recall in leave-one-game-family-out),
+chosen with RECIPES=name,name (default: all):
+    old_labels    the earlier rounds as Claude labeled them (+ Ali's hard round)
+    ali           the same crops after Ali's review
+    ali_aug       + recoloured copies of the revealing crops (SRC 'aug', from build_labeled AUG=K)
+    ali_photos    + Open Images photos at half weight
+    ali_aug_photos  both
+Every recipe is SCORED with Ali's labels on real (not recoloured) game crops, so the numbers compare directly.
+Recoloured copies of a game family are left out of training while that family is tested; photos never enter a test fold.
 
-usage: python bench/retrain37.py OUT_DIR LABELED.npz PHOTOS.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
-Writes OUT_DIR/<recipe>/{fast_h6,male_h6,thr_h6}.txt and OUT_DIR/report37.json; prints "R37 <json>".
+usage: python -m bench.compare_heads OUT_DIR LABELED.npz PHOTOS.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
+Writes OUT_DIR/<recipe>/{fast_h6,male_h6,thr_h6}.txt and OUT_DIR/compare.json; prints "R37 <json>".
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -48,13 +52,17 @@ def main(argv: list[str]) -> None:
     c_old = np.concatenate([lab["C_old"], tr["cls"]])
     c_new = np.concatenate([lab["C_new"], tr["cls"]])
     px, pc = photos["X"].astype(np.float32), photos["C"]
-    recipes = {
-        "old_labels": (c_old, 0.0),
-        "ali_labels": (c_new, 0.0),
-        "ali+photos": (c_new, 1.0),
-        "ali+photos_half": (c_new, 0.5),
+    all_recipes = {  # name: (labels, use recoloured copies, photo weight)
+        "old_labels": (c_old, False, 0.0),
+        "ali": (c_new, False, 0.0),
+        "ali_aug": (c_new, True, 0.0),
+        "ali_photos": (c_new, False, 0.5),
+        "ali_aug_photos": (c_new, True, 0.5),
     }
-    scored = c_new != "-"  # every recipe is judged on Ali's labels
+    wanted = os.environ.get("RECIPES")
+    recipes = {k: v for k, v in all_recipes.items() if not wanted or k in wanted.split(",")}
+    aug = src == "aug"
+    scored = (c_new != "-") & ~aug  # every recipe is judged on Ali's labels, real crops only
     rep: dict = {
         "counts_old": {c: int((c_old == c).sum()) for c in "RMS"},
         "counts_new": {c: int((c_new == c).sum()) for c in "RMS"},
@@ -62,8 +70,8 @@ def main(argv: list[str]) -> None:
     }
     old_heads = RiskHeads.load(argv[5])
     rep["test_old_heads"] = score_test(old_heads.prisk(te["x"]), old_heads.thr, te["cls"], te["small"])
-    for name, (cls, pw) in recipes.items():
-        use = cls != "-"
+    for name, (cls, with_aug, pw) in recipes.items():
+        use = (cls != "-") & (with_aug | ~aug)
         p = np.full(len(cls), np.nan)
         for g in sorted(set(fam[scored]) - {"old"}):
             test = (fam == g) & scored
@@ -90,9 +98,9 @@ def main(argv: list[str]) -> None:
             pp = new.prisk(px) >= new.thr
             r["photos_covered"] = {c: round(float(pp[pc == c].mean()), 4) for c in "RMS" if (pc == c).any()}
         rep[name] = r
-        print("R37", name, json.dumps(r), flush=True)
-    (out / "report37.json").write_text(json.dumps(rep, indent=1))
-    print("R37_REPORT " + json.dumps(rep), flush=True)
+        print("HEADS_CMP", name, json.dumps(r), flush=True)
+    (out / "compare.json").write_text(json.dumps(rep, indent=1))
+    print("HEADS_CMP_REPORT " + json.dumps(rep), flush=True)
 
 
 if __name__ == "__main__":
