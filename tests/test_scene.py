@@ -117,3 +117,24 @@ def test_hud_thread_reads_in_background_and_counts_errors():
     while not hud.idle() and time.monotonic() - t0 < 2:
         time.sleep(0.01)
     assert hud.results() == [(3, 0.2, "")] and hud.errors == 1
+
+
+def test_body_close_up_gets_the_card(tmp_path, stub_run):
+    """A risky person filling ~45% of the frame (frames 30-59) is hidden whole-screen, not with a giant garment."""
+    import cv2
+
+    from tests.stubs import RED
+
+    path = str(tmp_path / "close.mp4")
+    writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), 30, (1920, 1080))
+    for f in range(120):
+        im = np.full((1080, 1920, 3), (90, 120, 140), np.uint8)
+        axes = (700, 560) if 30 <= f < 60 else (70, 230)
+        cv2.ellipse(im, (960, 540), axes, 0, 0, 360, RED, -1)
+        writer.write(im)
+    writer.release()
+    report, sink = stub_run(path, "offline", close_hold_s=0.3)
+    card = [v for v, o in enumerate(sink.frames) if is_card(o)]
+    assert set(range(30, 60)) <= set(card), "the close-up is hidden"
+    assert min(card) >= 30 - 15, "starts at most scene_back_s (0.5 s) before the first close decision"
+    assert max(card) <= 60 + 9 + 3, "released after the close hold (0.3 s); the small person gets a garment only"

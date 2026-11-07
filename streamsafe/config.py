@@ -46,6 +46,8 @@ class SceneConfig:
     scene_hold_s: float = 3.0  # cover stays this long after the last trigger
     scene_every_s: float = 0.5  # scene model period (and on every cut)
     scene_back_s: float = 0.5  # frames this far before a triggering decision are covered too (not shown yet)
+    close_area: float = 0.35  # covered people filling this share of the frame -> whole-screen card (close-ups)
+    close_hold_s: float = 1.0
     hud_ocr: bool = False  # read the game's on-screen prompts (needs rapidocr_onnxruntime)
     hud_every_s: float = 0.5
     hud_hold_s: float = 4.0

@@ -115,6 +115,11 @@ class Analyzer:
         timings["track"], clock = _lap(clock)
 
         risky = [p for p in people if p.risky]
+        risky_px = sum(int(p.mask.sum()) for p in risky)
+        if cfg.scene.close_area < 1 and risky_px >= cfg.scene.close_area * im.shape[0] * im.shape[1]:
+            self.latch.mark_close(t)  # a body close-up: the whole frame is hidden instead of one huge garment
+            st["close_cards"].append(1)
+            return Decision(frame_id=frame_id, ok=True, scene=True, n_people=len(people), n_risky=len(risky))
         plan = [(p, choose_mode(p.height, self.tracker.tracks[p.tid].garment, cfg.garment.small_h)) for p in risky]
         dressed = [p for p, mode in plan if mode == "full"]
         poses = dict(zip(map(id, dressed), self.models.pose(rgb, [p.box for p in dressed]), strict=True)) if dressed else {}
@@ -185,7 +190,7 @@ class Analyzer:
             if (cut or t - self._hud_at >= cfg.scene.hud_every_s) and self.hud.submit(frame_id, t, bgr):
                 self._hud_at = t
             self.stats["hud_errors"] = [self.hud.errors]
-        if not cfg.scene.scene_guard and self.hud is None:
+        if not cfg.scene.scene_guard and self.hud is None and cfg.scene.close_area >= 1:
             return False, None
         was_on = self.latch.on
         on = self.latch.update(t, p_explicit, max((ft for _, ft in hits), default=None))
