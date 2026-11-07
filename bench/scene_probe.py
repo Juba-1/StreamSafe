@@ -2,7 +2,8 @@
 
 For every clip, frames at FPS (default 2): explicit / beach probabilities and the best prompt; with HUD=1
 also the OCR text and keyword. Writes OUT/scene_probe.csv, per-clip summaries, and contact sheets of the
-highest-scoring frames of every clip (OUT/sheets/<clip>.jpg, 320x180 thumbs with p) for visual review.
+highest-scoring frames of every clip (OUT/sheets/<clip>.jpg, 320x180 thumbs with p) for visual review,
+and OUT/scene_emb.npz (clip, t, emb fp16) so a scene head can be trained on labeled frames later.
 
 usage: python -m bench.scene_probe OUT_DIR VIDEO [VIDEO ...]      env: FPS=2 SECS=600 HUD=0 TOP=24
 Prints "SCENE_CLIP <json>" per clip and "SCENE_TIMING <json>".
@@ -53,6 +54,7 @@ def main(argv: list[str]) -> None:
         hud = RapidHud()
     scene = SigLIPScene()
     t_scene, t_hud = [], []
+    all_emb, all_key = [], []
     with open(out / "scene_probe.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["clip", "t", "p_explicit", "p_swim", "best_prompt", "hud_text", "hud_hit"])
@@ -63,7 +65,9 @@ def main(argv: list[str]) -> None:
             for k, frame in enumerate(src.frames()):
                 rgb = cv2.cvtColor(cv2.resize(frame, (960, 540), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
                 s = time.perf_counter()
-                p = scene.probs(rgb)
+                emb, p = scene.embed_probs(rgb)
+                all_emb.append(emb.astype(np.float16))
+                all_key.append((name, round(k / fps, 2)))
                 t_scene.append(1000 * (time.perf_counter() - s))
                 p_e = float(p[len(SWIM_PROMPTS) : len(SWIM_PROMPTS) + len(EXPLICIT_PROMPTS)].sum())
                 text = hit = ""
@@ -92,6 +96,9 @@ def main(argv: list[str]) -> None:
             print("SCENE_CLIP " + json.dumps(rep), flush=True)
             rows.sort(key=lambda r: -r[0])
             sheet(rows[:top], out / "sheets" / f"{name}.jpg")
+    if all_emb:
+        clips, times = zip(*all_key, strict=True)
+        np.savez_compressed(out / "scene_emb.npz", clip=np.array(clips), t=np.array(times), emb=np.stack(all_emb))
     timing = dict(scene_ms_p50=round(float(np.median(t_scene)), 2), scene_ms_p95=round(float(np.percentile(t_scene, 95)), 2))
     if t_hud:
         timing |= dict(hud_ms_p50=round(float(np.median(t_hud)), 2), hud_ms_p95=round(float(np.percentile(t_hud, 95)), 2))

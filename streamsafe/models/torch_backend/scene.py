@@ -2,7 +2,9 @@
   * beach / pool probability (the eye's threshold prior),
   * explicit-scene probability (the scene layer's whole-screen cover, ``analysis/scene.py``).
 Probabilities = softmax over all prompts, summed per group. The OTHER group holds look-alikes that must
-NOT count as explicit (night clubs, bars, beaches are handled per person by the garments)."""
+NOT count as explicit (night clubs, bars, beaches are handled per person by the garments).
+With a trained head (``scene_h.txt`` next to the eye heads: a linear head on the same normalised image
+embedding, trained on labeled game frames) the explicit probability comes from the head instead."""
 
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+from streamsafe.models.heads import LinearHead
 from streamsafe.models.torch_backend.device import DEVICE, HALF
 
 SWIM_PROMPTS = [
@@ -39,7 +42,7 @@ OTHER_PROMPTS = [
 
 
 class SigLIPScene:
-    def __init__(self, repo: str = "google/siglip2-base-patch16-224") -> None:
+    def __init__(self, repo: str = "google/siglip2-base-patch16-224", head: LinearHead | None = None) -> None:
         from transformers import AutoModel, AutoProcessor
 
         self.model = AutoModel.from_pretrained(repo, torch_dtype=HALF).to(DEVICE).eval()
@@ -52,16 +55,18 @@ class SigLIPScene:
             self.text = torch.nn.functional.normalize(t.float(), dim=-1)
         n_s, n_e = len(SWIM_PROMPTS), len(EXPLICIT_PROMPTS)
         self._swim, self._explicit = slice(0, n_s), slice(n_s, n_s + n_e)
+        self.head = head
 
-    def probs(self, rgb: np.ndarray) -> np.ndarray:
-        """Softmax over every prompt (bench tools read the per-prompt values)."""
+    def embed_probs(self, rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """(normalised image embedding, softmax over every prompt) - bench tools read both."""
         pixels = self.processor(images=[Image.fromarray(rgb)], return_tensors="pt")["pixel_values"].to(DEVICE, HALF)
         with torch.inference_mode():
             v = self.model.vision_model(pixel_values=pixels).pooler_output.float()
             v = torch.nn.functional.normalize(v, dim=-1)
             logits = v @ self.text.T * self.model.logit_scale.exp().float() + self.model.logit_bias.float()
-            return torch.softmax(logits, -1)[0].cpu().numpy()
+            return v[0].cpu().numpy(), torch.softmax(logits, -1)[0].cpu().numpy()
 
     def __call__(self, rgb: np.ndarray) -> tuple[float, float]:
-        p = self.probs(rgb)
-        return float(p[self._swim].sum()), float(p[self._explicit].sum())
+        emb, p = self.embed_probs(rgb)
+        explicit = float(self.head(emb)) if self.head is not None else float(p[self._explicit].sum())
+        return float(p[self._swim].sum()), explicit

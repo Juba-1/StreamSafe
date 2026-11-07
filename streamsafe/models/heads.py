@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 
 FAST_FILE, MALE_FILE, THR_FILE = "fast_h6.txt", "male_h6.txt", "thr_h6.txt"
+SCENE_FILE = "scene_h.txt"  # optional: explicit-scene head on the scene model's image embedding
 
 
 def _sigmoid(z: np.ndarray) -> np.ndarray:
