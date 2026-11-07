@@ -133,7 +133,7 @@ def test_body_close_up_gets_the_card(tmp_path, stub_run):
         cv2.ellipse(im, (960, 540), axes, 0, 0, 360, RED, -1)
         writer.write(im)
     writer.release()
-    report, sink = stub_run(path, "offline", close_hold_s=0.3)
+    _, sink = stub_run(path, "offline", close_hold_s=0.3)
     card = [v for v, o in enumerate(sink.frames) if is_card(o)]
     assert set(range(30, 60)) <= set(card), "the close-up is hidden"
     assert min(card) >= 30 - 15, "starts at most scene_back_s (0.5 s) before the first close decision"

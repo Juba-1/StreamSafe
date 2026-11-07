@@ -29,8 +29,11 @@ class RapidHud:
         from rapidocr_onnxruntime import RapidOCR
 
         self.ocr = RapidOCR(**OCR_ARGS)
-        _limit_threads(self.ocr.text_detector.infer)
-        _limit_threads(self.ocr.text_recognizer.session)
+        holders = _session_holders(self.ocr)
+        if not holders:
+            raise RuntimeError("RapidOCR internals changed: no ONNX sessions found (pin rapidocr_onnxruntime==1.2.3)")
+        for holder in holders:
+            _limit_threads(holder)
 
     def __call__(self, bgr: np.ndarray) -> str:
         h, w = bgr.shape[:2]
@@ -43,6 +46,21 @@ class RapidHud:
             res, _ = self.ocr(cv2.copyMakeBorder(roi, *PAD, cv2.BORDER_CONSTANT, value=(0, 0, 0)))
             words += [r[1] for r in res or []]
         return " ".join(words)
+
+
+def _session_holders(obj, depth: int = 0, seen: set | None = None) -> list:
+    """Objects inside RapidOCR whose ``.session`` is an ONNX Runtime session (found by walking attributes,
+    so a renamed attribute in another RapidOCR release does not break it)."""
+    import onnxruntime as ort
+
+    seen = set() if seen is None else seen
+    if depth > 3 or id(obj) in seen or not hasattr(obj, "__dict__"):
+        return []
+    seen.add(id(obj))
+    found = [obj] if isinstance(getattr(obj, "session", None), ort.InferenceSession) else []
+    for value in vars(obj).values():
+        found += _session_holders(value, depth + 1, seen)
+    return found
 
 
 def _limit_threads(holder) -> None:  # RapidOCR internals: its OrtInferSession wrapper (`.session` = ORT session)
