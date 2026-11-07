@@ -14,13 +14,17 @@ import numpy as np
 REGIONS = ((0.0, 0.22, 0.0, 0.42), (0.84, 0.97, 0.2, 0.8))
 READ_W = 1280  # regions are cut from the frame resized to this width (text stays readable, cost bounded)
 PAD = (60, 60, 40, 40)
+# RapidOCR's default text detector upscales the SHORT side to 736 px (a 260 px tall region becomes 2264 x 736)
+# and runs an angle classifier: 0.45 s per region on 2 CPU cores. Capping the LONG side at 640 and dropping
+# the angle step (HUD text is never upside down) reads the same words in 0.1 s (TESTED, 7 Nov 2026).
+OCR_ARGS = dict(det_limit_side_len=640, det_limit_type="max", det_model_path=None, use_angle_cls=False)
 
 
 class RapidHud:
     def __init__(self) -> None:
         from rapidocr_onnxruntime import RapidOCR
 
-        self.ocr = RapidOCR()
+        self.ocr = RapidOCR(**OCR_ARGS)
 
     def __call__(self, bgr: np.ndarray) -> str:
         h, w = bgr.shape[:2]
