@@ -39,7 +39,7 @@ ROUNDS = {"1": ("picks.csv", "video"), "2": ("picks2.csv", "video2"), "3": ("pic
 
 def _ui_class(label: str) -> str:
     """label.html classes -> R/M/S (not_person counts as safe, as in every earlier head)."""
-    if label in ("swim_underwear", "exposed", "revealing"):
+    if label in ("swim_underwear", "exposed", "revealing", "pose_suggestive"):
         return "R"
     return "M" if label in ("shirtless_male", "revealing_male") else "S"
 
