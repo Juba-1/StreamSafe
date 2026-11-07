@@ -18,6 +18,10 @@ PAD = (60, 60, 40, 40)
 # and runs an angle classifier: 0.45 s per region on 2 CPU cores. Capping the LONG side at 640 and dropping
 # the angle step (HUD text is never upside down) reads the same words in 0.1 s (TESTED, 7 Nov 2026).
 OCR_ARGS = dict(det_limit_side_len=640, det_limit_type="max", det_model_path=None, use_angle_cls=False)
+# RapidOCR builds its ONNX sessions with default options: one busy-spinning thread per CPU core. On the pod
+# that starved the renderer (run 41: 98% late frames while OCR ran). The HUD reader gets OCR_THREADS
+# threads that sleep when idle; it is a background signal, the picture must never wait for it.
+OCR_THREADS = 2
 
 
 class RapidHud:
@@ -25,6 +29,8 @@ class RapidHud:
         from rapidocr_onnxruntime import RapidOCR
 
         self.ocr = RapidOCR(**OCR_ARGS)
+        _limit_threads(self.ocr.text_detector.infer)
+        _limit_threads(self.ocr.text_recognizer.session)
 
     def __call__(self, bgr: np.ndarray) -> str:
         h, w = bgr.shape[:2]
@@ -37,3 +43,17 @@ class RapidHud:
             res, _ = self.ocr(cv2.copyMakeBorder(roi, *PAD, cv2.BORDER_CONSTANT, value=(0, 0, 0)))
             words += [r[1] for r in res or []]
         return " ".join(words)
+
+
+def _limit_threads(holder) -> None:  # RapidOCR internals: its OrtInferSession wrapper (`.session` = ORT session)
+    """Rebuild the holder's ONNX Runtime session with few, non-spinning threads (same model, same provider)."""
+    import onnxruntime as ort
+
+    old = holder.session
+    opt = ort.SessionOptions()
+    opt.log_severity_level = 4
+    opt.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    opt.intra_op_num_threads = OCR_THREADS
+    opt.inter_op_num_threads = 1
+    opt.add_session_config_entry("session.intra_op.allow_spinning", "0")
+    holder.session = ort.InferenceSession(old._model_path, sess_options=opt, providers=["CPUExecutionProvider"])
