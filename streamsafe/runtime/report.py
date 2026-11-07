@@ -8,7 +8,8 @@ from typing import Any
 
 import numpy as np
 
-FRAME_LISTS = ("failclosed_frames", "held_frames", "scene_frames", "muted_frames")  # kept as frame-id lists, not summarised
+# kept as frame-id lists, not summarised
+FRAME_LISTS = ("failclosed_frames", "held_frames", "scene_frames", "muted_frames", "dropped_frames")
 MAX_LISTED = 200
 
 

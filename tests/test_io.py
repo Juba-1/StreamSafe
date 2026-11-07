@@ -72,7 +72,9 @@ def test_srt_input_realtime_pipeline(tmp_path):
         source.close()
         sink.close()
     s = report["summary"]
-    assert s["frames_out"] >= 80
+    assert s["frames_in"] >= 80
+    assert s["frames_out"] + s["dropped_frames"] == s["frames_in"]
+    assert s["frames_out"] >= 60  # a 2-core CI box may drop a few late frames (never shows them late)
     assert s["analyzer_errors"] == 0
     assert s["decisions"] > 3  # 2-core CI box shared with two ffmpeg encoders
     n_written = sum(1 for _ in FFmpegSource(out, (1920, 1080), 30.0).frames())

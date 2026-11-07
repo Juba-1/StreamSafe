@@ -55,13 +55,27 @@ def gpu_mb() -> float:
         return -1.0
 
 
-def tree_rss_mb(proc: psutil.Process) -> float:
-    total = 0
+def tree_rss_mb(proc: psutil.Process) -> tuple[float, dict[str, int]]:
+    """RSS of the engine and all its child processes, total and per process kind."""
+    total, parts = 0, {}
     with contextlib.suppress(psutil.Error):
-        for p in [proc, *proc.children(recursive=True)]:
+        for i, p in enumerate([proc, *proc.children(recursive=True)]):
             with contextlib.suppress(psutil.Error):
-                total += p.memory_info().rss
-    return total / 2**20
+                rss = p.memory_info().rss
+                total += rss
+                name = "engine" if i == 0 else ("ffmpeg" if "ffmpeg" in p.name() else "worker")
+                parts[name] = parts.get(name, 0) + round(rss / 2**20)
+    return total / 2**20, parts
+
+
+def live_lines(log: Path) -> list[dict]:
+    """The engine's ``LIVE {...}`` progress lines (LIVE_LOG_S)."""
+    out = []
+    for line in log.read_text(errors="replace").splitlines():
+        if line.startswith("LIVE "):
+            with contextlib.suppress(ValueError):
+                out.append(json.loads(line[5:]))
+    return out
 
 
 class HeartbeatWatch(threading.Thread):
@@ -99,7 +113,7 @@ def main(argv: list[str]) -> None:
     assert ff, "ffmpeg must be on PATH"
     src = playlist(out, clips, ff)
     state = out / "state.txt"
-    env = dict(os.environ, OBS_STATE=str(state))
+    env = dict(os.environ, OBS_STATE=str(state), LIVE_LOG_S="10")
     log = open(out / "engine.log", "w")  # noqa: SIM115 - open for the engine's whole life
     engine = subprocess.Popen(
         [sys.executable, "-m", "streamsafe", "--input", f"{IN_URL}?fifo_size=1000000&overrun_nonfatal=1",
@@ -114,12 +128,14 @@ def main(argv: list[str]) -> None:
     )  # fmt: skip
     watch = HeartbeatWatch(state)
     watch.start()
-    series, t0 = [], time.monotonic()
+    series, parts, t0 = [], [], time.monotonic()
     while sender.poll() is None and engine.poll() is None:
         time.sleep(SAMPLE_S)
-        series.append([round(time.monotonic() - t0), round(tree_rss_mb(eng)), gpu_mb()])
+        rss, by_proc = tree_rss_mb(eng)
+        series.append([round(time.monotonic() - t0), round(rss), gpu_mb()])
+        parts.append(by_proc)
         if len(series) % 30 == 0:
-            print("SOAK_TICK", json.dumps(series[-1]), flush=True)
+            print("SOAK_TICK", json.dumps(series[-1] + [by_proc]), flush=True)
     sender.wait()
     try:
         engine.wait(timeout=120)  # input ended -> the engine finishes and writes its stats
@@ -140,6 +156,8 @@ def main(argv: list[str]) -> None:
         heartbeat_max_gap_ms=round(watch.max_gap_ms),
         heartbeat_stale_events=watch.stale_events,
         heartbeat_reads=watch.reads,
+        rss_by_process_last=parts[-1] if parts else {},
+        rss_by_process_max={k: max(p.get(k, 0) for p in parts) for k in (parts[-1] if parts else {})},
         series=series,
     )
     stats = out / "stats.json"
@@ -147,8 +165,14 @@ def main(argv: list[str]) -> None:
         s = json.loads(stats.read_text())
         late_frames = s.get("late_frames", {})
         report["engine"] = s["summary"] | {"late_share": late_frames.get("mean"), "render_ms_p95": s.get("render_ms", {}).get("p95")}
+    live = live_lines(out / "engine.log")
+    if live:
+        report["live_late_ms_max"] = max(x["late_ms_max"] for x in live)
+        report["live_waiting_max"] = max(x["waiting_max"] for x in live)
+        report["live_dropped"] = live[-1]["dropped"]
+        report["live"] = live
     (out / "soak.json").write_text(json.dumps(report, indent=1))
-    print("SOAK " + json.dumps({k: v for k, v in report.items() if k != "series"}), flush=True)
+    print("SOAK " + json.dumps({k: v for k, v in report.items() if k not in ("series", "live")}), flush=True)
 
 
 if __name__ == "__main__":

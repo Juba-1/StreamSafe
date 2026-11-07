@@ -82,6 +82,10 @@ class RuntimeConfig:
     delay: float = 2.0  # stream delay in seconds: frame f is shown at capture_time(f) + delay
     fps: float = 30.0  # output frame rate
     secs: float = 1e9  # stop after this many seconds (file inputs)
+    # a frame more than this past its due time is dropped instead of shown, so a slow output (encoder,
+    # busy CPU) never makes the stream delay - and the frames waiting in memory - grow without limit
+    max_late_s: float = 0.5
+    live_log_s: float = 0.0  # > 0: print a "LIVE {...}" progress line this often (soak tests, support logs)
 
 
 @dataclass

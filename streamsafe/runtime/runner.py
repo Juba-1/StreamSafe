@@ -11,6 +11,7 @@ Both modes share the analyzer, the output gate and the reporting.
 from __future__ import annotations
 
 import collections
+import json
 import threading
 import time
 from collections.abc import Callable
@@ -35,6 +36,23 @@ LATE_MS = 33.0  # a frame shown later than this after its due time counts as lat
 KEEP_DECISIONS = 60  # frames of decision history kept behind the output position
 
 AnalyzerFactory = Callable[[Config, float], Analyzer]
+
+
+class LiveLog:
+    """Prints ``LIVE {...}`` every ``every_s`` seconds (0 = off): output position, worst lateness and
+    the frames waiting in memory since the last line, frames dropped so far."""
+
+    def __init__(self, every_s: float) -> None:
+        self.every_s, self._next, self._worst, self._waiting = every_s, time.perf_counter() + every_s, 0.0, 0
+
+    def tick(self, frame_id: int, late_ms: float, waiting: int, dropped: int) -> None:
+        if self.every_s <= 0:
+            return
+        self._worst, self._waiting = max(self._worst, late_ms), max(self._waiting, waiting)
+        if time.perf_counter() >= self._next:
+            line = dict(frame=frame_id, late_ms_max=round(self._worst, 1), waiting_max=self._waiting, dropped=dropped)
+            print("LIVE " + json.dumps(line), flush=True)
+            self._next, self._worst, self._waiting = self._next + self.every_s, 0.0, 0
 
 
 def default_analyzer(cfg: Config, output_scale: float) -> Analyzer:
@@ -111,11 +129,14 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     worker.start()
     gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps)
     frames: dict[int, tuple[float, Any]] = {}  # frame id -> (capture time, frame)
+    cap = int((rt.delay + rt.max_late_s + 1.0) * rt.fps)  # frames held at most, even if the output stalls
+    n_captured = 0  # frame ids below this have been captured (a missing one was dropped)
     lock = threading.Lock()
     capture_done = threading.Event()
     stats: dict[str, list] = collections.defaultdict(list)
 
     def capture() -> None:
+        nonlocal n_captured
         cuts = CutDetector()
         t0 = time.perf_counter() + 0.5
         try:
@@ -131,6 +152,9 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                 worker.submit(fid, frame if full_res else _to_analysis(frame), cut)
                 with lock:
                     frames[fid] = (captured, frame)
+                    n_captured = fid + 1
+                    if len(frames) > cap:  # output stalled: forget the oldest, keep memory bounded
+                        del frames[min(frames)]
         except Exception as exc:  # a broken input ends the run; frames already captured are still shown
             stats["source_errors"].append(f"{exc!r:.300}")
         finally:
@@ -145,11 +169,17 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     receiver.start()
 
     obs = ObsStateWriter(cfg.output.obs_state) if cfg.output.obs_state else None
-    v = 0
+    live = LiveLog(rt.live_log_s)
+    v = shown = 0
     try:
         while True:
             with lock:
                 item = frames.pop(v, None)
+                waiting, gone = len(frames), v < n_captured
+            if item is None and gone:  # dropped while waiting (output stalled)
+                stats["dropped_frames"].append(v)
+                v += 1
+                continue
             if item is None:
                 if capture_done.is_set():
                     with lock:
@@ -160,6 +190,11 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                 continue
             captured, frame = item
             due = captured + rt.delay
+            if time.perf_counter() - due > rt.max_late_s:
+                stats["dropped_frames"].append(v)  # never shown: skipping it costs a stutter, never safety
+                gate.forget_before(v - KEEP_DECISIONS)
+                v += 1
+                continue
             while time.perf_counter() < due:
                 time.sleep(0.0005)
             out = gate.render(v, frame)
@@ -171,7 +206,9 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
             stats["emit_lateness_ms"].append(late)
             stats["late_frames"].append(int(late > LATE_MS))
             gate.forget_before(v - KEEP_DECISIONS)
+            live.tick(v, late, waiting, len(stats["dropped_frames"]))
             v += 1
+            shown += 1
     finally:
         if obs is not None:
             obs.close()
@@ -184,6 +221,7 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     stats.update(gate.stats)
     gpu = worker.stats.pop("device", ["?"])[0]
     n_dec = len(worker.stats.get("ms_total", []))
-    report = summarize(stats, worker.stats, v, n_dec, rt.fps, dict(mode="realtime", gpu=gpu, delay_s=rt.delay))
+    extra = dict(mode="realtime", gpu=gpu, delay_s=rt.delay, frames_in=v, dropped_frames=v - shown)
+    report = summarize(stats, worker.stats, shown, n_dec, rt.fps, extra)
     write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, worker.diag, gate.log)
     return report
