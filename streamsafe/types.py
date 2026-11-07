@@ -78,5 +78,6 @@ class Decision:
     n_risky: int = 0
     people: list[tuple[int, Box]] = field(default_factory=list)  # (track id, box) of everyone seen
     scene: bool = False  # whole-screen cover (explicit scene, see analysis/scene.py); layers are then empty
+    scene_from: int | None = None  # earliest frame the scene evidence came from (a HUD read finishes later)
     backfilled: int = 0  # garments added later by look-ahead
     refs: dict[int, MotionRef] = field(default_factory=dict)  # look-ahead only: motion reference per track id

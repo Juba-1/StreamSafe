@@ -35,7 +35,7 @@ def test_latch_hysteresis_and_hold():
     assert latch.update(2.0, 0.1, None), "low reading, but the last trigger (1.0) is within the hold"
     assert not latch.update(2.1, 0.1, None)
     assert not latch.update(2.2, 0.4, None), "off: 0.4 is below the enter level"
-    assert latch.update(3.0, None, "endthedance")
+    assert latch.update(3.0, None, 3.0), "HUD hit"
     assert latch.update(4.9, 0.0, None) and not latch.update(5.1, 0.0, None), "HUD hold 2 s"
 
 
@@ -79,3 +79,41 @@ def test_obs_state_file(tmp_path):
     assert path.read_text() == "1 7 1 1\n", "a change is written at once"
     w.close()
     assert path.read_text().startswith("0 "), "a clean stop tells OBS to fail closed"
+
+
+def test_late_hud_evidence_covers_back_to_its_own_frame():
+    """A HUD read of frame 20 finishes at decision 45: frames 20.. are covered (they are still in the delay)."""
+    gate = OutputGate(RenderConfig(motion=False), (W, H), scene=SceneConfig(scene_back_s=0.0, mute_lead_s=0.0, mute_tail_s=0.0), fps=30)
+    for k in range(0, 90, 3):
+        gate.add_decision(Decision(frame_id=k, ok=True, scene=45 <= k < 60, scene_from=20 if k == 45 else None))
+    shown = [gate.render(v, np.full((H, W, 3), 100, np.uint8)) for v in range(90)]
+    card = [v for v, o in enumerate(shown) if o is gate.card]
+    assert card[0] == 20 and card[-1] == 59
+
+
+def test_hud_thread_reads_in_background_and_counts_errors():
+    import time
+
+    from streamsafe.analysis.hud_thread import HudThread
+
+    calls = []
+
+    def reader(bgr):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("ocr broke")
+        time.sleep(0.05)
+        return "Press E to end the dance"
+
+    hud = HudThread(reader)
+    frame = np.zeros((10, 10, 3), np.uint8)
+    assert hud.submit(1, 0.0, frame)
+    assert not hud.submit(2, 0.1, frame), "busy: the frame is skipped, the caller never waits"
+    t0 = time.monotonic()
+    while not hud.idle() and time.monotonic() - t0 < 2:
+        time.sleep(0.01)
+    assert hud.results() == [(1, 0.0, "endthedance")]
+    assert hud.submit(3, 0.2, frame)
+    while not hud.idle() and time.monotonic() - t0 < 2:
+        time.sleep(0.01)
+    assert hud.results() == [(3, 0.2, "")] and hud.errors == 1

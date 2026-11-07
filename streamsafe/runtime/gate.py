@@ -27,6 +27,8 @@ from streamsafe.render.lookahead import backfill
 from streamsafe.render.slate import make_scene_card, make_slate
 from streamsafe.types import ANALYSIS_SIZE, Decision
 
+SCENE_LOOK = 150  # frames: how far ahead a scene decision is searched (late evidence reaches back this far at most)
+
 
 class OutputGate:
     def __init__(
@@ -107,8 +109,8 @@ class OutputGate:
             self._shown = v
             ids = usable_decisions(v, self._keys, self._cut_between, self.cfg.max_gap)
             decisions = [self._decisions[k] for k in ids]
-            scene = any(d.scene for d in decisions) or self._scene_ahead(v, self._back)
-            scene_soon = self._scene_ahead(v, self._back + self._lead)
+            scene = any(d.scene for d in decisions) or self._scene_ahead(v, 0)
+            scene_soon = self._scene_ahead(v, self._lead)
         if not decisions or not all(d.ok for d in decisions):
             if self._last is not None and self._held < self.cfg.hold:
                 out = self._last
@@ -134,11 +136,14 @@ class OutputGate:
         self.stats["render_ms"].append(1000 * (time.perf_counter() - t0))
         return out
 
-    def _scene_ahead(self, v: int, n: int) -> bool:
-        """A scene decision on a frame in (v, v + n]. Caller holds the lock."""
+    def _scene_ahead(self, v: int, margin: int) -> bool:
+        """A later scene decision whose cover reaches back to frame v (- margin): it starts ``scene_back_s``
+        before its own frame, or before its evidence frame (``scene_from``, a late HUD read). Caller holds
+        the lock."""
         i = bisect_right(self._keys, v)
-        while i < len(self._keys) and self._keys[i] <= v + n:
-            if self._decisions[self._keys[i]].scene:
+        while i < len(self._keys) and self._keys[i] <= v + SCENE_LOOK:
+            d = self._decisions[self._keys[i]]
+            if d.scene and (d.frame_id if d.scene_from is None else min(d.scene_from, d.frame_id)) - self._back - margin <= v:
                 return True
             i += 1
         return False

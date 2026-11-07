@@ -15,8 +15,9 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
+from streamsafe.analysis.hud_thread import HudThread
 from streamsafe.analysis.risk import RiskPolicy
-from streamsafe.analysis.scene import SceneLatch, hud_hit
+from streamsafe.analysis.scene import SceneLatch
 from streamsafe.analysis.tracks import Tracker
 from streamsafe.config import Config
 from streamsafe.garment.builder import GarmentBuilder, SafePerson, choose_mode
@@ -46,6 +47,7 @@ class Analyzer:
         self.latch = SceneLatch(cfg.scene)
         self._scene_at = -1e9
         self._hud_at = -1e9
+        self.hud = HudThread(models.hud) if models.hud is not None and cfg.scene.hud_ocr else None
         self.stats: defaultdict[str, list] = defaultdict(list)
         self.diag: list = []
 
@@ -88,11 +90,11 @@ class Analyzer:
         clock = time.perf_counter()
         t = clock if now is None else now  # scene clock: the stream time offline, so runs repeat exactly
 
-        scene_on = self._scene_step(rgb, im if full is None else full, cut, t)
+        scene_on, scene_from = self._scene_step(frame_id, rgb, im if full is None else full, cut, t)
         st["scene_on"].append(int(scene_on))
         timings["scene"], clock = _lap(clock)
         if scene_on:  # the whole frame is covered: no person work needed (saves GPU for the stream)
-            return Decision(frame_id=frame_id, ok=True, scene=True)
+            return Decision(frame_id=frame_id, ok=True, scene=True, scene_from=scene_from)
 
         people, crops = self.detect(rgb, full, full_bgr=True)
         timings["detect"], clock = _lap(clock)
@@ -166,22 +168,29 @@ class Analyzer:
                 crops.append(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) if full_bgr else crop)
         return people, crops
 
-    def _scene_step(self, rgb: np.ndarray, bgr: np.ndarray, cut: bool, t: float) -> bool:
-        """Runs the scene model / HUD reader when due and returns the scene latch (whole-screen cover)."""
+    def _scene_step(self, frame_id: int, rgb: np.ndarray, bgr: np.ndarray, cut: bool, t: float) -> tuple[bool, int | None]:
+        """Runs the scene model when due, feeds / collects the HUD thread, and returns the scene latch plus
+        the earliest frame of a HUD hit that arrived now (None when the evidence is this frame)."""
         cfg, models = self.cfg, self.models
-        p_explicit = hud = None
+        p_explicit = None
         if models.scene is not None and (cfg.eye.scene_prior or cfg.scene.scene_guard):
             every = cfg.scene.scene_every_s if cfg.scene.scene_guard else SCENE_EVERY_S
             if cut or t - self._scene_at >= every:
                 self.p_swim, p = models.scene(rgb)
                 self._scene_at = t
                 p_explicit = p if cfg.scene.scene_guard else None
-        if models.hud is not None and cfg.scene.hud_ocr and (cut or t - self._hud_at >= cfg.scene.hud_every_s):
-            hud = hud_hit(models.hud(bgr))
-            self._hud_at = t
-        if not cfg.scene.scene_guard and not cfg.scene.hud_ocr:
-            return False
-        return self.latch.update(t, p_explicit, hud)
+        hits: list[tuple[int, float]] = []
+        if self.hud is not None:
+            hits = [(f, ft) for f, ft, kw in self.hud.results() if kw]
+            if (cut or t - self._hud_at >= cfg.scene.hud_every_s) and self.hud.submit(frame_id, t, bgr):
+                self._hud_at = t
+            self.stats["hud_errors"] = [self.hud.errors]
+        if not cfg.scene.scene_guard and self.hud is None:
+            return False, None
+        was_on = self.latch.on
+        on = self.latch.update(t, p_explicit, max((ft for _, ft in hits), default=None))
+        first = min((f for f, _ in hits), default=None)
+        return on, (first if on and not was_on and first is not None else None)
 
 
 def eye_crop(image: np.ndarray, box: tuple[int, int, int, int], mask: np.ndarray, scale: float = 1.0) -> np.ndarray:

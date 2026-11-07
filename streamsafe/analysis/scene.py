@@ -52,12 +52,14 @@ class SceneLatch:
         self._last_scene = -1e9  # time of the last scene-model trigger
         self._last_hud = -1e9
 
-    def update(self, now: float, p_explicit: float | None, hud: str | None) -> bool:
+    def update(self, now: float, p_explicit: float | None = None, hud_at: float | None = None) -> bool:
+        """``p_explicit``: a scene-model reading of this decision's frame; ``hud_at``: stream time of a frame
+        where the HUD reader found a keyword (reads finish later, so it can be in the past)."""
         cfg = self.cfg
         if p_explicit is not None and (p_explicit >= cfg.scene_enter or (self.on and p_explicit >= cfg.scene_exit)):
             self._last_scene = now
-        if hud:
-            self._last_hud = now
+        if hud_at is not None:
+            self._last_hud = max(self._last_hud, hud_at)
         scene_on = now - self._last_scene <= cfg.scene_hold_s
         hud_on = now - self._last_hud <= cfg.hud_hold_s
         self.on = scene_on or hud_on
