@@ -37,6 +37,12 @@ class PoseEstimator(Protocol):
 
 
 class SceneClassifier(Protocol):
-    def pswim(self, rgb: np.ndarray) -> float:
-        """Probability that the frame shows a beach / pool scene."""
+    def __call__(self, rgb: np.ndarray) -> tuple[float, float]:
+        """(probability of a beach / pool scene, probability of an explicit scene) for an RGB frame."""
+        ...
+
+
+class HudReader(Protocol):
+    def __call__(self, bgr: np.ndarray) -> str:
+        """Text in the game's prompt / subtitle areas of a BGR frame (any size), '' when none."""
         ...

@@ -61,9 +61,24 @@ class NoPose:
         return [(np.zeros((17, 2), np.float32), np.zeros(17, np.float32)) for _ in boxes]
 
 
+MAGENTA = (200, 40, 200)  # BGR background of an "explicit scene" in the test videos
+
+
+class MagentaScene:
+    """Scene model stand-in: explicit when most of the frame is the magenta background."""
+
+    def __call__(self, rgb: np.ndarray) -> tuple[float, float]:
+        hit = np.abs(rgb.astype(np.int16) - np.array(MAGENTA[::-1], np.int16)).sum(2) < 60
+        return 0.0, 0.9 if hit.mean() > 0.5 else 0.05
+
+
 def stub_analyzer(cfg: Config, output_scale: float) -> Analyzer:
     """Analyzer factory for the tests (top-level so the realtime worker process can import it)."""
     return Analyzer(cfg, Models(detector=BlobDetector(), eye=ColourEye(), pose=NoPose()), output_scale)
+
+
+def stub_scene_analyzer(cfg: Config, output_scale: float) -> Analyzer:
+    return Analyzer(cfg, Models(detector=BlobDetector(), eye=ColourEye(), pose=NoPose(), scene=MagentaScene()), output_scale)
 
 
 def make_video(
@@ -78,17 +93,21 @@ def make_video(
     size: tuple[int, int] = (1920, 1080),
     fold_shade: float = 0.8,
     first_col: tuple[int, int, int] = RED,
+    scene: tuple[int, int] | None = None,
 ) -> list[tuple[np.ndarray, np.ndarray, bool]]:
     """Red person walks right (``speed`` px/frame at 1080p); green person static; new background
     at ``cut_at``. ``fold_shade`` 0.8 splits the stub blob into pieces (as in engine2's tests), 0.9
     keeps it whole. ``first_col`` / ``turn_col`` / ``turn_safe_at``: the walker's outfit before / after
-    a change. Returns per frame the ground-truth masks (analysis size) of red and green."""
+    a change. ``scene``: frames [a, b) get the magenta "explicit scene" background. Returns per frame
+    the ground-truth masks (analysis size) of red and green."""
     w, h = size
     k = w / 1920
     writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), 30, size)
     truth = []
     for f in range(n):
         bg = (90, 120, 140) if f < cut_at else (150, 90, 60)
+        if scene is not None and scene[0] <= f < scene[1]:
+            bg = MAGENTA
         im = np.full((h, w, 3), bg, np.uint8)
         cv2.rectangle(im, (0, int(900 * k)), (w, h), (60, 60, 60), -1)
         cx = 400 + speed * f

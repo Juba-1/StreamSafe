@@ -21,6 +21,7 @@ import numpy as np
 
 from streamsafe.analysis.analyzer import Analyzer
 from streamsafe.config import Config
+from streamsafe.io.obs_link import ObsStateWriter
 from streamsafe.io.sinks import FrameSink
 from streamsafe.io.sources import FrameSource
 from streamsafe.runtime.cuts import CutDetector
@@ -65,7 +66,7 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
     rt = cfg.runtime
     analyzer = factory(cfg, _output_scale(source))
     analyzer.warmup()
-    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out))
+    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps)
     cuts = CutDetector()
     pending: collections.OrderedDict = collections.OrderedDict()  # frames waiting for their decisions
     cut_since_last, emitted = True, 0
@@ -94,6 +95,7 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
             gate.forget_before(emitted - KEEP_DECISIONS)
     while pending:
         emit(*pending.popitem(last=False))
+    gate.finish()
 
     n_dec = len(analyzer.stats.get("ms_total", []))
     report = summarize(gate.stats, analyzer.stats, emitted, n_dec, rt.fps, dict(mode="offline", gpu=device_name()))
@@ -107,7 +109,7 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
     worker = AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE)
     worker.start()
-    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out))
+    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps)
     frames: dict[int, tuple[float, Any]] = {}  # frame id -> (capture time, frame)
     lock = threading.Lock()
     capture_done = threading.Event()
@@ -142,6 +144,7 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     receiver = threading.Thread(target=receive, name="decisions", daemon=True)
     receiver.start()
 
+    obs = ObsStateWriter(cfg.output.obs_state) if cfg.output.obs_state else None
     v = 0
     try:
         while True:
@@ -162,15 +165,21 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
             out = gate.render(v, frame)
             if sink is not None:
                 sink.write(out)
+            if obs is not None:
+                obs.update(v, gate.muted, out is gate.slate or out is gate.card)
             late = 1000 * (time.perf_counter() - due)
             stats["emit_lateness_ms"].append(late)
             stats["late_frames"].append(int(late > LATE_MS))
             gate.forget_before(v - KEEP_DECISIONS)
             v += 1
     finally:
+        if obs is not None:
+            obs.close()
+            stats["obs_write_errors"].append(obs.errors)
         worker.stop()
         receiver.join(timeout=60)
         worker.close()
+    gate.finish()
 
     stats.update(gate.stats)
     gpu = worker.stats.pop("device", ["?"])[0]

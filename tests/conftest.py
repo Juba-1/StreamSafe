@@ -4,7 +4,7 @@ import pytest
 from streamsafe.config import Config
 from streamsafe.io.sources import VideoFileSource
 from streamsafe.runtime.runner import run
-from tests.stubs import stub_analyzer
+from tests.stubs import stub_analyzer, stub_scene_analyzer
 
 
 class MemorySink:
@@ -22,12 +22,12 @@ class MemorySink:
         pass
 
 
-def run_stub(path: str, mode: str, **settings) -> tuple[dict, MemorySink]:
+def run_stub(path: str, mode: str, scene_model: bool = False, **settings) -> tuple[dict, MemorySink]:
     cfg = Config.from_env(env={}, mode=mode, delay=1.0, **settings)
     source = VideoFileSource(path, cfg.runtime.fps)
     sink = MemorySink()
     try:
-        report = run(cfg, source, sink, factory=stub_analyzer)
+        report = run(cfg, source, sink, factory=stub_scene_analyzer if scene_model else stub_analyzer)
     finally:
         source.close()
     return report, sink

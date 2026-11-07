@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-FRAME_LISTS = ("failclosed_frames", "held_frames")  # kept as frame-id lists, not summarised
+FRAME_LISTS = ("failclosed_frames", "held_frames", "scene_frames", "muted_frames")  # kept as frame-id lists, not summarised
 MAX_LISTED = 200
 
 
@@ -37,6 +37,8 @@ def summarize(gate_stats: dict, analyzer_stats: dict, n_frames: int, n_decisions
         decisions_per_s=round(n_decisions / max(1e-6, seconds), 2),
         failclosed_frames=len(merged.get("failclosed_frames", [])),
         held_frames=len(merged.get("held_frames", [])),
+        scene_frames=len(merged.get("scene_frames", [])),
+        muted_frames=len(merged.get("muted_frames", [])),
         analyzer_errors=len(merged.get("analyzer_errors", [])),
         **extra,
     )

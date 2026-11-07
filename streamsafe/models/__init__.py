@@ -6,12 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from streamsafe.models.base import PersonDetector, PoseEstimator, RiskEye, SceneClassifier
+from streamsafe.models.base import HudReader, PersonDetector, PoseEstimator, RiskEye, SceneClassifier
 
 if TYPE_CHECKING:
     from streamsafe.config import Config
 
-__all__ = ["Models", "PersonDetector", "PoseEstimator", "RiskEye", "SceneClassifier", "build_models"]
+__all__ = ["HudReader", "Models", "PersonDetector", "PoseEstimator", "RiskEye", "SceneClassifier", "build_models"]
 
 
 @dataclass
@@ -20,6 +20,7 @@ class Models:
     eye: RiskEye
     pose: PoseEstimator
     scene: SceneClassifier | None = None
+    hud: HudReader | None = None
 
 
 def build_models(cfg: Config) -> Models:

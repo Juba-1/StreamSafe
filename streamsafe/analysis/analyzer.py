@@ -1,6 +1,7 @@
 """One decision for one frame:
 
-    detect people -> eye (skipped for people matched by motion) -> track ids -> risk policy
+    scene layer (explicit scene -> whole-screen cover, nothing else runs)
+    -> detect people -> eye (skipped for people matched by motion) -> track ids -> risk policy
     -> pose (covered people only) -> one garment layer per covered person
 
 Any exception produces ``Decision(ok=False)``: the renderer then fails closed for that frame.
@@ -15,6 +16,7 @@ import cv2
 import numpy as np
 
 from streamsafe.analysis.risk import RiskPolicy
+from streamsafe.analysis.scene import SceneLatch, hud_hit
 from streamsafe.analysis.tracks import Tracker
 from streamsafe.config import Config
 from streamsafe.garment.builder import GarmentBuilder, SafePerson, choose_mode
@@ -23,7 +25,7 @@ from streamsafe.render.motion import make_motion_ref
 from streamsafe.types import ANALYSIS_SIZE, Decision, Person
 
 SWIM_SHIFT = 0.05  # beach / pool scenes lower the threshold by up to this (x score scale)
-SCENE_EVERY_S = 1.0  # scene prior refresh period (and on every cut)
+SCENE_EVERY_S = 1.0  # scene model period when only the beach prior needs it (and on every cut)
 MIN_W = 12
 MIN_MASK_PX = 200
 CROP_DILATE = np.ones((9, 9), np.uint8)
@@ -41,7 +43,9 @@ class Analyzer:
         self.policy = RiskPolicy(cfg.risk, self.thr, models.eye.prisk)
         self.garments = GarmentBuilder(cfg.garment, output_scale)
         self.p_swim = 0.0
+        self.latch = SceneLatch(cfg.scene)
         self._scene_at = -1e9
+        self._hud_at = -1e9
         self.stats: defaultdict[str, list] = defaultdict(list)
         self.diag: list = []
 
@@ -52,6 +56,10 @@ class Analyzer:
         self.models.detector(blank)
         self.models.eye.embed([blank[:120, :60]])
         self.models.pose(blank, [(10, 10, 60, 120)])
+        if self.models.scene is not None:
+            self.models.scene(cv2.cvtColor(blank, cv2.COLOR_BGR2RGB))
+        if self.models.hud is not None:
+            self.models.hud(blank)
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
         """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
@@ -78,6 +86,13 @@ class Analyzer:
         cfg, st = self.cfg, self.stats
         rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         clock = time.perf_counter()
+        t = clock if now is None else now  # scene clock: the stream time offline, so runs repeat exactly
+
+        scene_on = self._scene_step(rgb, im if full is None else full, cut, t)
+        st["scene_on"].append(int(scene_on))
+        timings["scene"], clock = _lap(clock)
+        if scene_on:  # the whole frame is covered: no person work needed (saves GPU for the stream)
+            return Decision(frame_id=frame_id, ok=True, scene=True)
 
         people, crops = self.detect(rgb, full, full_bgr=True)
         timings["detect"], clock = _lap(clock)
@@ -92,7 +107,7 @@ class Analyzer:
         timings["eye"], clock = _lap(clock)
 
         self.tracker.assign(people, cut)
-        thr = self.thr - SWIM_SHIFT * self.scale * self._swim_prior(rgb, cut)
+        thr = self.thr - SWIM_SHIFT * self.scale * (self.p_swim if cfg.eye.scene_prior else 0.0)
         self.policy.update(people, self.tracker, thr, now)
         self.tracker.forget_old()
         timings["track"], clock = _lap(clock)
@@ -151,14 +166,22 @@ class Analyzer:
                 crops.append(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) if full_bgr else crop)
         return people, crops
 
-    def _swim_prior(self, rgb: np.ndarray, cut: bool) -> float:
-        scene = self.models.scene
-        if scene is None or not self.cfg.eye.scene_prior:
-            return 0.0
-        if cut or time.perf_counter() - self._scene_at > SCENE_EVERY_S:
-            self.p_swim = scene.pswim(rgb)
-            self._scene_at = time.perf_counter()
-        return self.p_swim
+    def _scene_step(self, rgb: np.ndarray, bgr: np.ndarray, cut: bool, t: float) -> bool:
+        """Runs the scene model / HUD reader when due and returns the scene latch (whole-screen cover)."""
+        cfg, models = self.cfg, self.models
+        p_explicit = hud = None
+        if models.scene is not None and (cfg.eye.scene_prior or cfg.scene.scene_guard):
+            every = cfg.scene.scene_every_s if cfg.scene.scene_guard else SCENE_EVERY_S
+            if cut or t - self._scene_at >= every:
+                self.p_swim, p = models.scene(rgb)
+                self._scene_at = t
+                p_explicit = p if cfg.scene.scene_guard else None
+        if models.hud is not None and cfg.scene.hud_ocr and (cut or t - self._hud_at >= cfg.scene.hud_every_s):
+            hud = hud_hit(models.hud(bgr))
+            self._hud_at = t
+        if not cfg.scene.scene_guard and not cfg.scene.hud_ocr:
+            return False
+        return self.latch.update(t, p_explicit, hud)
 
 
 def eye_crop(image: np.ndarray, box: tuple[int, int, int, int], mask: np.ndarray, scale: float = 1.0) -> np.ndarray:

@@ -20,5 +20,14 @@ def load_torch_models(cfg: Config) -> Models:
         detector=RFDETRDetector(cfg.detector.det_model, cfg.detector.det_thr),
         eye=RadioEye(cfg.eye.eye_repo, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir),
         pose=ViTPose(),
-        scene=SigLIPScene() if cfg.eye.scene_prior else None,
+        scene=SigLIPScene() if cfg.eye.scene_prior or cfg.scene.scene_guard else None,
+        hud=_hud(cfg),
     )
+
+
+def _hud(cfg: Config):  # optional dependency: imported only when enabled
+    if not cfg.scene.hud_ocr:
+        return None
+    from streamsafe.models.ocr_hud import RapidHud  # fails loudly when enabled but not installed
+
+    return RapidHud()

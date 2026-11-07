@@ -77,5 +77,6 @@ class Decision:
     n_people: int = 0
     n_risky: int = 0
     people: list[tuple[int, Box]] = field(default_factory=list)  # (track id, box) of everyone seen
+    scene: bool = False  # whole-screen cover (explicit scene, see analysis/scene.py); layers are then empty
     backfilled: int = 0  # garments added later by look-ahead
     refs: dict[int, MotionRef] = field(default_factory=dict)  # look-ahead only: motion reference per track id

@@ -1,0 +1,64 @@
+"""Scene layer: whole-screen cover for scenes no garment can handle.
+
+A person garment needs a detected person. Strip-club dances, sex scenes and extreme close-ups of a body
+often show no detectable "person" at all, so the whole frame is covered instead (and the game audio is
+muted with it, see ``runtime/gate.py``). Two independent signals, either one is enough:
+
+  * SCENE: the scene model's probability that the frame is an explicit scene (zero-shot prompts in
+    ``models/torch_backend/scene.py``), checked every ``scene_every_s`` and on every cut;
+  * HUD:   on-screen text of the game's own prompts ("end the dance", "private room" ...), read by an
+    optional OCR model; the keyword match below is plain code.
+
+The latch (deterministic): ON at p >= ``scene_enter`` or a HUD hit; it stays ON while p >= ``scene_exit``,
+or while the last trigger is younger than its hold time. Hysteresis + hold = no flicker on a noisy score.
+"""
+
+from __future__ import annotations
+
+import re
+
+from streamsafe.config import SceneConfig
+
+# Game prompts that only appear during a private dance / strip-club interaction (letters only, lower case).
+HUD_KEYWORDS = (
+    "endthedance",
+    "stoptouching",
+    "movethecamera",
+    "privateroom",
+    "lapdance",
+    "privatedance",
+    "approachadancer",
+    "acceptadance",
+    "likemeter",
+    "touchher",
+    "totouch",
+)
+
+
+def hud_hit(text: str) -> str:
+    """The first HUD keyword in ``text`` ('' when none). Spaces / punctuation / case are ignored, so OCR
+    that splits or joins words still matches."""
+    norm = re.sub("[^a-z]", "", text.lower())
+    return next((k for k in HUD_KEYWORDS if k in norm), "")
+
+
+class SceneLatch:
+    """Covered / not-covered state of the whole scene. ``update`` once per decision; readings are optional
+    (a decision that did not run the scene model or the OCR passes None)."""
+
+    def __init__(self, cfg: SceneConfig) -> None:
+        self.cfg = cfg
+        self.on = False
+        self._last_scene = -1e9  # time of the last scene-model trigger
+        self._last_hud = -1e9
+
+    def update(self, now: float, p_explicit: float | None, hud: str | None) -> bool:
+        cfg = self.cfg
+        if p_explicit is not None and (p_explicit >= cfg.scene_enter or (self.on and p_explicit >= cfg.scene_exit)):
+            self._last_scene = now
+        if hud:
+            self._last_hud = now
+        scene_on = now - self._last_scene <= cfg.scene_hold_s
+        hud_on = now - self._last_hud <= cfg.hud_hold_s
+        self.on = scene_on or hud_on
+        return self.on

@@ -39,6 +39,21 @@ class RiskConfig:
 
 
 @dataclass
+class SceneConfig:
+    scene_guard: bool = True  # whole-screen cover + game audio mute for explicit scenes
+    scene_enter: float = 0.5  # scene model probability that turns the cover on (calibrated in run 41)
+    scene_exit: float = 0.3  # ...and keeps it on
+    scene_hold_s: float = 3.0  # cover stays this long after the last trigger
+    scene_every_s: float = 0.5  # scene model period (and on every cut)
+    scene_back_s: float = 0.5  # frames this far before a triggering decision are covered too (not shown yet)
+    hud_ocr: bool = False  # read the game's on-screen prompts (needs rapidocr_onnxruntime)
+    hud_every_s: float = 0.5
+    hud_hold_s: float = 4.0
+    mute_lead_s: float = 0.3  # game audio is muted this early before a whole-screen cover ...
+    mute_tail_s: float = 0.5  # ... and stays muted this long after it
+
+
+@dataclass
 class GarmentConfig:
     small_h: int = 64  # shorter people get a plain full cover (no pose); hysteresis x0.8 / x1.25
     kp_smooth: float = 0.5  # skeleton smoothing between consecutive decisions
@@ -71,6 +86,7 @@ class RuntimeConfig:
 class OutputConfig:
     stats_out: str = ""  # optional JSON with timings / counters
     diag_out: str = ""  # optional JSON log of every decision and every drawn garment
+    obs_state: str = ""  # state file for the OBS guard script (obs/streamsafe_guard.lua): heartbeat + mute
 
 
 @dataclass
@@ -78,6 +94,7 @@ class Config:
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     eye: EyeConfig = field(default_factory=EyeConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
+    scene: SceneConfig = field(default_factory=SceneConfig)
     garment: GarmentConfig = field(default_factory=GarmentConfig)
     render: RenderConfig = field(default_factory=RenderConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
