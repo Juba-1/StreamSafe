@@ -5,7 +5,10 @@ also the OCR text and keyword. Writes OUT/scene_probe.csv, per-clip summaries, a
 highest-scoring frames of every clip (OUT/sheets/<clip>.jpg, 320x180 thumbs with p) for visual review,
 and OUT/scene_emb.npz (clip, t, emb fp16) so a scene head can be trained on labeled frames later.
 
-usage: python -m bench.scene_probe OUT_DIR VIDEO [VIDEO ...]      env: FPS=2 SECS=600 HUD=0 TOP=24
+With ALL=1 every sampled frame also goes to numbered labeling sheets (OUT/label/sheet_NNN.jpg, 24 per sheet,
+cell = global row id of scene_emb.npz), so frames can be labeled explicit / not and a head trained.
+
+usage: python -m bench.scene_probe OUT_DIR VIDEO [VIDEO ...]      env: FPS=2 SECS=600 HUD=0 TOP=24 ALL=0
 Prints "SCENE_CLIP <json>" per clip and "SCENE_TIMING <json>".
 """
 
@@ -47,6 +50,11 @@ def main(argv: list[str]) -> None:
     (out / "sheets").mkdir(parents=True, exist_ok=True)
     fps, secs = float(os.environ.get("FPS", 2)), float(os.environ.get("SECS", 600))
     top = int(os.environ.get("TOP", 24))
+    label_all = os.environ.get("ALL") == "1"
+    pending: list[tuple[float, np.ndarray, str]] = []  # labeling cells not written yet
+    n_sheets = 0
+    if label_all:
+        (out / "label").mkdir(exist_ok=True)
     hud = None
     if os.environ.get("HUD") == "1":
         from streamsafe.models.ocr_hud import RapidHud
@@ -80,7 +88,13 @@ def main(argv: list[str]) -> None:
                 w.writerow([name, round(k / fps, 2), round(p_e, 4), round(float(p[: len(SWIM_PROMPTS)].sum()), 4), best, text[:120], hit])
                 pe.append(p_e)
                 note = ("HUD " if hit else "") + f"{k / fps:.0f}s {best}"
-                rows.append((p_e, cv2.resize(frame, THUMB, interpolation=cv2.INTER_AREA), note))
+                thumb = cv2.resize(frame, THUMB, interpolation=cv2.INTER_AREA)
+                rows.append((p_e, thumb, note))
+                if label_all:
+                    pending.append((p_e, thumb, f"#{len(all_emb) - 1} {name[:14]}"))
+                    if len(pending) == 24:
+                        sheet(pending, out / "label" / f"sheet_{n_sheets:03d}.jpg")
+                        pending, n_sheets = [], n_sheets + 1
             src.close()
             if not pe:
                 continue
@@ -96,6 +110,8 @@ def main(argv: list[str]) -> None:
             print("SCENE_CLIP " + json.dumps(rep), flush=True)
             rows.sort(key=lambda r: -r[0])
             sheet(rows[:top], out / "sheets" / f"{name}.jpg")
+    if pending:
+        sheet(pending, out / "label" / f"sheet_{n_sheets:03d}.jpg")
     if all_emb:
         clips, times = zip(*all_key, strict=True)
         np.savez_compressed(out / "scene_emb.npz", clip=np.array(clips), t=np.array(times), emb=np.stack(all_emb))
