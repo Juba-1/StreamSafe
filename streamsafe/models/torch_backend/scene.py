@@ -3,8 +3,10 @@
   * explicit-scene probability (the scene layer's whole-screen cover, ``analysis/scene.py``).
 Probabilities = softmax over all prompts, summed per group. The OTHER group holds look-alikes that must
 NOT count as explicit (night clubs, bars, beaches are handled per person by the garments).
-With a trained head (``scene_h.txt`` next to the eye heads: a linear head on the same normalised image
-embedding, trained on labeled game frames) the explicit probability comes from the head instead."""
+The explicit probability is reported ONLY with a trained head (``scene_h.txt`` next to the eye heads: a
+linear head on the same normalised image embedding, trained on labeled game frames). The zero-shot explicit
+score is kept for bench tools but never drives the cover: on GTA V clips it scored clothed cutscene arguments
+0.9-0.98 and a helicopter over sandy hills 0.67 (run 42 sheets), which would blank normal gameplay."""
 
 from __future__ import annotations
 
@@ -66,7 +68,7 @@ class SigLIPScene:
             logits = v @ self.text.T * self.model.logit_scale.exp().float() + self.model.logit_bias.float()
             return v[0].cpu().numpy(), torch.softmax(logits, -1)[0].cpu().numpy()
 
-    def __call__(self, rgb: np.ndarray) -> tuple[float, float]:
+    def __call__(self, rgb: np.ndarray) -> tuple[float, float | None]:
         emb, p = self.embed_probs(rgb)
-        explicit = float(self.head(emb)) if self.head is not None else float(p[self._explicit].sum())
+        explicit = float(self.head(emb)) if self.head is not None else None
         return float(p[self._swim].sum()), explicit

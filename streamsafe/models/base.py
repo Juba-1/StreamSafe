@@ -37,8 +37,9 @@ class PoseEstimator(Protocol):
 
 
 class SceneClassifier(Protocol):
-    def __call__(self, rgb: np.ndarray) -> tuple[float, float]:
-        """(probability of a beach / pool scene, probability of an explicit scene) for an RGB frame."""
+    def __call__(self, rgb: np.ndarray) -> tuple[float, float | None]:
+        """(probability of a beach / pool scene, probability of an explicit scene or None when the model has
+        no trained explicit-scene head) for an RGB frame."""
         ...
 
 

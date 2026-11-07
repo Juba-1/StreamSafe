@@ -178,7 +178,7 @@ class Analyzer:
             if cut or t - self._scene_at >= every:
                 self.p_swim, p = models.scene(rgb)
                 self._scene_at = t
-                p_explicit = p if cfg.scene.scene_guard else None
+                p_explicit = p if cfg.scene.scene_guard else None  # None: no trained head -> HUD only
         hits: list[tuple[int, float]] = []
         if self.hud is not None:
             hits = [(f, ft) for f, ft, kw in self.hud.results() if kw]

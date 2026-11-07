@@ -4,8 +4,9 @@ A person garment needs a detected person. Strip-club dances, sex scenes and extr
 often show no detectable "person" at all, so the whole frame is covered instead (and the game audio is
 muted with it, see ``runtime/gate.py``). Two independent signals, either one is enough:
 
-  * SCENE: the scene model's probability that the frame is an explicit scene (zero-shot prompts in
-    ``models/torch_backend/scene.py``), checked every ``scene_every_s`` and on every cut;
+  * SCENE: a trained explicit-scene head on the scene model's image embedding (``scene_h.txt``), checked
+    every ``scene_every_s`` and on every cut; without a trained head this signal is off (zero-shot prompts
+    were measured unreliable, see ``models/torch_backend/scene.py``);
   * HUD:   on-screen text of the game's own prompts ("end the dance", "private room" ...), read by an
     optional OCR model; the keyword match below is plain code.
 
