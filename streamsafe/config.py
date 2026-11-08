@@ -40,6 +40,15 @@ class RiskConfig:
     young_k: float = 1.6  # first look at a BIG person needs p >= young_k * thr
     young_min_h: int = 150  # ...for people at least this tall (analysis px)
     release_s: float = 1.0  # clear evidence needed this long before a person is uncovered
+    # Golden rule (Ali): covering a modest person for a moment is better than uncovering a revealing one.
+    # A person who looked clearly risky (max p >= fast_clear_k x thr) is never fast-cleared by two low readings
+    # (a bent-over or half-off-screen pose reads low); 0 = old rule (only p >= 0.85 blocked it)
+    fast_clear_k: float = 1.5
+    # a new track where a covered person was lost moments ago (pose / edge broke the identity) takes over that
+    # person's cover instead of starting from zero with the strict first-look rule (run 50: club dancer)
+    handoff: bool = True
+    handoff_iou: float = 0.3
+    handoff_window: int = 10  # decisions (~1 s); never across a cut
 
 
 @dataclass

@@ -6,7 +6,9 @@ Rules (thresholds scale with the operating threshold through ``scale = thr / 0.4
   * p blends this frame's score with the score of the track's running appearance
   * COVER when S >= 2, or the raw score >= HARD, or (first 3 looks) p >= the first-look threshold,
     which is stricter for big close-up people (modest close-ups were the main false covers)
-  * FAST CLEAR when the last two readings are very low (< 0.08 * scale) and never hard-risky
+  * FAST CLEAR when the last two readings are very low (< 0.08 * scale) and the person never read clearly
+    risky (max p < fast_clear_k * thr)
+  * HANDOFF: a new track where a covered track was lost moments ago (same place) inherits its risk state
   * RELEASE otherwise only after 3 clearly-safe decisions AND release_s seconds
 Eye-skipped (stale) readings repeat the last evidence; the release clock keeps running.
 """
@@ -48,11 +50,31 @@ class RiskPolicy:
     def update(self, people: list[Person], tracker: Tracker, thr: float, now: float | None = None) -> None:
         """Set ``person.risky`` for every person of this decision (thr may include the scene prior)."""
         now = time.perf_counter() if now is None else now
+        present = {p.tid for p in people}
         for person in people:
             track = tracker.tracks[person.tid]
+            if self.cfg.handoff and track.risk.n_obs == 0:
+                self._handoff(person, track, tracker, present)
             self._observe(person, track)
             tracker.observe(person)
             person.risky = self._decide(person, track, people, tracker, thr, now)
+
+    def _handoff(self, person: Person, track: Track, tracker: Tracker, present: set[int]) -> None:
+        """Copy the risk state of a covered track lost moments ago at this place (identity broke, person did not)."""
+        best, best_iou = None, self.cfg.handoff_iou
+        for tid, old in tracker.tracks.items():
+            if tid in present or not old.risk.risky or tracker.decision - old.last_seen > self.cfg.handoff_window:
+                continue
+            if old.last_seen < 0:  # cleared by a scene cut
+                continue
+            iou = box_iou(old.box, person.box)
+            if iou >= best_iou:
+                best, best_iou = old, iou
+        if best is not None:
+            r, o = track.risk, best.risk
+            r.risky, r.evidence, r.max_p, r.history = True, o.evidence, o.max_p, list(o.history)
+            r.n_obs = FIRST_LOOKS  # past the first-look rule: it is the same person
+            o.risky = False  # one cover per person: the old track is gone
 
     @staticmethod
     def _observe(person: Person, track: Track) -> None:
@@ -87,7 +109,8 @@ class RiskPolicy:
             # someone half-hidden behind a covered person: only a clear reading counts
             0.6 * scale if (overlap_risky > OVERLAP_IOU and prior and max(prior) < 0.2 * scale) else 0,
         )
-        fast_clear = len(r.history) >= 2 and max(r.history[-2:]) < 0.08 * scale and overlap <= OVERLAP_IOU and r.max_p < HARD
+        never_clear = HARD if cfg.fast_clear_k <= 0 else min(HARD, cfg.fast_clear_k * thr)
+        fast_clear = len(r.history) >= 2 and max(r.history[-2:]) < 0.08 * scale and overlap <= OVERLAP_IOU and r.max_p < never_clear
 
         if fast_clear and r.risky:
             r.risky = False

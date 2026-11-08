@@ -134,25 +134,61 @@ def test_risk_release_needs_time_for_borderline_readings():
     assert released - times[5] >= 1.0
 
 
-def test_risk_fast_clear_for_very_sure_readings():
+def _run(policy, tr, emb, p, steps, start=0, x=100):
+    out = []
+    for i in range(start, start + steps):
+        people = [_person(x, p, emb)]
+        tr.assign(people, cut=False)
+        policy.update(people, tr, 0.1746, now=i / 10)
+        out.append(people[0].risky)
+    return out
+
+
+def test_risk_fast_clear_only_for_marginal_covers():
+    """Two very low readings release a person who was only marginally risky, never one who read clearly
+    risky (a bent-over or half-off-screen pose reads low: the golden rule keeps the cover)."""
     emb = np.zeros(8, np.float32)
     emb[0] = 1
-    reading = {"p": 0.5}
     tr = Tracker()
+    reading = {"p": 0.25}  # above thr 0.1746, below 1.5 x thr
     policy = RiskPolicy(RiskConfig(), 0.1746, lambda e: np.full(len(e), reading["p"]))
-    for i in range(5):
-        people = [_person(100, reading["p"], emb)]
-        tr.assign(people, cut=False)
-        policy.update(people, tr, 0.1746, now=i / 10)
-    assert people[0].risky
+    assert _run(policy, tr, emb, 0.25, 12)[-1]
     reading["p"] = 0.01
-    states = []
-    for i in range(5, 8):
-        people = [_person(100, reading["p"], emb)]
-        tr.assign(people, cut=False)
-        policy.update(people, tr, 0.1746, now=i / 10)
-        states.append(people[0].risky)
-    assert states == [True, False, False], "released after two very low readings"
+    assert _run(policy, tr, emb, 0.01, 3, start=12) == [True, False, False], "marginal cover: fast clear"
+
+    tr2 = Tracker()
+    reading["p"] = 0.5
+    assert _run(policy, tr2, emb, 0.5, 5)[-1]
+    reading["p"] = 0.01
+    assert all(_run(policy, tr2, emb, 0.01, 3, start=5)), "clearly risky: no fast clear"
+
+
+def test_risk_handoff_keeps_the_cover_when_identity_breaks():
+    """A covered person whose track is lost (new pose, edge of frame) and re-found as a new track at the same
+    place stays covered at once, instead of facing the strict first-look rule for big people."""
+    tr = Tracker()
+    reading = {"p": 0.5}
+    policy = RiskPolicy(RiskConfig(), 0.1746, lambda e: np.full(len(e), reading["p"]))
+    a = np.zeros(8, np.float32)
+    a[0] = 1
+    assert _run(policy, tr, a, 0.5, 5)[-1]
+    b = np.zeros(8, np.float32)
+    b[1] = 1  # looks different now: the tracker makes a new track
+    reading["p"] = 0.2  # reads low-ish in the new pose (below the first-look bar 1.6 x thr)
+    people = [_person(104, 0.2, b)]
+    tr.assign(people, cut=False)
+    policy.update(people, tr, 0.1746, now=0.5)
+    assert people[0].tid != 0 and people[0].risky, "new track took over the cover"
+
+    tr2 = Tracker()
+    policy2 = RiskPolicy(RiskConfig(handoff=False), 0.1746, lambda e: np.full(len(e), reading["p"]))
+    reading["p"] = 0.5
+    _run(policy2, tr2, a, 0.5, 5)
+    reading["p"] = 0.2
+    people = [_person(104, 0.2, b)]
+    tr2.assign(people, cut=False)
+    policy2.update(people, tr2, 0.1746, now=0.5)
+    assert not people[0].risky, "without handoff the identity break uncovers her (the run 50 bug)"
 
 
 def test_brand_slate_uses_the_streamers_image_and_colour(tmp_path):
