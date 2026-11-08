@@ -25,6 +25,7 @@ from streamsafe.config import BrandConfig, RenderConfig, SceneConfig
 from streamsafe.render.compositor import DrawLog, compose, usable_decisions
 from streamsafe.render.lookahead import backfill
 from streamsafe.render.slate import brand_frames
+from streamsafe.render.smooth import TrackSmoother
 from streamsafe.types import ANALYSIS_SIZE, Decision
 
 SCENE_LOOK = 150  # frames: how far ahead a scene decision is searched (late evidence reaches back this far at most)
@@ -43,6 +44,7 @@ class OutputGate:
         self.cfg = cfg
         self.scale = output_size[0] / ANALYSIS_SIZE[0]
         self.slate, self.card = brand_frames(*output_size, brand or BrandConfig())
+        self.smoother = TrackSmoother(cfg.smooth_alpha, cfg.smooth_beta, cfg.smooth_reset) if cfg.smooth else None
         scene = scene or SceneConfig()
         self._back = round(scene.scene_back_s * fps)
         self._lead = round(scene.mute_lead_s * fps)
@@ -128,7 +130,11 @@ class OutputGate:
             gray = None
             if self.cfg.motion:  # same analysis-size gray the analyzer used for its references
                 gray = cv2.cvtColor(cv2.resize(frame, ANALYSIS_SIZE, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
-            out = compose(frame, v, decisions, gray, self.cfg.mc_min, self.scale, self.log)
+            if self.smoother is not None:
+                if self._cuts.get(v, False):
+                    self.smoother.clear()
+                self.smoother.prune(v)
+            out = compose(frame, v, decisions, gray, self.cfg.mc_min, self.scale, self.log, self.smoother)
         self._last = out
         if out is self.slate or out is self.card:
             self._last_full = v

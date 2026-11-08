@@ -174,3 +174,23 @@ def test_brand_slate_uses_the_streamers_image_and_colour(tmp_path):
     assert (card == slate).all(), "scene card uses the slate image unless scene_image is set"
     slate, _ = brand_frames(640, 360, BrandConfig(slate_color="#102030"))
     assert tuple(slate[2, 2]) == parse_color("#102030") == (0x30, 0x20, 0x10)
+
+
+def test_track_smoother_steadies_wobble_follows_motion_and_resets_on_jumps():
+    from streamsafe.render.smooth import TrackSmoother
+
+    rng = np.random.default_rng(0)
+    sm = TrackSmoother(alpha=0.5, beta=0.15, reset_frac=0.25)
+    truth = [(100 + 3.0 * v, 200 + 2.0 * v) for v in range(60)]  # steady walk
+    meas = [(y + rng.normal(0, 2), x + rng.normal(0, 2)) for y, x in truth]
+    out = [sm.place(1, v, 0, y, x, 300) for v, (y, x) in enumerate(meas)]
+
+    def shake(seq):
+        return float(np.mean([abs(seq[i + 1][0] - 2 * seq[i][0] + seq[i - 1][0]) for i in range(1, len(seq) - 1)]))
+
+    assert shake(out) < 0.6 * shake(meas), "wobble reduced"
+    err = np.mean([abs(o[0] - t[0]) for o, t in zip(out[20:], truth[20:], strict=True)])
+    assert err < 2.0, "follows a steady walk without trailing"
+    y, _ = sm.place(1, 60, 0, 900.0, 200.0, 300)  # cut / re-detection far away
+    assert y == 900.0, "a jump resets at once (never drifts off the person)"
+    assert sm.place(2, 5, 0, 10.0, 10.0, 100) == (10.0, 10.0), "a new person starts at its measurement"

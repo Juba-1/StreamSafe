@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 
 from streamsafe.render.motion import motion_shift
+from streamsafe.render.smooth import TrackSmoother
 from streamsafe.types import Decision, Layer
 
 MAX_INTERP_JUMP = 0.6  # of the layer size: larger centroid jumps are not the same motion
@@ -76,6 +77,7 @@ def compose(
     mc_min: float,
     scale: float,
     log: DrawLog | None = None,
+    smoother: TrackSmoother | None = None,
 ) -> np.ndarray:
     """Draws onto ``frame`` (in place) and returns it. ``decisions`` in time order (1 or 2);
     ``gray`` = analysis-size grayscale of ``frame`` (None disables motion compensation)."""
@@ -83,6 +85,7 @@ def compose(
     if len(decisions) == 2 and decisions[1].frame_id - v < v - decisions[0].frame_id:
         decisions = [decisions[1], decisions[0]]  # nearer decision first
     tracked: set[int] = set()  # people already drawn with a reliable motion estimate
+    placed: set[int] = set()  # people already drawn at least once
     for dec in decisions:
         for layer in dec.layers:
             if layer.tid in tracked:
@@ -91,6 +94,11 @@ def compose(
             if shift is not None:
                 tracked.add(layer.tid)
             dy, dx = shift if shift is not None else offsets.get(id(layer), (0.0, 0.0))
+            if smoother is not None and layer.tid not in placed:  # the person's main copy only
+                cy, cx = layer.centroid[0] + dy, layer.centroid[1] + dx
+                sy, sx = smoother.place(layer.tid, v, dec.frame_id, cy, cx, max(layer.shape))
+                dy, dx = dy + sy - cy, dx + sx - cx
+            placed.add(layer.tid)
             draw(frame, layer, dy, dx)
             if log is not None:
                 h, w = layer.shape

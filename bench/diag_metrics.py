@@ -9,6 +9,10 @@ ghosts     frames where one person gets 2+ garments that do not overlap each oth
 size_jump  frame-to-frame garment height jumps > 15 % on the same person (per 10 s)
 torso      share of a covered person's torso band (x 30-70 %, y 20-75 % of the box) inside garment boxes;
            p10 and the share of frames under 80 % = visibly exposed while "covered"
+jitter     per garment track: |c(t+1) - 2 c(t) + c(t-1)| / garment height (c = garment centre, 3 consecutive
+           frames) - shaking; the same for the detected person box (det_jitter) is the true motion + detector noise
+pops       frames where that acceleration is > 4 % of the height (a visible jump), per 10 s; switch_pop_p90 =
+           the acceleration on frames where the garment changes to another decision's shape
 early      per track in the first 25 s: first second, risky decisions, decisions, max p, height
 """
 
@@ -78,6 +82,54 @@ def torso_cover(person: Box, garments: list[Box]) -> float:
         if a2 > a1 and c2 > c1:
             band[c1:c2, a1:a2] = True
     return float(band.mean())
+
+
+POP = 0.04  # acceleration (fraction of height) that reads as a visible jump
+
+
+def jitter(frm: list, people: list[list[Box]]) -> dict:
+    """Shaking of each garment (and of its detected person, for reference) from 3 consecutive frames."""
+    series: dict[int, dict[int, tuple]] = defaultdict(dict)
+    for v, tid, kf, y, x, h, w, _used, _col in frm:
+        series[tid].setdefault(v, (y + h / 2, x + w / 2, h, kf, (x, y, x + w, y + h)))
+    acc, det_acc, switch = [], [], []
+    for track in series.values():
+        for v, (cy, cx, h, kf, box) in track.items():
+            a, b = track.get(v - 1), track.get(v + 1)
+            if a is None or b is None:
+                continue
+            ay = abs(b[0] - 2 * cy + a[0]) / max(1, h)
+            ax = abs(b[1] - 2 * cx + a[1]) / max(1, h)
+            acc.append(max(ay, ax))
+            if a[3] != kf or b[3] != kf:
+                switch.append(acc[-1])
+            pb = [_match(people, u, g[4]) for u, g in ((v - 1, a), (v, (cy, cx, h, kf, box)), (v + 1, b))]
+            if all(p is not None for p in pb):
+                c = [((p[1] + p[3]) / 2, (p[0] + p[2]) / 2) for p in pb]
+                ph = max(1, pb[1][3] - pb[1][1])
+                det_acc.append(max(abs(c[2][0] - 2 * c[1][0] + c[0][0]), abs(c[2][1] - 2 * c[1][1] + c[0][1])) / ph)
+    seconds = max(1, len(people)) / FPS
+
+    def q(values: list, p: float) -> float | None:
+        return round(float(np.percentile(values, p)), 4) if values else None
+
+    return dict(
+        jitter_p50=q(acc, 50),
+        jitter_p90=q(acc, 90),
+        jitter_p99=q(acc, 99),
+        pops_per10s=round(10 * sum(a > POP for a in acc) / seconds, 2),
+        switch_pop_p90=q(switch, 90),
+        det_jitter_p50=q(det_acc, 50),
+        det_jitter_p90=q(det_acc, 90),
+        det_pops_per10s=round(10 * sum(a > POP for a in det_acc) / seconds, 2),
+    )
+
+
+def _match(people: list[list[Box]], v: int, g: Box) -> Box | None:
+    if v >= len(people) or not people[v]:
+        return None
+    pb = max(people[v], key=lambda p: inter(g, p) / area(g))
+    return pb if inter(g, pb) / area(g) >= 0.2 else None
 
 
 def metrics(diag: dict, people: list[list[Box]]) -> dict:
@@ -155,6 +207,7 @@ def metrics(diag: dict, people: list[list[Box]]) -> dict:
         torso_p10=q(torso, 10),
         torso_under80=round(float(np.mean(np.array(torso) < 0.8)), 4) if torso else None,
         size_jump_per10s=round(10 * size_jumps / seconds, 2),
+        **jitter(diag["frm"], people),
         early_risky_tracks=early_risky,
     )
 

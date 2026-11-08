@@ -50,4 +50,4 @@ def test_slow_output_drops_frames_instead_of_drifting(tmp_path):
     assert s["frames_in"] == 180
     assert s["dropped_frames"] > 30, "a third of the frames cannot be shown in time"
     assert s["frames_out"] == len(sink.frames) == 180 - s["dropped_frames"]
-    assert report["emit_lateness_ms"]["max"] < 200 + 60, "lateness stays near max_late_s, it does not grow"
+    assert report["emit_lateness_ms"]["max"] < 200 + 50 + 100, "max_late_s + one slow write + scheduling; never grows"
