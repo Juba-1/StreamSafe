@@ -194,3 +194,26 @@ def test_track_smoother_steadies_wobble_follows_motion_and_resets_on_jumps():
     y, _ = sm.place(1, 60, 0, 900.0, 200.0, 300)  # cut / re-detection far away
     assert y == 900.0, "a jump resets at once (never drifts off the person)"
     assert sm.place(2, 5, 0, 10.0, 10.0, 100) == (10.0, 10.0), "a new person starts at its measurement"
+
+
+def test_fast_mover_gets_a_margin_slow_mover_does_not():
+    from streamsafe.analysis.tracks import GarmentMemory
+    from streamsafe.config import GarmentConfig
+    from streamsafe.garment.builder import GarmentBuilder
+
+    b = GarmentBuilder(GarmentConfig(), 2.0)
+    cover = np.zeros((200, 200), bool)
+    cover[50:150, 80:120] = True
+    keep_off = np.zeros_like(cover)
+
+    class P:  # person box now: x 80-120, y 50-150 (h 100)
+        box = (80, 50, 120, 150)
+
+    mem = GarmentMemory()
+    mem.cover, mem.cover_at = (cover, (79, 50, 119, 150), (0, 0)), 4  # moved 1 px: slow
+    assert (b._motion_margin(cover, keep_off, P, mem, 5, False) == cover).all()
+    mem.cover = (cover, (60, 50, 100, 150), (0, 0))  # moved 20 px = 0.2 x height: fast
+    out = b._motion_margin(cover, keep_off, P, mem, 5, False)
+    assert out[100, 135] and out[100, 65], "covers where she runs to and comes from"
+    assert out.sum() > cover.sum()
+    assert (b._motion_margin(cover, keep_off, P, mem, 5, True) == cover).all(), "never across a cut"

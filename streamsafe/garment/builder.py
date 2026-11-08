@@ -37,6 +37,16 @@ class SafePerson(NamedTuple):
     area: int
 
 
+def _shifted(mask: np.ndarray, dy: int, dx: int) -> np.ndarray:
+    """``mask`` moved by (dy, dx) pixels inside the same array (what falls off the edge is dropped)."""
+    h, w = mask.shape
+    out = np.zeros_like(mask)
+    if abs(dy) >= h or abs(dx) >= w:
+        return out
+    out[max(0, dy) : h + min(0, dy), max(0, dx) : w + min(0, dx)] = mask[max(0, -dy) : h + min(0, -dy), max(0, -dx) : w + min(0, -dx)]
+    return out
+
+
 def choose_mode(height: int, memory: GarmentMemory, small_h: int) -> str:
     lo, hi = SMALL_HYSTERESIS
     limit = small_h * (hi if memory.mode == "small" else lo if memory.mode == "full" else 1.0)
@@ -98,6 +108,7 @@ class GarmentBuilder:
         except Exception:  # never fail the decision because of geometry: cover the body
             cover, keep = body, np.zeros_like(body)
         cover = cover & ~(safe_near & ~body) & ~keep  # never spills onto a clearly safe person
+        cover = self._motion_margin(cover, safe_near & ~own, person, memory, decision, cut)
         cover = self._with_shape_memory(cover, body, own, safe_near, person, memory, (wy1, wx1), decision, cut)
         if cover.sum() < MIN_PIXELS:
             return None
@@ -116,6 +127,28 @@ class GarmentBuilder:
                 kp[ok] = (1 - self.cfg.kp_smooth) * kp[ok] + self.cfg.kp_smooth * prev[0][ok]
             memory.keypoints, memory.keypoints_at = (kp, sc), decision
         return kp, sc
+
+    def _motion_margin(
+        self, cover: np.ndarray, keep_off: np.ndarray, person: Person, memory: GarmentMemory, decision: int, cut: bool
+    ) -> np.ndarray:
+        """A fast mover's garment also reaches where they will be (and were) one decision step away, so the
+        frames between decisions stay covered even when the per-frame motion estimate cannot keep up (sprints,
+        dives). Slow people are untouched. Boolean shifts of the garment crop, once per decision."""
+        if not self.cfg.motion_margin or cut or memory.cover is None or memory.cover_at != decision - 1:
+            return cover
+        _, pbox, _ = memory.cover
+        x1, y1, x2, y2 = person.box
+        h = max(1, y2 - y1)
+        dy = (y1 + y2 - pbox[1] - pbox[3]) / 2
+        dx = (x1 + x2 - pbox[0] - pbox[2]) / 2
+        if max(abs(dx), abs(dy)) < self.cfg.margin_min_speed * h:
+            return cover
+        lim = self.cfg.margin_max * h
+        sy, sx = int(np.rint(np.clip(dy, -lim, lim))), int(np.rint(np.clip(dx, -lim, lim)))
+        out = cover.copy()
+        for k in (1, -1):  # ahead (frames after this decision) and behind (frames before it)
+            out |= _shifted(cover, k * sy, k * sx)
+        return out & ~keep_off  # never spills onto a clearly safe person
 
     def _with_shape_memory(
         self,

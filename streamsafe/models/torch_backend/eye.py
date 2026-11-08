@@ -15,11 +15,11 @@ from streamsafe.models.torch_backend.device import DEVICE
 
 
 class RadioEye:
-    def __init__(self, repo: str, width: int, height: int, head_dir: str) -> None:
+    def __init__(self, repo: str, width: int, height: int, head_dir: str, revision: str) -> None:
         from transformers import AutoModel
 
         self.width, self.height = width, height
-        self.model = AutoModel.from_pretrained(repo, trust_remote_code=True).to(DEVICE).eval()
+        self.model = AutoModel.from_pretrained(repo, revision=revision, trust_remote_code=True).to(DEVICE).eval()
         self.bf16 = False
         if DEVICE == "cuda":
             self.model = self.model.to(torch.bfloat16)

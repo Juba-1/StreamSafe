@@ -8,6 +8,8 @@ chosen with RECIPES=name,name (default: all):
     ali_photos    + Open Images photos at half weight
     ali_aug_photos  both
 Every recipe is SCORED with Ali's labels on real (not recoloured) game crops, so the numbers compare directly.
+env EXTRA=a.npz[,b.npz] adds examples from bench/add_examples.py (e.g. a modest character the eye covered) to
+the TRAINING of every recipe, never to a test fold; EXTRA_WEIGHT (default 1) is their sample weight.
 Recoloured copies of a game family are left out of training while that family is tested; photos never enter a test fold.
 
 usage: python -m bench.compare_heads OUT_DIR LABELED.npz PHOTOS.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
@@ -51,6 +53,15 @@ def main(argv: list[str]) -> None:
     src = np.concatenate([lab["SRC"], np.full(len(tr["cls"]), "hard")])
     c_old = np.concatenate([lab["C_old"], tr["cls"]])
     c_new = np.concatenate([lab["C_new"], tr["cls"]])
+    weight = np.ones(len(x))
+    for path in filter(None, os.environ.get("EXTRA", "").split(",")):
+        ex = np.load(path)
+        n = len(ex["C"])
+        x = np.concatenate([x, ex["X"].astype(np.float32)])
+        fam = np.concatenate([fam, ex["G"]])
+        src = np.concatenate([src, np.full(n, "extra")])
+        c_old, c_new = np.concatenate([c_old, ex["C"]]), np.concatenate([c_new, ex["C"]])
+        weight = np.concatenate([weight, np.full(n, float(os.environ.get("EXTRA_WEIGHT", 1.0)))])
     px, pc = photos["X"].astype(np.float32), photos["C"]
     all_recipes = {  # name: (labels, use recoloured copies, photo weight)
         "old_labels": (c_old, False, 0.0),
@@ -62,7 +73,7 @@ def main(argv: list[str]) -> None:
     wanted = os.environ.get("RECIPES")
     recipes = {k: v for k, v in all_recipes.items() if not wanted or k in wanted.split(",")}
     aug = src == "aug"
-    scored = (c_new != "-") & ~aug  # every recipe is judged on Ali's labels, real crops only
+    scored = (c_new != "-") & ~aug & (src != "extra")  # every recipe is judged on Ali's labels, real crops only
     rep: dict = {
         "counts_old": {c: int((c_old == c).sum()) for c in "RMS"},
         "counts_new": {c: int((c_new == c).sum()) for c in "RMS"},
@@ -76,14 +87,14 @@ def main(argv: list[str]) -> None:
         for g in sorted(set(fam[scored]) - {"old"}):
             test = (fam == g) & scored
             train = (fam != g) & use
-            xs, cs, ws = x[train], cls[train], np.ones(int(train.sum()))
+            xs, cs, ws = x[train], cls[train], weight[train]
             if pw > 0:
                 xs, cs, ws = np.concatenate([xs, px]), np.concatenate([cs, pc]), np.concatenate([ws, np.full(len(pc), pw)])
             p[test] = prisk(fit(xs, cs, ws), x[test])
         known = scored & (fam != "old")
         r = report(np.where(known, p, np.nan), np.where(scored, c_new, "-"), fam, src)
         r["lofo_auc_women_vs_rest"] = round(float(roc_auc_score(c_new[known] == "R", p[known])), 4)
-        xs, cs, ws = x[use], cls[use], np.ones(int(use.sum()))
+        xs, cs, ws = x[use], cls[use], weight[use]
         if pw > 0:
             xs, cs, ws = np.concatenate([xs, px]), np.concatenate([cs, pc]), np.concatenate([ws, np.full(len(pc), pw)])
         heads = fit(xs, cs, ws)

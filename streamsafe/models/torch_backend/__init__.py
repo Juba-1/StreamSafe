@@ -18,7 +18,7 @@ def load_torch_models(cfg: Config) -> Models:
 
     return Models(
         detector=RFDETRDetector(cfg.detector.det_model, cfg.detector.det_thr),
-        eye=RadioEye(cfg.eye.eye_repo, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir),
+        eye=RadioEye(cfg.eye.eye_repo, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cfg.eye.eye_revision),
         pose=ViTPose(),
         scene=SigLIPScene(head=_scene_head(cfg)) if cfg.eye.scene_prior or cfg.scene.scene_guard else None,
         hud=_hud(cfg),

@@ -22,6 +22,9 @@ class DetectorConfig:
 @dataclass
 class EyeConfig:
     eye_repo: str = "nvidia/C-RADIOv4-H"
+    # the eye runs the repo's own Python code (trust_remote_code): pinned to the reviewed commit, so a change
+    # upstream can never run unreviewed code on a streamer's PC. Update only after reading the new code.
+    eye_revision: str = "0057b339059c0b9e1b4ba996f975410ebbfdfcc8"
     eye_w: int = 224
     eye_h: int = 384
     head_dir: str = ""  # folder with fast_h6.txt, male_h6.txt, thr_h6.txt
@@ -63,6 +66,11 @@ class GarmentConfig:
     small_h: int = 64  # shorter people get a plain full cover (no pose); hysteresis x0.8 / x1.25
     kp_smooth: float = 0.5  # skeleton smoothing between consecutive decisions
     shape_memory: bool = True  # a garment never shrinks in a single step
+    # fast movers (> margin_min_speed x their height between two decisions): the garment also covers where
+    # they move to / come from, up to margin_max x height (Ali, run 47: volleyball runner partly outrun)
+    motion_margin: bool = True
+    margin_min_speed: float = 0.04
+    margin_max: float = 0.3
     fabric_ds: int = 2  # cloth shading computed at 1/N resolution (outline at full resolution)
     color: str = "navy"  # one colour for everybody (streamer setting): a palette name or "#RRGGBB"
     logo: str = ""  # optional image on the chest (sponsor / ad mode), drawn in its own exact colours
