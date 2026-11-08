@@ -103,6 +103,9 @@ class RenderConfig:
     smooth_alpha: float = 0.5  # share of the measurement taken each frame (1 = no smoothing)
     smooth_beta: float = 0.15  # velocity correction
     smooth_reset: float = 0.25  # a measurement farther than this (x garment size) from the prediction resets
+    # a residual of smooth_fast x size or more is taken whole (real motion, not wobble); smaller ones are
+    # smoothed in proportion. Lower = follows faster but shakes more (run 48: 0.08 undid most of run 47's gain)
+    smooth_fast: float = 0.08
     lookahead: bool = False  # a person turning risky is also covered in the earlier frames still waiting
     lookahead_frames: int = 60  # how far back (same shot, not yet shown)
 

@@ -4,7 +4,8 @@ prison scene is modest, she must not be covered").
 The engine's own detector and eye (full-resolution crops, exactly as live) run on every frame between T0 and
 T1; the biggest person of each frame becomes one example with the given label (R revealing, S modest woman,
 M man). A contact sheet of the chosen crops is written next to the output, so a person can check that the
-right character was picked before the examples are used.
+right character was picked before the examples are used. With ALL=1 every detected person at least MIN_H
+analysis px tall becomes an example (for a shot where everybody shares the label, e.g. inmates in a prison yard).
 
 usage: HEAD_DIR=<heads> python -m training.add_examples OUT.npz VIDEO T0 T1 LABEL [FAMILY]
 Writes OUT.npz (X fp16 unit-norm, C label, G family) and OUT.jpg; prints "EXAMPLES <json>".
@@ -14,6 +15,7 @@ Use the npz with ``EXTRA=OUT.npz python -m training.compare_heads ...`` (trainin
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -35,6 +37,7 @@ def main(argv: list[str]) -> None:
     family = argv[5] if len(argv) > 5 else "extra"
     if label not in ("R", "S", "M"):
         raise SystemExit("LABEL must be R, S or M")
+    every, min_h = os.environ.get("ALL") == "1", int(os.environ.get("MIN_H", "40"))
     cfg = Config.from_env()
     analyzer = Analyzer(cfg, build_models(cfg), 1.0)
     src = VideoFileSource(video, FPS, t1)
@@ -46,19 +49,25 @@ def main(argv: list[str]) -> None:
         people, crops = analyzer.detect(rgb, frame, full_bgr=True)
         if not people:
             continue
-        j = max(range(len(people)), key=lambda i: (people[i].box[3] - people[i].box[1]) * (people[i].box[2] - people[i].box[0]))
-        emb = analyzer.models.eye.embed([crops[j]])
-        x.append(emb[0])
-        ps.append(float(analyzer.models.eye.prisk(emb)[0]))
-        c = crops[j]
-        thumbs.append(cv2.resize(cv2.cvtColor(c, cv2.COLOR_RGB2BGR), (max(1, int(c.shape[1] * THUMB_H / c.shape[0])), THUMB_H)))
+        if every:
+            picked = [i for i, p in enumerate(people) if p.box[3] - p.box[1] >= min_h]
+        else:
+            picked = [max(range(len(people)), key=lambda i: (people[i].box[3] - people[i].box[1]) * (people[i].box[2] - people[i].box[0]))]
+        if not picked:
+            continue
+        emb = analyzer.models.eye.embed([crops[j] for j in picked])
+        x.extend(emb)
+        ps.extend(float(v) for v in analyzer.models.eye.prisk(emb))
+        for j in picked:
+            c = crops[j]
+            thumbs.append(cv2.resize(cv2.cvtColor(c, cv2.COLOR_RGB2BGR), (max(1, int(c.shape[1] * THUMB_H / c.shape[0])), THUMB_H)))
     src.close()
     if not x:
         raise SystemExit("no person found between T0 and T1")
     xs = np.stack(x).astype(np.float32)
     xs /= np.linalg.norm(xs, axis=1, keepdims=True)
     np.savez_compressed(out, X=xs.astype(np.float16), C=np.array([label] * len(xs)), G=np.array([family] * len(xs)))
-    cv2.imwrite(str(out.with_suffix(".jpg")), np.hstack(thumbs[:12]))
+    cv2.imwrite(str(out.with_suffix(".jpg")), np.hstack(thumbs[:: max(1, len(thumbs) // 16)][:16]))
     rep = dict(n=len(xs), label=label, family=family, p_now=[round(p, 3) for p in ps], thr=round(analyzer.thr, 4))
     print("EXAMPLES " + json.dumps(rep), flush=True)
 

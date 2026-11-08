@@ -44,7 +44,7 @@ class OutputGate:
         self.cfg = cfg
         self.scale = output_size[0] / ANALYSIS_SIZE[0]
         self.slate, self.card = brand_frames(*output_size, brand or BrandConfig())
-        self.smoother = TrackSmoother(cfg.smooth_alpha, cfg.smooth_beta, cfg.smooth_reset) if cfg.smooth else None
+        self.smoother = TrackSmoother(cfg.smooth_alpha, cfg.smooth_beta, cfg.smooth_reset, cfg.smooth_fast) if cfg.smooth else None
         scene = scene or SceneConfig()
         self._back = round(scene.scene_back_s * fps)
         self._lead = round(scene.mute_lead_s * fps)
