@@ -4,7 +4,7 @@ Rounds: ``old`` + ``newcrops`` (label.html, labeled by Ali), video rounds 1-2 an
 Claude; ``LABELS.json`` holds the original codes and the codes after Ali's review, per round and sheet). A crop is kept
 when either labeling makes it R/M/S, so recipes trained on the old and on the corrected labels see the same rows.
 
-usage: HEAD_DIR=<heads> python -m bench.build_labeled OUT.npz LABELS.json DATA_DIR NEWCROPS_DIR ROUND1_DIR ROUND2_DIR ROUND3_DIR
+usage: HEAD_DIR=<heads> python -m training.build_labeled OUT.npz LABELS.json DATA_DIR NEWCROPS_DIR ROUND1_DIR ROUND2_DIR ROUND3_DIR
   HEAD_DIR      any head folder (the eye needs one to load; the heads are not used here)
   DATA_DIR      holds data/labels.csv + data/crops (streamsafe_data.tar)
   NEWCROPS_DIR  holds newcrops/labels_new.csv (+ crops)
@@ -29,9 +29,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from bench.train_heads import family
 from streamsafe.config import Config
 from streamsafe.models import build_models
+from training.common import family
 
 SOURCES = ("old", "newcrops", "video", "video2", "clubs", "aug")
 ROUNDS = {"1": ("picks.csv", "video"), "2": ("picks2.csv", "video2"), "3": ("picks3.csv", "clubs")}

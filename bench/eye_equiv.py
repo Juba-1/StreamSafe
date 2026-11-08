@@ -1,5 +1,5 @@
 """The eye on 270 real club crops (run24 eyecheck): covered count must match (46 fp32 / 45-47 bf16).
-usage: python bench/eye_equiv.py HEAD_DIR [CROP_TAR_DIR]"""
+usage: python -m bench.eye_equiv HEAD_DIR [CROP_TAR_DIR]"""
 
 import glob
 import io

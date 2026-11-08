@@ -2,12 +2,12 @@
 (the earlier rounds + both mined rounds), threshold at 85% women recall over that whole population,
 the same convention the current heads were calibrated with (compare_heads).
 
-Why: bench.pose_eval sets the threshold on the mined crops alone. Those are the hardest crops by
+Why: experiments/pose_eval.py sets the threshold on the mined crops alone. Those are the hardest crops by
 construction, so 85% recall there forces a low threshold and the heads then cover far more junk in real
 videos (run 39 disagreement sheets: blurred crowds, bikes, faces). Here every recipe is also compared at
 equal modest-covered rate (the same false-cover budget as today's heads), which shows what it really buys.
 
-usage: python -m bench.calibrate OUT_DIR LABELED.npz REFIND.npz
+usage: python -m training.calibrate OUT_DIR LABELED.npz REFIND.npz
 Writes OUT_DIR/<recipe>_cal/{fast_h6,male_h6,thr_h6}.txt and OUT_DIR/calibrate.json; prints "CAL <name> <json>".
 """
 
@@ -19,8 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from bench.pose_eval import fit, logits, prisk_from, score
-from bench.train_heads import FAST_FILE, MALE_FILE, THR_FILE, _quantise, family
+from training.common import family, fit_strict, logits, prisk_from_logits, score, write_heads
 
 
 def main(argv: list[str]) -> None:
@@ -51,9 +50,9 @@ def main(argv: list[str]) -> None:
         p = np.full(len(c_all), np.nan)
         for g in sorted(set(fam[scored])):
             m = rows & (fam != g)
-            h = fit(x[m], train_cls[m])
+            h = fit_strict(x[m], train_cls[m])
             t = (fam == g) & scored
-            p[t] = prisk_from(logits(h, x[t]))
+            p[t] = prisk_from_logits(logits(h, x[t]))
         s = scored
         r = {
             "lofo_all": score(p[s], c_all[s]),
@@ -67,15 +66,12 @@ def main(argv: list[str]) -> None:
         mod = np.sort(p[s & (c_all == "S")])
         thr_eq = float(mod[round((1 - base_modest) * (len(mod) - 1))])
         r["lofo_all_eq_modest"] = score(p[s], c_all[s], thr_eq)
-        h = fit(x[rows], train_cls[rows])
-        pt = prisk_from(logits(h, xh[te]))
+        h = fit_strict(x[rows], train_cls[rows])
+        pt = prisk_from_logits(logits(h, xh[te]))
         r["test"] = score(pt, cls[te], thr)
         r["test_eq_modest"] = score(pt, cls[te], thr_eq)
         for suffix, t in (("_cal", thr), ("_eq", thr_eq)):
-            d = out / f"{name}{suffix}"
-            d.mkdir(parents=True, exist_ok=True)
-            for fname, text in ((FAST_FILE, _quantise(h[0])), (MALE_FILE, _quantise(h[1])), (THR_FILE, f"{t:.4f}")):
-                (d / fname).write_text(text)
+            write_heads(out / f"{name}{suffix}", h, t)
         rep[name] = r
         print("CAL", name, json.dumps(r), flush=True)
     (out / "calibrate.json").write_text(json.dumps(rep, indent=1))

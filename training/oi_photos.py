@@ -12,7 +12,7 @@ Images with a Girl or Boy box are skipped (no children), as are drawings (IsDepi
 Each photo goes through the engine's own detector and eye crop (full-resolution path), so the eye sees what it sees live.
 Photos are never written out; only embeddings and a small audit sheet per class.
 
-usage: python bench/oi_photos.py OUT_DIR
+usage: python -m training.oi_photos OUT_DIR
 env:   HEAD_DIR=<any head dir, the eye needs one to load>  N_R=1500 N_M=600 N_SW=1500 N_SM=500 WORKERS=32
 Writes OUT_DIR/photos_emb.npz (X fp16, C, G='old' = training only, SRC='photo', TAG = group:rule), OUT_DIR/sheet_<group>.jpg.
 """

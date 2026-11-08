@@ -22,10 +22,10 @@ STD = np.array([0.229, 0.224, 0.225], np.float32) * 255
 
 
 class ViTPose:
-    def __init__(self, repo: str = "usyd-community/vitpose-base-simple") -> None:
+    def __init__(self, repo: str, revision: str) -> None:
         from transformers import VitPoseForPoseEstimation
 
-        self.model = VitPoseForPoseEstimation.from_pretrained(repo).to(DEVICE, HALF).eval()
+        self.model = VitPoseForPoseEstimation.from_pretrained(repo, revision=revision).to(DEVICE, HALF).eval()
 
     def __call__(self, rgb: np.ndarray, boxes: list[Box]) -> list[Keypoints]:
         if not boxes:

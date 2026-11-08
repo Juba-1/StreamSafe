@@ -3,7 +3,7 @@
 Both runs must be offline runs of the same clip (same decisions, same detector); people are paired by frame and box.
 One cell per track and side (the frame where the two scores differ most), at most 30 per side.
 
-usage: python bench/disagree.py VIDEO NAME_A=diag_a.json NAME_B=diag_b.json OUT.jpg
+usage: python -m bench.disagree VIDEO NAME_A=diag_a.json NAME_B=diag_b.json OUT.jpg
 Prints "DISAGREE <json>" (person-decisions covered by only A / only B, tracks) and writes the sheet:
 left block = covered only by A, right block = covered only by B; each cell shows the person in context.
 """

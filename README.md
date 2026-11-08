@@ -1,47 +1,85 @@
 # StreamSafe engine
 
-Covers risky characters in a game stream **before** viewers see them. The picture is held back by a
-fixed delay (2 s by default); during that time every frame is analysed and each person who must be
-covered gets an opaque garment that follows them. If anything goes wrong the viewer gets a
-full-screen "back in a moment" slate - never an unprotected frame.
+Covers risky characters in a game stream **before** viewers see them. The picture is held back by a fixed
+delay (2 s by default). During that time every frame is analysed, and each person who must be covered gets an
+opaque garment that is drawn once and then moves with them. Explicit scenes get a whole-screen card and the
+game audio is muted. If anything goes wrong, viewers get a full-screen slate, never an unprotected frame.
+
+Target setup: the game runs on a console, a capture card feeds the streamer's PC, OBS streams, and StreamSafe
+sits between the capture and the stream scene (`docs/OBS_SETUP.md`).
 
 ## How it fits together
 
 ```
- source ──► capture ──► AnalyzerWorker (own process) ─── decisions ──┐
- (file,                │   detect ─► eye ─► tracks ─► risk ─► pose ─► garments
-  SRT/RTMP,            │                                              ▼
-  OBS Virtual Camera)  └──► delay buffer ──────────────────────► OutputGate ──► sink
-                                                                (fail closed)    (file, RTMP/SRT,
-                                                                                  window for OBS)
+ source ──► capture ──► AnalyzerWorker (own process) ───── decisions ─────┐
+ (file,                │   detect ─► track ─► eye ─► risk ─► pose ─► garment │
+  SRT/RTMP,            │   scene model + HUD reader ─► scene layer           ▼
+  OBS Virtual Camera)  └──► delay buffer ─────────────────────────────► OutputGate ──► sink
+                                                                     (fail closed,    (file, RTMP/SRT,
+                                                                      steady placement) window for OBS)
+                                                                          │
+                                                          OBS state file ─┴─► obs/streamsafe_guard.lua
+                                                          (heartbeat + mute)   (slate + game-audio mute)
 ```
 
-| Package | Responsibility |
+One decision per analysed frame says who is covered and with which garment shape. The gate draws every
+output frame from the decisions next to it (same shot only) and moves each garment with its person.
+
+| Folder | Responsibility |
 |---|---|
-| `streamsafe/config.py` | every setting, grouped by component; each one can be set from the environment |
+| `streamsafe/config.py` | every setting with its default and the reason for it; each one can be set from the environment |
 | `streamsafe/types.py` | data passed between stages: `Person`, `Layer`, `Decision`, `MotionRef` |
-| `streamsafe/models/` | model protocols (`base.py`) + the PyTorch backend; risk heads (`heads.py`) |
-| `streamsafe/analysis/` | `tracks.py` (who is who), `risk.py` (who must be covered), `analyzer.py` (one decision) |
-| `streamsafe/garment/` | `shapes.py` (where the garment goes), `fabric.py` (how it looks), `builder.py` (one layer per person) |
-| `streamsafe/render/` | `compositor.py` (which decisions protect a frame, drawing), `motion.py`, `slate.py` |
-| `streamsafe/runtime/` | `runner.py` (realtime / offline), `worker.py` (analyzer process), `gate.py` (fail-closed output), `cuts.py`, `report.py` |
-| `streamsafe/io/` | `sources.py` (file, FFmpeg URL, capture device), `sinks.py` (file, FFmpeg stream, window) |
-| `bench/` | GPU benchmark tools: metrics, side-by-side videos, frame strips |
-| `tests/` | stand-in models, end-to-end, failure injection, I/O, bit-exact equivalence with the previous engine |
+| `streamsafe/models/` | model protocols (`base.py`), risk heads (`heads.py`), HUD reader (`ocr_hud.py`), PyTorch backend |
+| `streamsafe/analysis/` | `tracks.py` who is who, `risk.py` who must be covered, `scene.py` whole-screen cover, `analyzer.py` one decision |
+| `streamsafe/garment/` | `shapes.py` where the garment goes, `fabric.py` how it looks (colour, logo), `builder.py` one layer per person |
+| `streamsafe/render/` | `compositor.py` drawing, `motion.py` following, `smooth.py` steady placement, `slate.py` slate and scene card |
+| `streamsafe/runtime/` | `runner.py` realtime/offline loop, `worker.py` analyzer process, `gate.py` fail-closed output, `cuts.py`, `report.py` |
+| `streamsafe/io/` | `sources.py` inputs, `sinks.py` outputs, `obs_link.py` state file for the OBS guard |
+| `obs/` | `streamsafe_guard.lua`: OBS script that shows the slate and mutes game audio when the engine says so or stops |
+| `bench/` | measure and review the engine (metrics, side-by-side videos, soak test). See `bench/README.md` |
+| `training/` | build the eye's heads and the scene head from labeled crops. See `training/README.md` |
+| `experiments/` | one-off research scripts behind past decisions. Not used by the engine. See `experiments/README.md` |
+| `tests/` | stand-in models: end-to-end, failure injection, I/O, OBS guard, equivalence with the previous engine |
+
+## What protects the stream
+
+| Layer | What it does | Where |
+|---|---|---|
+| Person garments | Each risky person (the eye's score above the threshold) gets an opaque garment shaped by their pose. Small people get a plain full cover. | `analysis/risk.py`, `garment/` |
+| Release rule | A person is uncovered only after 1 s of clear evidence. A big person seen for the first time needs a stronger score to be covered (no flash covers on faces). | `analysis/risk.py` |
+| Following | Garments follow their person between decisions (motion estimate), are steadied by a small per-person filter, and fast movers get a margin in their direction of motion. | `render/motion.py`, `render/smooth.py`, `garment/builder.py` |
+| Scene layer | Explicit scenes (trained scene head, HUD prompts): whole-screen card + game-audio mute, with lead and tail times. | `analysis/scene.py` |
+| Fail closed | No decision for a frame, a failed or stale decision, a cut with no fresh decision, a crashed analyzer: the last protected frame is repeated for at most 2 frames, then the slate. | `runtime/gate.py` |
+| Bounded latency | A frame more than 0.5 s late is dropped, never shown late, so delay and memory cannot grow. | `runtime/runner.py` |
+| OBS guard | No heartbeat from the engine for 0.5 s: OBS shows the slate and mutes game audio. | `obs/streamsafe_guard.lua` |
+| Brand | Garment colour and chest logo, slate and scene-card image/colour/text are streamer settings. | `config.py` (`GarmentConfig`, `BrandConfig`) |
 
 Rules the code keeps:
-- **Fail closed.** No decision for a frame, a failed decision, a scene cut with no fresh decision, a
-  crashed analyzer: the gate repeats the last protected frame for at most 2 frames, then shows the slate.
-- **Decisions are bound to frames and shots.** A frame is drawn only with decisions at most 18 frames
-  away and never across a scene cut.
-- **Models are sensors; the decision is code.** `analysis/risk.py` is plain, deterministic logic.
-- **Opaque covers only.** No blur, no pixelation.
+- **Fail closed.** Doubt, error or a missing decision means cover, never show.
+- **Decisions are bound to frames and shots.** A frame is drawn only with decisions at most 18 frames away and never across a cut.
+- **Models are sensors; the decision is code.** `analysis/risk.py` and `analysis/scene.py` are plain, deterministic logic.
+- **Opaque covers only.** No blur, no pixelation. Audio is muted with every whole-screen cover.
 - **Swappable models.** The engine only talks to the protocols in `models/base.py`.
+
+## Models
+
+All are downloaded from the Hugging Face Hub at a **pinned commit** (`*_revision` in `config.py`). Nothing new
+reaches a streamer's PC until someone moves the pin on purpose.
+
+| Role | Model | License |
+|---|---|---|
+| Person detector + mask | RF-DETR-Seg Nano (`rfdetr` package) | Apache-2.0 |
+| Eye (who is risky) | `nvidia/C-RADIOv4-H` + our gated logistic heads (`HEAD_DIR`) | NVIDIA Open Model License (heads: ours) |
+| Scene model + beach prior | `google/siglip2-base-patch16-224` + our scene head | Apache-2.0 |
+| Pose (garment shape) | `usyd-community/vitpose-base-simple` | Apache-2.0 |
+| HUD reader (optional) | RapidOCR via `rapidocr_onnxruntime==1.2.3` | Apache-2.0 |
+
+Not allowed in the product: AGPL code or weights (Ultralytics YOLO, NudeNet), research-only weights.
 
 ## Run
 
 ```bash
-pip install -e ".[models]"          # engine + PyTorch models (GPU recommended)
+pip install -e ".[models]"          # engine + PyTorch models (NVIDIA GPU)
 
 # deterministic benchmark of a file (same result on any machine)
 python -m streamsafe --input trailer.mp4 --output review.mp4 --mode offline --head-dir heads/
@@ -50,39 +88,42 @@ python -m streamsafe --input trailer.mp4 --output review.mp4 --mode offline --he
 python -m streamsafe --input trailer.mp4 --output review.mp4 --head-dir heads/ --stats stats.json
 ```
 
-### Connecting OBS
-
-| Way | OBS side | StreamSafe | Restart of the stream needed? |
-|---|---|---|---|
-| **A. Virtual camera in, window out** | see the steps below | `--input "device:OBS Virtual Camera" --output window` | No - every step is an ordinary edit OBS allows while live (to be confirmed on a real setup) |
-| **B. SRT in, platform out** | Stream to `srt://127.0.0.1:9000` (Custom service) | `--input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest>/<key>"` | Yes (OBS's stream target changes) |
-| **C. OBS plugin** | planned (fork of the MIT obs-broadcast-delay / censure plugins) | - | Yes (OBS loads plugins at start) |
-
-Way A, step by step (the raw game never sits in a scene viewers can see):
-1. New scene **RAW** holding only the game capture. It is never switched to.
-2. Virtual Camera settings (gear icon) -> output type *Scene* = **RAW** -> Start Virtual Camera.
-3. Start StreamSafe: `python -m streamsafe --input "device:OBS Virtual Camera" --output window`.
-4. In the live scene: a full-screen slate image at the bottom, a *Window Capture* of "StreamSafe Output"
-   above it, then webcam and overlays. If StreamSafe stops, its window disappears and viewers see the
-   slate - fail closed.
-5. Delay what is not in the picture by the same amount (`--delay`, 2 s by default): *Sync Offset* on game
-   audio and mic (Advanced Audio Properties), *Render Delay* filter on the webcam.
-
-Audio is not processed by the engine yet: in A it is delayed inside OBS (not muted when the slate shows);
-B passes video only.
+Live with OBS (console + capture card): follow `docs/OBS_SETUP.md`. In short, OBS Virtual Camera (hidden raw
+scene) goes in, `--output window` comes out, and OBS captures that window. The guard script handles the slate and
+mutes the audio. The other way is SRT in, platform out:
+`--input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest>/<key>"` (video only).
 
 ## Settings
 
-All in `streamsafe/config.py`, e.g. `DELAY=1.5`, `EYE_EVERY=1`, `COLOR=black`, `LOGO=sponsor.png`,
-`MAX_GAP=18`. CLI flags override the environment.
+Every setting lives in `streamsafe/config.py`, grouped by component, with a comment saying why it has that value.
+Set any of them from the environment by its upper-case name. CLI flags override the environment. Examples:
+
+| Setting | Example | Meaning |
+|---|---|---|
+| `DELAY` | `DELAY=2.0` | stream delay in seconds |
+| `COLOR` / `LOGO` | `COLOR=#2c2c2c LOGO=sponsor.png` | garment colour (palette name or hex) and chest logo |
+| `SLATE_IMAGE` / `SLATE_COLOR` / `SLATE_TEXT` | `SLATE_IMAGE=logo.png` | the fail-closed slate |
+| `SCENE_IMAGE` / `SCENE_TEXT` | | the explicit-scene card |
+| `HUD_OCR` | `HUD_OCR=1` | read the game's on-screen prompts (needs `rapidocr_onnxruntime==1.2.3`) |
+| `SMOOTH`, `MOTION_MARGIN` | `SMOOTH=0` | steady placement and fast-mover margin (both on by default) |
+| `OBS_STATE` | `OBS_STATE=C:\StreamSafe\state.json` | state file read by the OBS guard script |
+
+## Security notes
+
+- Model code: only the eye runs repository code (`trust_remote_code`), and only at its pinned commit. All
+  third-party model downloads are pinned to a commit.
+- The engine never sees the stream key in the recommended OBS setup. OBS keeps it.
+- External programs (FFmpeg) are started with an argument list, never through a shell.
+- The OBS state file holds one line (alive, frame counter, mute, full-screen), written atomically. No network, no password.
+- Offline tools that read untrusted files (videos, label sheets) only decode them and never run them.
 
 ## Tests
 
 ```bash
 pip install -e ".[dev]"
 ruff check . && ruff format --check .
-pytest                       # ~3 min on 2 CPU cores; no GPU or model download needed
+pytest                       # ~4 min on 2 CPU cores; no GPU or model download needed
 ```
 
-`tests/test_equivalence.py` runs the previous engine (`engine2_ref`, set `STREAMSAFE_REF`) next to
-this one and requires identical decisions, garment positions and output pixels.
+`tests/test_equivalence.py` runs the previous engine (`engine2_ref`, set `STREAMSAFE_REF`) next to this one with
+steadying and the motion margin off (engine2 had neither) and requires identical decisions and output pixels.

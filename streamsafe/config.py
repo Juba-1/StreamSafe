@@ -21,10 +21,11 @@ class DetectorConfig:
 
 @dataclass
 class EyeConfig:
-    eye_repo: str = "nvidia/C-RADIOv4-H"
-    # the eye runs the repo's own Python code (trust_remote_code): pinned to the reviewed commit, so a change
-    # upstream can never run unreviewed code on a streamer's PC. Update only after reading the new code.
-    eye_revision: str = "0057b339059c0b9e1b4ba996f975410ebbfdfcc8"
+    # Every downloaded model is pinned to an exact Hub commit (here, scene_revision, pose_revision): an upstream
+    # change can never reach a streamer's PC unreviewed. The eye also runs the repo's own Python code
+    # (trust_remote_code), so read that code before moving its pin.
+    eye_repo: str = "nvidia/C-RADIOv4-H"  # NVIDIA Open Model License
+    eye_revision: str = "0057b339059c0b9e1b4ba996f975410ebbfdfcc8"  # 2026-01-30
     eye_w: int = 224
     eye_h: int = 384
     head_dir: str = ""  # folder with fast_h6.txt, male_h6.txt, thr_h6.txt
@@ -44,6 +45,8 @@ class RiskConfig:
 @dataclass
 class SceneConfig:
     scene_guard: bool = True  # whole-screen cover + game audio mute for explicit scenes
+    scene_repo: str = "google/siglip2-base-patch16-224"  # Apache-2.0; also the beach / pool prior
+    scene_revision: str = "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2"  # 2025-02-21
     scene_enter: float = 0.5  # scene model probability that turns the cover on (calibrated in run 41)
     scene_exit: float = 0.3  # ...and keeps it on
     scene_hold_s: float = 3.0  # cover stays this long after the last trigger
@@ -64,6 +67,8 @@ class SceneConfig:
 @dataclass
 class GarmentConfig:
     small_h: int = 64  # shorter people get a plain full cover (no pose); hysteresis x0.8 / x1.25
+    pose_repo: str = "usyd-community/vitpose-base-simple"  # Apache-2.0
+    pose_revision: str = "a93ac0c67e0b7e2c55287d21d4c460c8f3c54d45"  # 2025-01-08
     kp_smooth: float = 0.5  # skeleton smoothing between consecutive decisions
     shape_memory: bool = True  # a garment never shrinks in a single step
     # fast movers (> margin_min_speed x their height between two decisions): the garment also covers where

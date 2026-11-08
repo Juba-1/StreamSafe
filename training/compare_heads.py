@@ -1,6 +1,6 @@
 """Compare head-training recipes on the same labeled crops and write the heads of each.
 
-Recipes (all: gated heads, logistic regression C=2 balanced, threshold = 85% women recall in leave-one-game-family-out),
+Recipes (all: the gated-head recipe of training/common.py, threshold = 85% women recall in leave-one-game-family-out),
 chosen with RECIPES=name,name (default: all):
     old_labels    the earlier rounds as Claude labeled them (+ Ali's hard round)
     ali           the same crops after Ali's review
@@ -8,11 +8,11 @@ chosen with RECIPES=name,name (default: all):
     ali_photos    + Open Images photos at half weight
     ali_aug_photos  both
 Every recipe is SCORED with Ali's labels on real (not recoloured) game crops, so the numbers compare directly.
-env EXTRA=a.npz[,b.npz] adds examples from bench/add_examples.py (e.g. a modest character the eye covered) to
+env EXTRA=a.npz[,b.npz] adds examples from training/add_examples.py (e.g. a modest character the eye covered) to
 the TRAINING of every recipe, never to a test fold; EXTRA_WEIGHT (default 1) is their sample weight.
 Recoloured copies of a game family are left out of training while that family is tested; photos never enter a test fold.
 
-usage: python -m bench.compare_heads OUT_DIR LABELED.npz PHOTOS.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
+usage: python -m training.compare_heads OUT_DIR LABELED.npz PHOTOS.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
 Writes OUT_DIR/<recipe>/{fast_h6,male_h6,thr_h6}.txt and OUT_DIR/compare.json; prints "R37 <json>".
 """
 
@@ -24,23 +24,10 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-from bench.train_heads import FAST_FILE, MALE_FILE, THR_FILE, _quantise, load_mined, report, score_test
 from streamsafe.models.heads import RiskHeads
-
-
-def fit(x: np.ndarray, cls: np.ndarray, w: np.ndarray) -> tuple[LogisticRegression, LogisticRegression]:
-    def lr() -> LogisticRegression:
-        return LogisticRegression(max_iter=5000, C=2.0, class_weight="balanced")
-
-    a, b = cls != "M", cls != "S"
-    return lr().fit(x[a], cls[a] == "R", sample_weight=w[a]), lr().fit(x[b], cls[b] == "M", sample_weight=w[b])
-
-
-def prisk(heads: tuple[LogisticRegression, LogisticRegression], x: np.ndarray) -> np.ndarray:
-    return heads[0].predict_proba(x)[:, 1] * (1 - heads[1].predict_proba(x)[:, 1])
+from training.common import fit, load_mined, prisk, report, score_test, write_heads
 
 
 def main(argv: list[str]) -> None:
@@ -97,12 +84,8 @@ def main(argv: list[str]) -> None:
         xs, cs, ws = x[use], cls[use], weight[use]
         if pw > 0:
             xs, cs, ws = np.concatenate([xs, px]), np.concatenate([cs, pc]), np.concatenate([ws, np.full(len(pc), pw)])
-        heads = fit(xs, cs, ws)
         d = out / name
-        d.mkdir(parents=True, exist_ok=True)
-        thr = r["at_0.85"]["thr"]
-        for fname, text in ((FAST_FILE, _quantise(heads[0])), (MALE_FILE, _quantise(heads[1])), (THR_FILE, f"{thr:.4f}")):
-            (d / fname).write_text(text)
+        write_heads(d, fit(xs, cs, ws), r["at_0.85"]["thr"])
         new = RiskHeads.load(d)
         r["test"] = score_test(new.prisk(te["x"]), new.thr, te["cls"], te["small"])
         if pw > 0:  # how the photo-trained heads judge the photos themselves (sanity, not a test)

@@ -44,11 +44,11 @@ OTHER_PROMPTS = [
 
 
 class SigLIPScene:
-    def __init__(self, repo: str = "google/siglip2-base-patch16-224", head: LinearHead | None = None) -> None:
+    def __init__(self, repo: str, revision: str, head: LinearHead | None = None) -> None:
         from transformers import AutoModel, AutoProcessor
 
-        self.model = AutoModel.from_pretrained(repo, torch_dtype=HALF).to(DEVICE).eval()
-        self.processor = AutoProcessor.from_pretrained(repo)
+        self.model = AutoModel.from_pretrained(repo, revision=revision, torch_dtype=HALF).to(DEVICE).eval()
+        self.processor = AutoProcessor.from_pretrained(repo, revision=revision)
         prompts = SWIM_PROMPTS + EXPLICIT_PROMPTS + OTHER_PROMPTS
         text = self.processor(text=prompts, padding="max_length", max_length=64, return_tensors="pt")
         with torch.inference_mode():

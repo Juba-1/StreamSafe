@@ -4,7 +4,7 @@ Re-runs the mining sampler (same FPS / SECS) over the given videos, finds every 
 (same video, same sample index, closest height, embedding check) and scores it twice with the same heads:
 the crop cut from the 960x540 analysis frame (as today) and the crop cut from the native frame.
 
-usage: python bench/hires_eye.py OUT_DIR HEAD_DIR MINED_DIR LABELS.csv VIDEO [VIDEO ...]
+usage: python -m experiments.hires_eye OUT_DIR HEAD_DIR MINED_DIR LABELS.csv VIDEO [VIDEO ...]
 env:   FPS=2 SECS=90 (must match the mining run)
 Prints "HIRES_VIDEO ..." per video and "HIRES_REPORT <json>"; writes OUT_DIR/hires.csv and a contact
 sheet OUT_DIR/pairs.jpg (low-res crop | high-res crop) of the revealing women.

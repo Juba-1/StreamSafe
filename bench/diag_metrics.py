@@ -1,7 +1,7 @@
 """Cover-quality metrics from an engine diag log (``--diag``) and an independent per-frame person
 detection of the same source frames.
 
-usage: python bench/diag_metrics.py SRC.mp4 SECS LABEL=diag.json [LABEL=diag.json ...]
+usage: python -m bench.diag_metrics SRC.mp4 SECS LABEL=diag.json [LABEL=diag.json ...]
 
 lag        garment centre vs the detected person's centre in the SAME shown frame (fraction of width / height)
 off_body   share of the garment box outside the person box (trailing garment / ghost)

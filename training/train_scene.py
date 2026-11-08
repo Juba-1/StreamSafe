@@ -1,13 +1,13 @@
 """Train the explicit-scene head on labeled game frames (CPU, seconds).
 
-Inputs: one or more scene_emb.npz files from bench.scene_probe (clip, t, emb) and a labels CSV
+Inputs: one or more scene_emb.npz files from experiments/scene_probe.py (clip, t, emb) and a labels CSV
 (npz_index,row,label) with label E = explicit scene (must be hidden whole-screen) or N = not.
 Evaluation: leave-one-source-video-out (clip name without its start-second suffix), so a video never
 helps judge itself.
 The operating point favours precision (a whole-screen card on a normal scene is very visible): the
 threshold where at most MAX_FP of the not-explicit frames would trigger, and the recall it gives.
 
-usage: python -m bench.train_scene OUT_DIR LABELS.csv EMB0.npz [EMB1.npz ...]
+usage: python -m training.train_scene OUT_DIR LABELS.csv EMB0.npz [EMB1.npz ...]
 Writes OUT_DIR/scene_h.txt (eye-head format) and OUT_DIR/scene_report.json; prints "SCENE_HEAD <json>".
 """
 
@@ -23,7 +23,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-from bench.train_heads import _quantise
+from training.common import quantise
 
 MAX_FP = 0.01  # not-explicit frames allowed above the enter threshold
 EXIT_FP = 0.05  # ... above the (lower) stay-on threshold
@@ -73,7 +73,7 @@ def main(argv: list[str]) -> None:
     )  # fmt: skip
     clf = LogisticRegression(max_iter=5000, C=1.0, class_weight="balanced").fit(x, y)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "scene_h.txt").write_text(_quantise(clf))
+    (out / "scene_h.txt").write_text(quantise(clf))
     (out / "scene_report.json").write_text(json.dumps(rep, indent=1))
     print("SCENE_HEAD " + json.dumps(rep), flush=True)
 

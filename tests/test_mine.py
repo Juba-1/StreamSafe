@@ -1,4 +1,4 @@
-"""Hard-case mining (bench/mine_hard.py) on the stand-in models: band filter, de-duplication, outputs."""
+"""Hard-case mining (training/mine_hard.py) on the stand-in models: band filter, de-duplication, outputs."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pytest
 from streamsafe.config import Config
 from tests.stubs import BLUE, make_video, stub_analyzer
 
-_spec = importlib.util.spec_from_file_location("mine_hard", Path(__file__).parents[1] / "bench" / "mine_hard.py")
+_spec = importlib.util.spec_from_file_location("mine_hard", Path(__file__).parents[1] / "training" / "mine_hard.py")
 mine_hard = importlib.util.module_from_spec(_spec)
 sys.modules["mine_hard"] = mine_hard  # dataclasses look their module up while the file runs
 _spec.loader.exec_module(mine_hard)

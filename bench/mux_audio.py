@@ -4,7 +4,7 @@ The engine's output frame v is input frame v (the delay only shifts when it is s
 [a, b] in frames is [a / fps, (b + 1) / fps] in the clip's own time. Clips downloaded video-only get a quiet
 test tone instead, so the mute can still be heard.
 
-usage: python bench/mux_audio.py PROTECTED.mp4 ORIGINAL_CLIP STATS.json OUT.mp4
+usage: python -m bench.mux_audio PROTECTED.mp4 ORIGINAL_CLIP STATS.json OUT.mp4
 """
 
 import json

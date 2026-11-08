@@ -1,11 +1,11 @@
 """Compare head-training variants on one labeled set: which use of a hard-mining round helps?
 
-Each variant is trained like bench/train_heads.py (same recipe, same LOFO threshold) and scored on
+Each variant is trained like training/train_heads.py (same recipe, same LOFO threshold) and scored on
   - leave-one-game-family-out (LOFO) at 85% / 90% women recall: modest and men covered, women caught
   - the held-out mined test split: women / modest / men covered at the variant's own LOFO threshold,
     and AUC of revealing women vs everyone else (threshold-free ranking quality)
 
-usage: python bench/sweep_heads.py LABELED_EMB.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
+usage: python -m experiments.sweep_heads LABELED_EMB.npz MINED_DIR LABELS.csv OLD_HEAD_DIR
 Prints one "SWEEP <name> <json>" line per variant.
 """
 
@@ -19,10 +19,8 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
-sys.path.insert(0, str(Path(__file__).parent))
-from train_heads import load_mined, report, score_test
-
 from streamsafe.models.heads import RiskHeads
+from training.common import load_mined, report, score_test
 
 
 def _lr(c: float) -> LogisticRegression:

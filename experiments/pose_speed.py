@@ -1,7 +1,7 @@
 """What posture costs at run time: ViTPose on 1 / 4 / 8 people of a real frame, plus the posture features,
 next to the eye on the same people.
 
-usage: python -m bench.pose_speed HEAD_DIR VIDEO
+usage: python -m experiments.pose_speed HEAD_DIR VIDEO
 Prints "POSE_SPEED <json>" (median ms over 30 runs after warm-up).
 """
 

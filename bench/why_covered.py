@@ -1,5 +1,5 @@
 """Why a modest person is covered: per decision, the biggest person's risk score, the beach prior and the
-threshold (diag JSON from --diag). usage: python -m bench.lucia_probe DIAG.json [SECONDS=12] [FPS=30]"""
+threshold (diag JSON from --diag). usage: python -m bench.why_covered DIAG.json [SECONDS=12] [FPS=30]"""
 
 from __future__ import annotations
 

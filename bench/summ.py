@@ -1,5 +1,5 @@
 """One summary line per engine run, read from the LIVE_RESULT line on stdin.
-usage: python -m streamsafe ... | python bench/summ.py NAME"""
+usage: python -m streamsafe ... | python -m bench.summ NAME"""
 
 import json
 import sys

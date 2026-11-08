@@ -5,7 +5,7 @@ candidate when its risk p is near the threshold - small and mid-size people (the
 get a wider band. Candidates are de-duplicated (inside the video and against every crop that is
 already labeled), the hardest are kept, and numbered contact sheets are drawn for labeling.
 
-usage: python bench/mine_hard.py OUT_DIR HEAD_DIR LABELED_EMB.npz VIDEO [VIDEO ...]
+usage: python -m training.mine_hard OUT_DIR HEAD_DIR LABELED_EMB.npz VIDEO [VIDEO ...]
 env:   FPS=2  SECS=90  PER_VIDEO=8  PER_TEST_VIDEO=40  TEST=name,name  (held-out videos -> test split)
 
 Output: OUT_DIR/{crops,ctx}/<id>.jpg, meta.csv (id,split,video,frame,h,p), emb.npy (row = id),

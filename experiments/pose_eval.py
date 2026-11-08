@@ -1,6 +1,6 @@
 """Run 39: do Ali's review32 labels and posture features make the eye's heads better?
 
-Head recipes (gated logistic heads, C=2 balanced) on the earlier labeled set + the mined rounds (bench.refind):
+Head recipes (gated logistic heads, C=2 balanced) on the earlier labeled set + the mined rounds (training/refind.py):
     ali      earlier set + round-30 mined crops cut from the analysis frame (= today's heads)
     ali_hi   the same crops cut from the full-resolution frame (what the live engine sees)
     ali32    + round-38 mined crops (review32), full-res
@@ -12,7 +12,7 @@ Posture (streamsafe.analysis.posture) on top of the best eye recipe:
     stack    a small logistic model on [eye logits, posture features], fitted on out-of-fold eye logits
     rule_k   p x k when the pose is suggestive (lying / bent over / head below hips / legs wide apart / seen from behind)
 
-usage: python -m bench.pose_eval OUT_DIR LABELED.npz REFIND.npz
+usage: python -m experiments.pose_eval OUT_DIR LABELED.npz REFIND.npz
 Writes OUT_DIR/<recipe>/{fast_h6,male_h6,thr_h6}.txt and OUT_DIR/report39.json; prints "P39 <name> <json>".
 """
 
@@ -23,51 +23,11 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
 
-from bench.train_heads import FAST_FILE, MALE_FILE, THR_FILE, _quantise, family
 from streamsafe.analysis.posture import NAMES, features
+from training.common import family, fit_strict, logistic, logits, prisk_from_logits, score, write_heads
 
-RECALL = 0.85
 INNER = 3  # inner folds for out-of-fold eye logits (stacking)
-
-
-def lr(c: float = 2.0) -> LogisticRegression:
-    return LogisticRegression(max_iter=5000, C=c, class_weight="balanced")
-
-
-def fit(x: np.ndarray, cls: np.ndarray) -> tuple[LogisticRegression, LogisticRegression]:
-    """Women head: R vs S (N counts as S); male head: M vs R."""
-    a, b = cls != "M", np.isin(cls, ("M", "R"))
-    return lr().fit(x[a], cls[a] == "R"), lr().fit(x[b], cls[b] == "M")
-
-
-def logits(h: tuple[LogisticRegression, LogisticRegression], x: np.ndarray) -> np.ndarray:
-    return np.stack([h[0].decision_function(x), h[1].decision_function(x)], 1)
-
-
-def prisk_from(lg: np.ndarray) -> np.ndarray:
-    sig = 1 / (1 + np.exp(-lg))
-    return sig[:, 0] * (1 - sig[:, 1])
-
-
-def score(p: np.ndarray, cls: np.ndarray, thr: float | None = None, small: np.ndarray | None = None) -> dict:
-    """Threshold at RECALL women recall (unless given) and what it covers per class."""
-    r = cls == "R"
-    if thr is None:
-        thr = float(np.quantile(p[r], 1 - RECALL)) if r.any() else 0.5
-    hit = p >= thr
-    out: dict = {"thr": round(thr, 4), "n": {c: int((cls == c).sum()) for c in "RSMN"}}
-    for name, c in (("women", "R"), ("modest", "S"), ("men", "M"), ("not_person", "N")):
-        if (cls == c).any():
-            out[name] = round(float(hit[cls == c].mean()), 4)
-    known = np.isin(cls, ("R", "S", "M"))
-    if len(set(r[known])) == 2:
-        out["auc"] = round(float(roc_auc_score(r[known], p[known])), 4)
-    if small is not None and (r & small).any():
-        out["women_small"] = round(float(hit[r & small].mean()), 4)
-    return out
 
 
 def posture_matrix(rf: np.lib.npyio.NpzFile) -> np.ndarray:
@@ -120,18 +80,15 @@ def main(argv: list[str]) -> None:
         lg_all = np.full((len(cls), 2), np.nan)
         for g in sorted(set(fam[scored])):
             m = rows & (fam != g)
-            h = fit(np.concatenate([bx, xm[m]]), np.concatenate([bc, col(use_n, m)]))
+            h = fit_strict(np.concatenate([bx, xm[m]]), np.concatenate([bc, col(use_n, m)]))
             t = (fam == g) & tr
             lg_all[t] = logits(h, xh[t])
-            p[t] = prisk_from(lg_all[t])
+            p[t] = prisk_from_logits(lg_all[t])
         best_lofo[name] = lg_all
         r = {"lofo": score(p[tr], cls[tr], small=small[tr])}
-        h = fit(np.concatenate([bx, xm[rows]]), np.concatenate([bc, col(use_n, rows)]))
-        r["test"] = score(prisk_from(logits(h, xh[te])), cls[te], r["lofo"]["thr"], small[te])
-        d = out / name
-        d.mkdir(parents=True, exist_ok=True)
-        for fname, text in ((FAST_FILE, _quantise(h[0])), (MALE_FILE, _quantise(h[1])), (THR_FILE, f"{r['lofo']['thr']:.4f}")):
-            (d / fname).write_text(text)
+        h = fit_strict(np.concatenate([bx, xm[rows]]), np.concatenate([bc, col(use_n, rows)]))
+        r["test"] = score(prisk_from_logits(logits(h, xh[te])), cls[te], r["lofo"]["thr"], small[te])
+        write_heads(out / name, h, r["lofo"]["thr"])
         rep[name] = r
         print("P39", name, json.dumps(r), flush=True)
 
@@ -142,12 +99,12 @@ def main(argv: list[str]) -> None:
     base = "ali32n"
     rows, xm, use_n = recipes[base]
     lg = best_lofo[base]
-    p_eye = prisk_from(lg)
+    p_eye = prisk_from_logits(lg)
     for k in (1.5, 2.0, 3.0):
         pk = np.where(sug, np.minimum(1.0, p_eye * k), p_eye)
         r = {"lofo": score(pk[tr], cls[tr], small=small[tr])}
-        h = fit(np.concatenate([bx, xm[rows]]), np.concatenate([bc, col(use_n, rows)]))
-        pt = prisk_from(logits(h, xh[te]))
+        h = fit_strict(np.concatenate([bx, xm[rows]]), np.concatenate([bc, col(use_n, rows)]))
+        pt = prisk_from_logits(logits(h, xh[te]))
         r["test"] = score(np.where(sug[te], np.minimum(1.0, pt * k), pt), cls[te], r["lofo"]["thr"], small[te])
         rep[f"rule_{k}"] = r
         print("P39", f"rule_{k}", json.dumps(r), flush=True)
@@ -162,16 +119,16 @@ def main(argv: list[str]) -> None:
         for j in range(INNER):
             hold = np.isin(fam, inner[j::INNER])
             mi = m & ~hold
-            hi = fit(np.concatenate([bx, xm[mi]]), np.concatenate([bc, col(use_n, mi)]))
+            hi = fit_strict(np.concatenate([bx, xm[mi]]), np.concatenate([bc, col(use_n, mi)]))
             sel = m & hold
             oof[sel] = logits(hi, xh[sel])
         st_rows = m & ~np.isnan(oof[:, 0])
-        stk = lr(1.0).fit(zf(oof[st_rows], post[st_rows]), cls[st_rows] == "R")
+        stk = logistic(1.0).fit_strict(zf(oof[st_rows], post[st_rows]), cls[st_rows] == "R")
         t = (fam == g) & tr
         p_st[t] = stk.predict_proba(zf(lg[t], post[t]))[:, 1]
     r = {"lofo": score(p_st[tr], cls[tr], small=small[tr])}
-    stk = lr(1.0).fit(zf(lg[tr], post[tr]), cls[tr] == "R")  # final stacker on the LOFO logits of all training rows
-    h = fit(np.concatenate([bx, xm[rows]]), np.concatenate([bc, col(use_n, rows)]))
+    stk = logistic(1.0).fit_strict(zf(lg[tr], post[tr]), cls[tr] == "R")  # final stacker on the LOFO logits of all training rows
+    h = fit_strict(np.concatenate([bx, xm[rows]]), np.concatenate([bc, col(use_n, rows)]))
     r["test"] = score(stk.predict_proba(zf(logits(h, xh[te]), post[te]))[:, 1], cls[te], r["lofo"]["thr"], small[te])
     r["weights"] = dict(zip(["eye_women", "eye_male", *NAMES], np.round(stk.coef_[0], 3).tolist(), strict=True))
     rep["stack"] = r

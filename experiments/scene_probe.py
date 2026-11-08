@@ -8,7 +8,7 @@ and OUT/scene_emb.npz (clip, t, emb fp16) so a scene head can be trained on labe
 With ALL=1 every sampled frame also goes to numbered labeling sheets (OUT/label/sheet_NNN.jpg, 24 per sheet,
 cell = global row id of scene_emb.npz), so frames can be labeled explicit / not and a head trained.
 
-usage: python -m bench.scene_probe OUT_DIR VIDEO [VIDEO ...]      env: FPS=2 SECS=600 HUD=0 TOP=24 ALL=0
+usage: python -m experiments.scene_probe OUT_DIR VIDEO [VIDEO ...]      env: FPS=2 SECS=600 HUD=0 TOP=24 ALL=0
 Prints "SCENE_CLIP <json>" per clip and "SCENE_TIMING <json>".
 """
 
@@ -25,6 +25,7 @@ import cv2
 import numpy as np
 
 from streamsafe.analysis.scene import hud_hit
+from streamsafe.config import Config
 from streamsafe.io.sources import VideoFileSource
 from streamsafe.models.torch_backend.scene import EXPLICIT_PROMPTS, OTHER_PROMPTS, SWIM_PROMPTS, SigLIPScene
 
@@ -60,7 +61,8 @@ def main(argv: list[str]) -> None:
         from streamsafe.models.ocr_hud import RapidHud
 
         hud = RapidHud()
-    scene = SigLIPScene()
+    sc = Config().scene
+    scene = SigLIPScene(sc.scene_repo, sc.scene_revision)
     t_scene, t_hud = [], []
     all_emb, all_key = [], []
     with open(out / "scene_probe.csv", "w", newline="") as f:

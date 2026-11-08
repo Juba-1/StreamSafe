@@ -6,9 +6,9 @@ T1; the biggest person of each frame becomes one example with the given label (R
 M man). A contact sheet of the chosen crops is written next to the output, so a person can check that the
 right character was picked before the examples are used.
 
-usage: HEAD_DIR=<heads> python -m bench.add_examples OUT.npz VIDEO T0 T1 LABEL [FAMILY]
+usage: HEAD_DIR=<heads> python -m training.add_examples OUT.npz VIDEO T0 T1 LABEL [FAMILY]
 Writes OUT.npz (X fp16 unit-norm, C label, G family) and OUT.jpg; prints "EXAMPLES <json>".
-Use the npz with ``EXTRA=OUT.npz python -m bench.compare_heads ...`` (training only, never a test fold).
+Use the npz with ``EXTRA=OUT.npz python -m training.compare_heads ...`` (training only, never a test fold).
 """
 
 from __future__ import annotations

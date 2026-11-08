@@ -1,5 +1,5 @@
 """Frame strips from a side-by-side video: at each time, 6 frames 0.1 s apart, stacked -> one jpg.
-usage: python bench/strips.py SBS.mp4 OUT_PREFIX 1.0,6.7,21.8"""
+usage: python -m bench.strips SBS.mp4 OUT_PREFIX 1.0,6.7,21.8"""
 
 import sys
 

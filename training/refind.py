@@ -5,7 +5,7 @@ Several mining rounds at once (each a MINED_DIR with meta.csv + emb.npy and Ali'
 The mining sampler is re-run (same FPS / SECS); a person is the same when the recomputed analysis-frame
 embedding matches the stored one (cosine >= 0.97) and the height agrees within 4 px.
 
-usage: python -m bench.refind OUT.npz HEAD_DIR TAG=MINED_DIR=LABELS.csv [...] -- VIDEO [VIDEO ...]
+usage: python -m training.refind OUT.npz HEAD_DIR TAG=MINED_DIR=LABELS.csv [...] -- VIDEO [VIDEO ...]
 env:   FPS=2 SECS=90 (must match the mining runs)
 Writes OUT.npz: tag, id, split, video, label, h, box (n,4 analysis px), x_low, x_high (fp16), kp (n,17,2) in box
 units (0..1, x from the box left, y from the box top), ks (n,17) keypoint scores. Prints "REFIND ..." lines.

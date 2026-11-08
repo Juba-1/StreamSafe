@@ -1,5 +1,5 @@
 """Side-by-side review video: OLD (left) | NEW (right), 960x540 each -> 1920x540 H.264.
-usage: python bench/sbs.py OLD.mp4 NEW.mp4 OUT.mp4"""
+usage: python -m bench.sbs OLD.mp4 NEW.mp4 OUT.mp4"""
 
 import sys
 
