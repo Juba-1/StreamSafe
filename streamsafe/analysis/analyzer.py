@@ -143,7 +143,8 @@ class Analyzer:
         timings["garment"], _ = _lap(clock)
 
         if cfg.output.diag_out:
-            self.diag.append([frame_id, [[p.tid, list(p.box), round(p.p, 3), int(p.risky), int(p.stale)] for p in people]])
+            dets = [[p.tid, list(p.box), round(p.p, 3), int(p.risky), int(p.stale)] for p in people]
+            self.diag.append([frame_id, dets, round(self.p_swim, 3), round(thr, 4)])  # + beach prior and threshold
         return Decision(
             frame_id=frame_id,
             ok=True,

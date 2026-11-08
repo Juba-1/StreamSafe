@@ -125,7 +125,7 @@ def metrics(diag: dict, people: list[list[Box]]) -> dict:
         return round(float(np.percentile(values, p)), 3) if values else None
 
     early: dict[int, dict] = {}
-    for fid, dets in diag["dec"]:
+    for fid, dets, *_ in diag["dec"]:
         if fid > 25 * FPS:
             break
         for tid, box, p, risky, _stale in dets:
@@ -168,7 +168,7 @@ def late_cover(decisions: list) -> dict:
     looking ahead in the delay buffer."""
     first: dict[int, int] = {}
     first_risky: dict[int, int] = {}
-    for fid, dets in decisions:
+    for fid, dets, *_ in decisions:
         for tid, _box, _p, risky, _stale in dets:
             first.setdefault(tid, fid)
             if risky:

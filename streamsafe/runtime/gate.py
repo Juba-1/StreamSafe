@@ -21,10 +21,10 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
-from streamsafe.config import RenderConfig, SceneConfig
+from streamsafe.config import BrandConfig, RenderConfig, SceneConfig
 from streamsafe.render.compositor import DrawLog, compose, usable_decisions
 from streamsafe.render.lookahead import backfill
-from streamsafe.render.slate import make_scene_card, make_slate
+from streamsafe.render.slate import brand_frames
 from streamsafe.types import ANALYSIS_SIZE, Decision
 
 SCENE_LOOK = 150  # frames: how far ahead a scene decision is searched (late evidence reaches back this far at most)
@@ -38,11 +38,11 @@ class OutputGate:
         keep_log: bool = False,
         scene: SceneConfig | None = None,
         fps: float = 30.0,
+        brand: BrandConfig | None = None,
     ) -> None:
         self.cfg = cfg
         self.scale = output_size[0] / ANALYSIS_SIZE[0]
-        self.slate = make_slate(*output_size)
-        self.card = make_scene_card(*output_size)
+        self.slate, self.card = brand_frames(*output_size, brand or BrandConfig())
         scene = scene or SceneConfig()
         self._back = round(scene.scene_back_s * fps)
         self._lead = round(scene.mute_lead_s * fps)

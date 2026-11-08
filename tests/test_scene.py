@@ -119,8 +119,9 @@ def test_hud_thread_reads_in_background_and_counts_errors():
     assert hud.results() == [(3, 0.2, "")] and hud.errors == 1
 
 
-def test_body_close_up_gets_the_card(tmp_path, stub_run):
-    """A risky person filling ~45% of the frame (frames 30-59) is hidden whole-screen, not with a giant garment."""
+def test_close_up_card_is_off_by_default_and_works_when_set(tmp_path, stub_run):
+    """Default: a risky person filling ~45% of the frame keeps a garment (Ali: the 0:56 trailer card was wrong).
+    With close_area set (strict option), frames 30-59 are hidden whole-screen instead."""
     import cv2
 
     from tests.stubs import RED
@@ -134,6 +135,8 @@ def test_body_close_up_gets_the_card(tmp_path, stub_run):
         writer.write(im)
     writer.release()
     _, sink = stub_run(path, "offline", close_hold_s=0.3)
+    assert not any(is_card(o) for o in sink.frames), "default: garments only, no card"
+    _, sink = stub_run(path, "offline", close_hold_s=0.3, close_area=0.35)
     card = [v for v, o in enumerate(sink.frames) if is_card(o)]
     assert set(range(30, 60)) <= set(card), "the close-up is hidden"
     assert min(card) >= 30 - 15, "starts at most scene_back_s (0.5 s) before the first close decision"

@@ -32,9 +32,9 @@ def _iou(a: list[int], b: list[int]) -> float:
 
 def pairs(dec_a: list, dec_b: list) -> list[tuple[int, list[int], float, float, int, int, int]]:
     """(frame, box, p_a, p_b, risky_a, risky_b, track id in A) for every person seen by both runs."""
-    b_by_frame = dict(dec_b)
+    b_by_frame = {d[0]: d[1] for d in dec_b}
     out = []
-    for fid, people in dec_a:
+    for fid, people, *_ in dec_a:
         others = b_by_frame.get(fid, [])
         for tid, box, p, risky, _stale in people:
             best = max(others, key=lambda o: _iou(box, o[1]), default=None)

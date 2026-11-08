@@ -18,7 +18,7 @@ import numpy as np
 
 from streamsafe.analysis.tracks import GarmentMemory
 from streamsafe.config import GarmentConfig
-from streamsafe.garment.fabric import PALETTE, fabric, load_logo, put_logo
+from streamsafe.garment.fabric import fabric, load_logo, parse_color, put_logo
 from streamsafe.garment.shapes import cover_shape, robe_region
 from streamsafe.models.base import Keypoints
 from streamsafe.types import ANALYSIS_SIZE, Layer, Person
@@ -48,7 +48,7 @@ class GarmentBuilder:
     def __init__(self, cfg: GarmentConfig, output_scale: float) -> None:
         self.cfg = cfg
         self.scale = output_scale  # output px per analysis px
-        self.color = PALETTE[cfg.color]
+        self.color = parse_color(cfg.color)
         self.logo = load_logo(cfg.logo)
 
     def build(

@@ -20,6 +20,19 @@ PALETTE: dict[str, tuple[int, int, int]] = {
     "white": (225, 228, 230),
 }
 N_FOLDS = 6
+EDGE_FEATHER = 0.12  # a logo without transparency fades in over this share of its size (no hard square edge)
+
+
+def parse_color(value: str) -> tuple[int, int, int]:
+    """BGR from a palette name or "#RRGGBB"."""
+    v = value.strip()
+    if v.lower() in PALETTE:
+        return PALETTE[v.lower()]
+    h = v.lstrip("#")
+    if len(h) != 6:
+        raise ValueError(f"colour must be a palette name {sorted(PALETTE)} or #RRGGBB, got {value!r}")
+    r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+    return (b, g, r)
 
 
 def fabric(im: np.ndarray, region: np.ndarray, info: dict | None, color: tuple[int, int, int] | np.ndarray, seed: int = 0) -> np.ndarray:
@@ -92,13 +105,18 @@ def load_logo(path: str) -> np.ndarray | None:
         return None
     if logo.ndim == 2:
         logo = cv2.cvtColor(logo, cv2.COLOR_GRAY2BGRA)
-    if logo.shape[2] == 3:
-        logo = np.dstack([logo, np.full(logo.shape[:2], 255, np.uint8)])
+    if logo.shape[2] == 3:  # no transparency: opaque, with softly faded edges
+        h, w = logo.shape[:2]
+        f = max(1.0, EDGE_FEATHER * min(h, w))
+        ramp_y = np.clip((np.minimum(np.arange(h), h - 1 - np.arange(h)) + 0.5) / f, 0, 1)
+        ramp_x = np.clip((np.minimum(np.arange(w), w - 1 - np.arange(w)) + 0.5) / f, 0, 1)
+        alpha = (255 * np.outer(ramp_y, ramp_x) ** 1.5).astype(np.uint8)  # the image itself stays exact
+        logo = np.dstack([logo, alpha])
     return logo
 
 
 def put_logo(fab: np.ndarray, region: np.ndarray, logo: np.ndarray) -> np.ndarray:
-    """Logo on the chest band of the garment (inside the garment only), keeping the folds' shading."""
+    """Logo on the chest band of the garment (inside the garment only), in its own exact colours."""
     ys, xs = np.nonzero(region)
     if len(ys) < 200:
         return fab
@@ -108,13 +126,13 @@ def put_logo(fab: np.ndarray, region: np.ndarray, logo: np.ndarray) -> np.ndarra
     if band.sum() < 50:
         return fab
     cx = int(np.median(xs[band]))
-    lw = int(0.62 * (np.percentile(xs[band], 90) - np.percentile(xs[band], 10)))
+    lw = int(0.85 * (np.percentile(xs[band], 90) - np.percentile(xs[band], 10)))
     if lw < 12:
         return fab
-    lh = min(max(1, int(lw * logo.shape[0] / logo.shape[1])), int(0.38 * height))
+    lh = min(max(1, int(lw * logo.shape[0] / logo.shape[1])), int(0.42 * height))
     lw = max(1, int(lh * logo.shape[1] / logo.shape[0]))
     scaled = cv2.resize(logo, (lw, lh), interpolation=cv2.INTER_AREA)
-    cy = int(top + 0.27 * height)
+    cy = int(top + 0.08 * height + lh // 2 + 0.02 * height)
     y0, x0 = cy - lh // 2, cx - lw // 2
     a1, b1 = max(0, y0), max(0, x0)
     a2, b2 = min(fab.shape[0], y0 + lh), min(fab.shape[1], x0 + lw)
@@ -122,7 +140,5 @@ def put_logo(fab: np.ndarray, region: np.ndarray, logo: np.ndarray) -> np.ndarra
         return fab
     g = scaled[a1 - y0 : a2 - y0, b1 - x0 : b2 - x0].astype(np.float32)
     alpha = (g[..., 3:] / 255.0) * region[a1:a2, b1:b2, None]
-    lum = fab[a1:a2, b1:b2].astype(np.float32).mean(2, keepdims=True) / max(1.0, float(fab[region].mean()))
-    ink = np.clip(g[..., :3] * np.clip(0.55 + 0.45 * lum, 0.5, 1.15), 0, 255)
-    fab[a1:a2, b1:b2] = fab[a1:a2, b1:b2] * (1 - alpha) + ink * alpha
+    fab[a1:a2, b1:b2] = fab[a1:a2, b1:b2] * (1 - alpha) + g[..., :3] * alpha  # the logo's exact colours
     return fab

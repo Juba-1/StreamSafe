@@ -46,7 +46,10 @@ class SceneConfig:
     scene_hold_s: float = 3.0  # cover stays this long after the last trigger
     scene_every_s: float = 0.5  # scene model period (and on every cut)
     scene_back_s: float = 0.5  # frames this far before a triggering decision are covered too (not shown yet)
-    close_area: float = 0.35  # covered people filling this share of the frame -> whole-screen card (close-ups)
+    # covered people filling this share of the frame -> whole-screen card instead of garments. OFF (1.0) by
+    # default: run 44 showed it replaces a good garment on a found person (trailer 0:56) - Ali prefers the
+    # garment; strip-club / private-dance scenes are for the HUD reader and a trained scene head
+    close_area: float = 1.0
     close_hold_s: float = 1.0
     hud_ocr: bool = False  # read the game's on-screen prompts (needs rapidocr_onnxruntime)
     hud_every_s: float = 0.5
@@ -61,8 +64,19 @@ class GarmentConfig:
     kp_smooth: float = 0.5  # skeleton smoothing between consecutive decisions
     shape_memory: bool = True  # a garment never shrinks in a single step
     fabric_ds: int = 2  # cloth shading computed at 1/N resolution (outline at full resolution)
-    color: str = "navy"  # one colour for everybody (streamer setting)
-    logo: str = ""  # optional PNG on the chest (sponsor / ad mode)
+    color: str = "navy"  # one colour for everybody (streamer setting): a palette name or "#RRGGBB"
+    logo: str = ""  # optional image on the chest (sponsor / ad mode), drawn in its own exact colours
+
+
+@dataclass
+class BrandConfig:
+    """What viewers see on full-screen frames (fail-closed slate and scene card): the streamer's logo / ad."""
+
+    slate_image: str = ""  # image centred on the slate (and the scene card unless scene_image is set)
+    scene_image: str = ""
+    slate_color: str = ""  # "#RRGGBB" background; empty = default (or the image's border colour)
+    slate_text: str = "StreamSafe - back in a moment"  # empty = no text
+    scene_text: str = "StreamSafe - scene hidden"
 
 
 @dataclass
@@ -101,6 +115,7 @@ class Config:
     eye: EyeConfig = field(default_factory=EyeConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     scene: SceneConfig = field(default_factory=SceneConfig)
+    brand: BrandConfig = field(default_factory=BrandConfig)
     garment: GarmentConfig = field(default_factory=GarmentConfig)
     render: RenderConfig = field(default_factory=RenderConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)

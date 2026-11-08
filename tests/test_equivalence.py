@@ -62,6 +62,6 @@ def test_same_decisions_and_pixels_as_engine2(tmp_path, name):
     with open(diag) as f:
         new = json.load(f)
 
-    assert new["dec"] == ref["diag"]["dec"], "decisions differ"
+    assert [d[:2] for d in new["dec"]] == ref["diag"]["dec"], "decisions differ"  # (+ prior, threshold now)
     assert new["frm"] == ref["diag"]["frm"], "drawn garments differ"
     assert sink.hashes == ref["hashes"], "output pixels differ"

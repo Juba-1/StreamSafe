@@ -84,7 +84,7 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
     rt = cfg.runtime
     analyzer = factory(cfg, _output_scale(source))
     analyzer.warmup()
-    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps)
+    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps, brand=cfg.brand)
     cuts = CutDetector()
     pending: collections.OrderedDict = collections.OrderedDict()  # frames waiting for their decisions
     cut_since_last, emitted = True, 0
@@ -127,7 +127,7 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
     worker = AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE)
     worker.start()
-    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps)
+    gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps, brand=cfg.brand)
     frames: dict[int, tuple[float, Any]] = {}  # frame id -> (capture time, frame)
     cap = int((rt.delay + rt.max_late_s + 1.0) * rt.fps)  # frames held at most, even if the output stalls
     n_captured = 0  # frame ids below this have been captured (a missing one was dropped)

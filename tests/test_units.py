@@ -153,3 +153,24 @@ def test_risk_fast_clear_for_very_sure_readings():
         policy.update(people, tr, 0.1746, now=i / 10)
         states.append(people[0].risky)
     assert states == [True, False, False], "released after two very low readings"
+
+
+def test_brand_slate_uses_the_streamers_image_and_colour(tmp_path):
+    """The slate / scene card can carry the streamer's logo (exact colours) on its own background colour."""
+    import cv2
+
+    from streamsafe.config import BrandConfig
+    from streamsafe.garment.fabric import parse_color
+    from streamsafe.render.slate import brand_frames
+
+    logo = np.zeros((100, 100, 3), np.uint8)
+    logo[:] = (30, 30, 30)
+    logo[30:70, 30:70] = (0, 0, 255)  # red square in the middle
+    path = str(tmp_path / "logo.png")
+    cv2.imwrite(path, logo)
+    slate, card = brand_frames(640, 360, BrandConfig(slate_image=path, slate_text="", scene_text=""))
+    assert tuple(slate[2, 2]) == (30, 30, 30), "background = the image's border colour"
+    assert tuple(slate[180, 320]) == (0, 0, 255), "logo centre in its exact colour"
+    assert (card == slate).all(), "scene card uses the slate image unless scene_image is set"
+    slate, _ = brand_frames(640, 360, BrandConfig(slate_color="#102030"))
+    assert tuple(slate[2, 2]) == parse_color("#102030") == (0x30, 0x20, 0x10)
