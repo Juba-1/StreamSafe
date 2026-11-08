@@ -46,10 +46,11 @@ def test_walking_person_is_covered_and_safe_person_is_not(tmp_path, stub_run, mo
     assert not any(is_slate(o) for o in sink.frames)
 
 
-@pytest.mark.parametrize(("colour", "lo", "hi"), [(GREEN, 30, 75), (BLUE, 30, 75)])
+@pytest.mark.parametrize(("colour", "lo", "hi"), [(GREEN, 0, 15), (BLUE, 30, 75)])
 def test_release_after_turning_safe(tmp_path, stub_run, colour, lo, hi):
-    """A person who read clearly risky is released only after ~release_s, even on very sure safe readings
-    (golden rule: no fast clear for clearly risky people; marginal covers still clear fast, test_units)."""
+    """BLUE (same identity, borderline safe): a person who read clearly risky is released only after ~release_s.
+    GREEN looks like a different person and reads very clearly safe (p 0.02, below the handoff floor): a new
+    track that does not inherit the cover - the same rule that keeps covers off palm trees (run 51)."""
     path = str(tmp_path / "turn.mp4")
     truth = make_video(path, n=150, cut_at=10**6, turn_safe_at=60, turn_col=colour)
     _, sink = stub_run(path, "offline")

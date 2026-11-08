@@ -18,7 +18,7 @@ import numpy as np
 from streamsafe.analysis.hud_thread import HudThread
 from streamsafe.analysis.risk import RiskPolicy
 from streamsafe.analysis.scene import SceneLatch
-from streamsafe.analysis.tracks import Tracker
+from streamsafe.analysis.tracks import Tracker, box_iou
 from streamsafe.config import Config
 from streamsafe.garment.builder import GarmentBuilder, SafePerson, choose_mode
 from streamsafe.models import Models
@@ -31,6 +31,7 @@ MIN_W = 12
 MIN_MASK_PX = 200
 CROP_DILATE = np.ones((9, 9), np.uint8)
 CROP_BACKGROUND = 0.18  # background brightness in eye crops, as in head training
+COAST_FREE_IOU = 0.1  # a detection overlapping a lost person's last box this much ends coasting there
 SAFE_P = 0.2  # people below this (x scale) are "clearly safe": garments never spill onto them
 
 
@@ -160,7 +161,10 @@ class Analyzer:
         )
 
     def _coast(self, people: list, layers: list, cut: bool) -> int:
-        """Covered people the detector missed this time keep their last garment for a few decisions."""
+        """Covered people the detector missed this time keep their last garment for a few decisions.
+
+        Only where nobody is detected now: if someone is found at that place, the person was seen again (maybe
+        under a new identity) and gets a garment of their own; coasting there would draw a double (run 51)."""
         n = self.cfg.risk.coast_decisions
         if n <= 0 or cut:
             return 0
@@ -168,6 +172,8 @@ class Analyzer:
         coasted = 0
         for tid, track in self.tracker.tracks.items():
             if tid in present or not track.risk.risky or track.last_layer is None:
+                continue
+            if any(box_iou(track.box, p.box) > COAST_FREE_IOU for p in people):
                 continue
             if 0 < self.tracker.decision - track.last_seen <= n:
                 layers.append(track.last_layer)

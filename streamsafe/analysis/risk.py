@@ -34,7 +34,8 @@ FIRST_LOOKS = 3
 OVERLAP_IOU = 0.15
 HISTORY = 5
 TINY_H = 20  # people shorter than this use a lower threshold
-HANDOFF_MIN_P = 0.25  # x thr: below this a new track does not inherit a lost cover (run 50: palm trees, backs)
+HANDOFF_MIN_P = 0.25  # x thr: below this a new track does not inherit a lost cover (run 50: palm trees, backs);
+# above it a lost cover lingers ~release_s on whoever is at that place (golden rule: a moment too long, never too short)
 
 
 def _logit(q: float) -> float:
