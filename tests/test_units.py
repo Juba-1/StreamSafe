@@ -217,3 +217,19 @@ def test_fast_mover_gets_a_margin_slow_mover_does_not():
     assert out[100, 135] and out[100, 65], "covers where she runs to and comes from"
     assert out.sum() > cover.sum()
     assert (b._motion_margin(cover, keep_off, P, mem, 5, True) == cover).all(), "never across a cut"
+
+
+def test_damaged_head_files_are_refused_at_start(tmp_path):
+    from streamsafe.models.heads import FAST_FILE, MALE_FILE, THR_FILE, RiskHeads
+
+    (tmp_path / FAST_FILE).write_text("100;0.5;10,20,30")
+    (tmp_path / MALE_FILE).write_text("100;-0.5;1,2,3")
+    (tmp_path / THR_FILE).write_text("0.2104")
+    assert RiskHeads.load(tmp_path).thr == pytest.approx(0.2104)
+    (tmp_path / MALE_FILE).write_text("100;-0.5;1,2")  # size mismatch
+    with pytest.raises(ValueError):
+        RiskHeads.load(tmp_path)
+    (tmp_path / MALE_FILE).write_text("100;-0.5;1,2,3")
+    (tmp_path / THR_FILE).write_text("0")  # would cover nobody / everybody
+    with pytest.raises(ValueError):
+        RiskHeads.load(tmp_path)

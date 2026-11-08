@@ -42,7 +42,21 @@ class RiskHeads:
     @staticmethod
     def load(head_dir: str | Path) -> RiskHeads:
         d = Path(head_dir)
-        return RiskHeads(LinearHead.load(d / FAST_FILE), LinearHead.load(d / MALE_FILE), float((d / THR_FILE).read_text()))
+        heads = RiskHeads(LinearHead.load(d / FAST_FILE), LinearHead.load(d / MALE_FILE), float((d / THR_FILE).read_text()))
+        heads.check()
+        return heads
+
+    def check(self) -> None:
+        """Refuse damaged or mismatched head files at start-up, instead of failing on every frame later."""
+        ok = (
+            len(self.fast.w) == len(self.male.w) > 0
+            and np.isfinite(self.fast.w).all()
+            and np.isfinite(self.male.w).all()
+            and np.isfinite([self.fast.b, self.male.b]).all()
+            and 0.0 < self.thr < 1.0
+        )
+        if not ok:
+            raise ValueError(f"invalid risk heads (sizes {len(self.fast.w)}/{len(self.male.w)}, thr {self.thr})")
 
     def prisk(self, emb: np.ndarray) -> np.ndarray:
         return self.fast(emb) * (1 - self.male(emb))
