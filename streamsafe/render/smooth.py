@@ -5,7 +5,7 @@ wobbles by a pixel or two, and when the garment switches to the next decision's 
 An alpha-beta (constant-velocity) filter per person removes the wobble without trailing a person who moves
 steadily, and a switch to a new shape is eased in over a few frames instead of popping. The filter only
 smooths small corrections: the farther a measurement is from the prediction (a sudden sprint or turn), the
-more of it is taken at once, so a fast runner is followed without lag. A real jump (cut,
+more of it can be taken at once (``fast_frac``, off by default: run 49). A real jump (cut,
 re-detection, a measurement far from the prediction) resets the filter to the measurement at once, so the
 garment never drifts away from its person.
 """
@@ -27,7 +27,7 @@ class _Track:
 
 
 class TrackSmoother:
-    def __init__(self, alpha: float, beta: float, reset_frac: float, fast_frac: float = 0.08, forget: int = 30) -> None:
+    def __init__(self, alpha: float, beta: float, reset_frac: float, fast_frac: float = 0.0, forget: int = 30) -> None:
         self.alpha, self.beta, self.reset_frac, self.fast_frac, self.forget = alpha, beta, reset_frac, fast_frac, forget
         self._tracks: dict[int, _Track] = {}
 
@@ -45,8 +45,9 @@ class TrackSmoother:
         if math.hypot(ry, rx) > self.reset_frac * max(1.0, size):  # not the same smooth motion: follow at once
             self._tracks[tid] = _Track(v, kf, cy, cx)
             return cy, cx
-        # small residual = wobble -> alpha; a residual of fast_frac x size or more = real motion -> taken whole
-        a = max(self.alpha, min(1.0, math.hypot(ry, rx) / (self.fast_frac * max(1.0, size))))
+        a = self.alpha
+        if self.fast_frac > 0:  # small residual = wobble -> alpha; fast_frac x size or more = real motion -> taken whole
+            a = max(a, min(1.0, math.hypot(ry, rx) / (self.fast_frac * max(1.0, size))))
         t.cy, t.cx = py + a * ry, px + a * rx
         if kf == t.kf:  # a new shape's centre step is eased in but is not a velocity
             t.vy, t.vx = t.vy + self.beta * ry, t.vx + self.beta * rx

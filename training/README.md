@@ -24,4 +24,6 @@ Rules:
 - New heads are adopted only after the disagreement sheets (`bench/disagree.py`) and cover metrics show no new misses.
 - No children in labeling batches. No leaked footage. Research-only data never goes into product heads.
 
-Current product heads: run 37 `ali` (`runs/run37_ali_labels_photos/heads/ali_labels`, threshold 0.2104).
+Current product heads: run 48 `lucia` (`runs/run48_lucia_runner/heads_lucia/ali`, threshold 0.2096) = run 37 `ali`
++ 16 examples of Lucia in the trailer's prison shot (modest). Run 49 also added 90 yard-inmate crops: the inmates were
+no longer covered, but a woman in a swimsuit (volleyball) and one held-out revealing woman were lost -> rejected.
