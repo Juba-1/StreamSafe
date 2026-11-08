@@ -56,8 +56,8 @@ def test_same_decisions_and_pixels_as_engine2(tmp_path, name):
     ref = reference(video)
 
     diag = str(tmp_path / "diag.json")
-    # engine2 had none of: steadying, motion margin, the stricter fast clear, track handoff
-    legacy = dict(smooth=False, motion_margin=False, fast_clear_k=0.0, handoff=False)
+    # engine2 had none of: steadying, motion margin, the stricter fast clear, track handoff, coasting
+    legacy = dict(smooth=False, motion_margin=False, fast_clear_k=0.0, handoff=False, coast_decisions=0)
     cfg = Config.from_env(env={}, mode="offline", diag_out=diag, **legacy)
     source, sink = VideoFileSource(video, 30.0, size=(1920, 1080)), HashSink()
     run(cfg, source, sink, factory=stub_analyzer)

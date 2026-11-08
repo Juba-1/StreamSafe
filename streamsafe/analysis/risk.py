@@ -34,6 +34,7 @@ FIRST_LOOKS = 3
 OVERLAP_IOU = 0.15
 HISTORY = 5
 TINY_H = 20  # people shorter than this use a lower threshold
+HANDOFF_MIN_P = 0.25  # x thr: below this a new track does not inherit a lost cover (run 50: palm trees, backs)
 
 
 def _logit(q: float) -> float:
@@ -61,11 +62,16 @@ class RiskPolicy:
 
     def _handoff(self, person: Person, track: Track, tracker: Tracker, present: set[int]) -> None:
         """Copy the risk state of a covered track lost moments ago at this place (identity broke, person did not)."""
+        if person.p < HANDOFF_MIN_P * self.base_thr:  # a very clear "no" (a tree, a wall, a man's back) never inherits
+            return
         best, best_iou = None, self.cfg.handoff_iou
         for tid, old in tracker.tracks.items():
             if tid in present or not old.risk.risky or tracker.decision - old.last_seen > self.cfg.handoff_window:
                 continue
             if old.last_seen < 0:  # cleared by a scene cut
+                continue
+            h_old = old.box[3] - old.box[1]
+            if not 0.7 <= person.height / max(1, h_old) <= 1.4:  # not the same body size: someone else
                 continue
             iou = box_iou(old.box, person.box)
             if iou >= best_iou:

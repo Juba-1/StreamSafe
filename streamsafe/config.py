@@ -47,8 +47,12 @@ class RiskConfig:
     # a new track where a covered person was lost moments ago (pose / edge broke the identity) takes over that
     # person's cover instead of starting from zero with the strict first-look rule (run 50: club dancer)
     handoff: bool = True
-    handoff_iou: float = 0.3
-    handoff_window: int = 10  # decisions (~1 s); never across a cut
+    handoff_iou: float = 0.4
+    handoff_window: int = 5  # decisions (~0.5 s); never across a cut
+    # a covered person the detector misses for a moment (bent over, half off screen, motion blur) keeps the
+    # last garment, following the picture's motion, for this many decisions (~0.5 s); never across a cut.
+    # Run 50: the club dancer at trailer 0:29.6 lost her cover when detection dropped her for 0.4 s
+    coast_decisions: int = 5
 
 
 @dataclass

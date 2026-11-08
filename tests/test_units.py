@@ -269,3 +269,29 @@ def test_damaged_head_files_are_refused_at_start(tmp_path):
     (tmp_path / THR_FILE).write_text("0")  # would cover nobody / everybody
     with pytest.raises(ValueError):
         RiskHeads.load(tmp_path)
+
+
+def test_covered_person_missed_by_the_detector_keeps_the_garment_briefly():
+    """Run 50 club dancer: detection dropped her for 0.4 s and the cover vanished. A covered person the
+    detector misses keeps the last garment for coast_decisions, then (still missing) it is dropped."""
+    import cv2
+
+    from tests.stubs import RED, stub_analyzer
+
+    cfg = Config.from_env(env={}, mode="offline")
+    an = stub_analyzer(cfg, 1.0)
+
+    def frame(visible: bool) -> np.ndarray:
+        im = np.full((540, 960, 3), 90, np.uint8)
+        cv2.ellipse(im, (480, 300), (40, 110), 0, 0, 360, RED if visible else (90, 90, 90), -1)
+        return im
+
+    for f in range(6):
+        d = an(f * 3, frame(True), cut=False, now=f / 10)
+    assert d.layers, "covered while visible"
+    tid = d.layers[0].tid
+    kept = [bool([la for la in an(f * 3, frame(False), cut=False, now=f / 10).layers if la.tid == tid]) for f in range(6, 14)]
+    n = cfg.risk.coast_decisions
+    assert kept[:n] == [True] * n, "coasts while the detector misses her"
+    assert not any(kept[n + 1 :]), "then dropped: no endless ghost"
+    assert not an(99, frame(False), cut=True, now=2.0).layers, "never across a cut"

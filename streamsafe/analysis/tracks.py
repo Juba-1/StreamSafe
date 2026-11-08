@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from streamsafe.types import Box, Person
+from streamsafe.types import Box, Layer, Person
 
 APPEARANCE_MIN = 0.8  # cosine to the track's current AND first embedding
 RECENT = 2  # decisions within which mask overlap counts
@@ -77,6 +77,7 @@ class Track:
     eye_seen: int = -99  # decision index of the last real eye reading
     risk: RiskState = field(default_factory=RiskState)
     garment: GarmentMemory = field(default_factory=GarmentMemory)
+    last_layer: Layer | None = None  # last garment drawn for this person (coasting when detection drops out)
 
     @property
     def unit_emb(self) -> np.ndarray:

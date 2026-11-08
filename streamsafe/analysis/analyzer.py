@@ -142,6 +142,10 @@ class Analyzer:
                     refs[p.tid] = ref
         timings["garment"], _ = _lap(clock)
 
+        for layer in layers:
+            self.tracker.tracks[layer.tid].last_layer = layer
+        st["coasted"].append(self._coast(people, layers, cut))
+
         if cfg.output.diag_out:
             dets = [[p.tid, list(p.box), round(p.p, 3), int(p.risky), int(p.stale)] for p in people]
             self.diag.append([frame_id, dets, round(self.p_swim, 3), round(thr, 4)])  # + beach prior and threshold
@@ -154,6 +158,21 @@ class Analyzer:
             people=[(p.tid, p.box) for p in people],
             refs=refs,
         )
+
+    def _coast(self, people: list, layers: list, cut: bool) -> int:
+        """Covered people the detector missed this time keep their last garment for a few decisions."""
+        n = self.cfg.risk.coast_decisions
+        if n <= 0 or cut:
+            return 0
+        present = {p.tid for p in people}
+        coasted = 0
+        for tid, track in self.tracker.tracks.items():
+            if tid in present or not track.risk.risky or track.last_layer is None:
+                continue
+            if 0 < self.tracker.decision - track.last_seen <= n:
+                layers.append(track.last_layer)
+                coasted += 1
+        return coasted
 
     def detect(self, rgb: np.ndarray, full: np.ndarray | None = None, full_bgr: bool = False) -> tuple[list[Person], list[np.ndarray]]:
         """People in an RGB analysis frame and their eye crops (background darkened, as in head training).
