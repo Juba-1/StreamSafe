@@ -86,7 +86,7 @@ class RenderConfig:
     max_gap: int = 18  # a decision may protect frames at most this far away (same shot only)
     hold: int = 2  # a gap of at most this many frames repeats the last protected frame
     # steady placement (render/smooth.py): alpha-beta filter per person; numbers only, no image work
-    smooth: bool = False
+    smooth: bool = True  # run 47: shaking -40..47 % (p90), coverage unchanged, render +<1 ms
     smooth_alpha: float = 0.5  # share of the measurement taken each frame (1 = no smoothing)
     smooth_beta: float = 0.15  # velocity correction
     smooth_reset: float = 0.25  # a measurement farther than this (x garment size) from the prediction resets

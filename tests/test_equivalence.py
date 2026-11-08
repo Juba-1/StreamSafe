@@ -56,7 +56,7 @@ def test_same_decisions_and_pixels_as_engine2(tmp_path, name):
     ref = reference(video)
 
     diag = str(tmp_path / "diag.json")
-    cfg = Config.from_env(env={}, mode="offline", diag_out=diag)
+    cfg = Config.from_env(env={}, mode="offline", diag_out=diag, smooth=False)  # engine2 had no steadying
     source, sink = VideoFileSource(video, 30.0, size=(1920, 1080)), HashSink()
     run(cfg, source, sink, factory=stub_analyzer)
     with open(diag) as f:
