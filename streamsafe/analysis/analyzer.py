@@ -32,6 +32,9 @@ MIN_MASK_PX = 200
 CROP_DILATE = np.ones((9, 9), np.uint8)
 CROP_BACKGROUND = 0.18  # background brightness in eye crops, as in head training
 COAST_FREE_IOU = 0.1  # a detection overlapping a lost person's last box this much ends coasting there
+# only big (close) people coast: that is where a detector miss shows a lot and happens (bent over, half out of
+# the frame). Mid-size and small people coasting made floating garments in fast scenes (run 52 volleyball)
+COAST_MIN_H = 0.35  # x frame height
 SAFE_P = 0.2  # people below this (x scale) are "clearly safe": garments never spill onto them
 
 
@@ -172,6 +175,8 @@ class Analyzer:
         coasted = 0
         for tid, track in self.tracker.tracks.items():
             if tid in present or not track.risk.risky or track.last_layer is None:
+                continue
+            if track.box[3] - track.box[1] < COAST_MIN_H * ANALYSIS_SIZE[1]:
                 continue
             if any(box_iou(track.box, p.box) > COAST_FREE_IOU for p in people):
                 continue
