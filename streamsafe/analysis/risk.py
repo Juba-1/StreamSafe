@@ -11,6 +11,9 @@ Rules (thresholds scale with the operating threshold through ``scale = thr / 0.4
   * HANDOFF: a new track where a covered track was lost moments ago (same place) inherits its risk state
   * RELEASE otherwise only after 3 clearly-safe decisions AND release_s seconds
 Eye-skipped (stale) readings repeat the last evidence; the release clock keeps running.
+A person whose look the eye budget put off (``analysis/eye_schedule.py``) is covered and nothing else happens:
+no evidence, no observation counted, and the release clock stands still. When the look comes, evidence for
+covering counts once for every decision they waited, so the cover is not later than without the wait.
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ FIRST_LOOKS = 3
 OVERLAP_IOU = 0.15
 HISTORY = 5
 TINY_H = 20  # people shorter than this use a lower threshold
+MAX_WAITED = 30  # decisions of waiting that count at the look (0.85 ** 30 < 0.01: more changes nothing)
 HANDOFF_MIN_P = 0.25  # x thr: below this a new track does not inherit a lost cover (run 50: palm trees, backs);
 # above it a lost cover lingers ~release_s on whoever is at that place (golden rule: a moment too long, never too short)
 
@@ -48,13 +52,21 @@ class RiskPolicy:
         self.base_thr = base_thr
         self.scale = base_thr / 0.40
         self.prisk = prisk
+        self._last_update: float | None = None  # time of the previous decision
 
     def update(self, people: list[Person], tracker: Tracker, thr: float, now: float | None = None) -> None:
         """Set ``person.risky`` for every person of this decision (thr may include the scene prior)."""
         now = time.perf_counter() if now is None else now
+        since_last = 0.0 if self._last_update is None else now - self._last_update
+        self._last_update = now
         present = {p.tid for p in people}
         for person in people:
             track = tracker.tracks[person.tid]
+            if person.put_off:  # not seen this time: covered, and this decision never counts toward a release
+                if track.risk.safe_run:
+                    track.risk.safe_since += since_last
+                person.risky = True
+                continue
             if self.cfg.handoff and track.risk.n_obs == 0:
                 self._handoff(person, track, tracker, present)
             self._observe(person, track)
@@ -104,7 +116,12 @@ class RiskPolicy:
         weight = 0.5 if overlap > OVERLAP_IOU else 1.0
         th = thr if person.height >= TINY_H else min(thr, 0.2 * scale)
 
-        r.evidence = min(S_CAP, DECAY * r.evidence + weight * (_logit(p) - _logit(th)))
+        gain = weight * (_logit(p) - _logit(th))
+        # an uncovered person who waited for this look: the decisions they waited count with the reading they
+        # get now, as they would have with a look in time. Only toward covering - a low reading counts once
+        looks = 1 + min(person.waited, MAX_WAITED) if gain > 0 and not r.risky else 1
+        for _ in range(looks):
+            r.evidence = min(S_CAP, DECAY * r.evidence + gain)
         r.safe_run = r.safe_run + 1 if r.evidence < S_SAFE else 0
         if r.safe_run == 1:
             r.safe_since = now

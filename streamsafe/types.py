@@ -26,6 +26,8 @@ class Person:
     risky: bool = False  # cover decision, set by the risk policy
     stale: bool = False  # eye skipped: emb / p carried over from the matched track
     hint: int | None = None  # track id proposed by motion matching (eye skipped)
+    put_off: bool = False  # the eye budget put this person's look off: covered meanwhile, risk state untouched
+    waited: int = 0  # decisions this person was put off before the look they get now
 
     @property
     def height(self) -> int:

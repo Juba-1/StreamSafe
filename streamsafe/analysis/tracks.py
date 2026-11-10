@@ -39,7 +39,7 @@ def box_iou(a: Box, b: Box) -> float:
     return inter / (union + 1e-6)
 
 
-def _mask_iou(a: np.ndarray, b: np.ndarray) -> float:
+def mask_iou(a: np.ndarray, b: np.ndarray) -> float:
     return (a & b).sum() / ((a | b).sum() + 1)
 
 
@@ -95,16 +95,25 @@ class Tracker:
         """Mark people that can reuse a track's embedding; returns how many were marked."""
         if eye_every <= 1 or cut:
             return 0
-        candidates = [
-            (tid, t)
-            for tid, t in self.tracks.items()
-            if t.last_seen == self.decision and t.risk.n_obs >= 2 and self.decision + 1 - t.eye_seen < eye_every
-        ]
-        taken: set[int] = set()
-        for person in people:
+        fresh = {tid for tid, t in self.tracks.items() if t.risk.n_obs >= 2 and self.decision + 1 - t.eye_seen < eye_every}
+        matches = self.motion_matches(people, fresh)
+        for j, tid in matches.items():
+            self.carry(people[j], tid)
+        return len(matches)
+
+    def motion_matches(self, people: list[Person], among: set[int] | None = None) -> dict[int, int]:
+        """Person index -> track id for people that are clearly one track of the last decision, barely moved
+        (see the module text). ``among`` limits the tracks looked at; people already marked stale are skipped
+        and their tracks stay taken."""
+        candidates = [(tid, t) for tid, t in self.tracks.items() if t.last_seen == self.decision and (among is None or tid in among)]
+        taken = {p.hint for p in people if p.stale}
+        out: dict[int, int] = {}
+        for j, person in enumerate(people):
+            if person.stale:
+                continue
             m4 = person.mask[::MASK_STRIDE, ::MASK_STRIDE]
             scored = sorted(
-                ((_mask_iou(t.mask4, m4), tid, t) for tid, t in candidates if box_iou(t.box, person.box) >= 0.3),
+                ((mask_iou(t.mask4, m4), tid, t) for tid, t in candidates if box_iou(t.box, person.box) >= 0.3),
                 key=lambda z: -z[0],
             )
             if not scored or scored[0][0] < HINT_IOU or scored[0][1] in taken:
@@ -115,10 +124,15 @@ class Tracker:
             if abs(person.height - (track.box[3] - track.box[1])) > HINT_HEIGHT_TOL * max(person.height, 1):
                 continue
             taken.add(tid)
-            person.hint, person.stale = tid, True
-            person.emb = track.emb / (np.linalg.norm(track.emb) + 1e-6)
-            person.p = track.risk.history[-1] if track.risk.history else 0.0
-        return len(taken)
+            out[j] = tid
+        return out
+
+    def carry(self, person: Person, tid: int) -> None:
+        """No eye for this person now: identity, embedding and last score come from the track."""
+        track = self.tracks[tid]
+        person.hint, person.stale = tid, True
+        person.emb = track.emb / (np.linalg.norm(track.emb) + 1e-6)
+        person.p = track.risk.history[-1] if track.risk.history else 0.0
 
     # -- identity ------------------------------------------------------------------------------
     def assign(self, people: list[Person], cut: bool) -> None:
@@ -150,7 +164,7 @@ class Tracker:
                 if cos < APPEARANCE_MIN or cos_first < APPEARANCE_MIN:
                     continue
                 if age <= RECENT:
-                    overlap = _mask_iou(track.mask4, masks4[j]) if box_iou(track.box, person.box) > 0 else 0.0
+                    overlap = mask_iou(track.mask4, masks4[j]) if box_iou(track.box, person.box) > 0 else 0.0
                     score = overlap + 0.5 * max(0.0, cos - 0.6)
                 else:
                     score = cos - 0.8 if cos > 0.85 else -1.0

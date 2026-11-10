@@ -40,6 +40,11 @@ class EyeConfig:
     eye_h: int = 384
     head_dir: str = ""  # folder with fast_h6.txt, male_h6.txt, thr_h6.txt
     eye_every: int = 3  # a person followed by motion alone is re-checked every N decisions
+    # at most this many eye crops per decision; 0 = no limit (every look when it falls due, as in runs 20-55).
+    # With a limit the biggest people are looked at first and whoever has to wait is covered until the eye has
+    # seen them (analysis/eye_schedule.py): a slow GPU then covers a few more people instead of showing the slate
+    eye_budget: int = 0
+    eye_max_age: int = 9  # with a budget: a covered person's look waits behind everybody else at most this long
     scene_prior: bool = True  # beach / pool scenes lower the threshold slightly
     full_res_crops: bool = True  # eye crops from the native frame (run36: women 63->77%, men 54->47%)
 
