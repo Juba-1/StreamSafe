@@ -13,7 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from streamsafe.models.onnx_backend.session import open_session
+from streamsafe.models.onnx_backend.session import Trt, open_session
 from streamsafe.types import Box
 
 COCO_PERSON = 1
@@ -23,8 +23,8 @@ STD = np.array([0.229, 0.224, 0.225], np.float32)
 
 
 class OnnxRFDETR:
-    def __init__(self, path: str | Path, thr: float = 0.35, allow_cpu: bool = False) -> None:
-        self.session = open_session(path, allow_cpu)
+    def __init__(self, path: str | Path, thr: float = 0.35, allow_cpu: bool = False, trt: Trt | None = None) -> None:
+        self.session = open_session(path, allow_cpu, trt)  # fixed input shape: no batch range needed
         inp = self.session.get_inputs()[0]
         self.input_name = inp.name
         self.res = int(inp.shape[2])

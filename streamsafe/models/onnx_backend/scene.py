@@ -9,13 +9,13 @@ import numpy as np
 
 from streamsafe.models import scene_common as sc
 from streamsafe.models.heads import LinearHead
-from streamsafe.models.onnx_backend.session import open_session
+from streamsafe.models.onnx_backend.session import Trt, open_session
 
 
 class OnnxSigLIPScene:
-    def __init__(self, folder: str | Path, head: LinearHead | None = None, allow_cpu: bool = False) -> None:
+    def __init__(self, folder: str | Path, head: LinearHead | None = None, allow_cpu: bool = False, trt: Trt | None = None) -> None:
         folder = Path(folder)
-        self.session = open_session(folder / "scene_vision.onnx", allow_cpu)
+        self.session = open_session(folder / "scene_vision.onnx", allow_cpu, trt)  # fixed input shape
         self.input_name = self.session.get_inputs()[0].name
         self.text = np.load(folder / "scene_text.npy").astype(np.float32)
         if self.text.shape[0] != len(sc.PROMPTS):

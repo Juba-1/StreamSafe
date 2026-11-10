@@ -1,5 +1,6 @@
 """ONNX Runtime implementations of the model protocols: the same models as the PyTorch backend, exported with
-``tools/export_onnx.py``, running on NVIDIA (CUDA), any DirectX 12 GPU on Windows (DirectML) or the CPU.
+``tools/export_onnx.py``, running on NVIDIA (CUDA, optionally TensorRT), any DirectX 12 GPU on Windows (DirectML)
+or the CPU.
 
 Before anything is loaded, every file is checked against ``manifest.json`` (sha256): a damaged or swapped model
 file stops the engine at start (fail closed), it never runs with unknown weights.
@@ -53,6 +54,7 @@ def load_onnx_models(cfg: Config) -> Models:
     from streamsafe.models.onnx_backend.eye import OnnxRadioEye
     from streamsafe.models.onnx_backend.pose import OnnxViTPose
     from streamsafe.models.onnx_backend.scene import OnnxSigLIPScene
+    from streamsafe.models.onnx_backend.session import Trt
 
     folder = Path(cfg.backend.onnx_dir)
     pins = {
@@ -67,14 +69,15 @@ def load_onnx_models(cfg: Config) -> Models:
     if files["detector.onnx"].get("model") != want:
         raise ValueError(f"detector.onnx is {files['detector.onnx'].get('model')!r}, the config wants {want!r}")
     cpu = cfg.backend.allow_cpu
+    trt = Trt(cfg.backend.trt_cache or str(folder / "trt_cache"), cfg.backend.trt_fp16, files) if cfg.backend.trt else None
     eye_file = "eye16.onnx" if cfg.backend.eye_fp16 else "eye.onnx"
     scene = None
     if cfg.eye.scene_prior or cfg.scene.scene_guard:
-        scene = OnnxSigLIPScene(folder, head=scene_head(cfg), allow_cpu=cpu)
+        scene = OnnxSigLIPScene(folder, head=scene_head(cfg), allow_cpu=cpu, trt=trt)
     return Models(
-        detector=OnnxRFDETR(folder / "detector.onnx", cfg.detector.det_thr, cpu),
-        eye=OnnxRadioEye(folder / eye_file, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cpu),
-        pose=OnnxViTPose(folder / "pose.onnx", cpu),
+        detector=OnnxRFDETR(folder / "detector.onnx", cfg.detector.det_thr, cpu, trt),
+        eye=OnnxRadioEye(folder / eye_file, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cpu, trt, cfg.eye.eye_budget or 4),
+        pose=OnnxViTPose(folder / "pose.onnx", cpu, trt),
         scene=scene,
         hud=hud_reader(cfg),
     )

@@ -27,6 +27,11 @@ class BackendConfig:
     onnx_dir: str = ""  # folder written by tools/export_onnx.py (checked against its manifest.json at start)
     allow_cpu: bool = False  # tests only: without a GPU the onnx backend refuses to start instead of crawling
     eye_fp16: bool = False  # onnx: the eye in fp16 (eye16.onnx: half the memory, faster on most GPUs); run 56 checks it
+    # onnx on NVIDIA: TensorRT in front of CUDA. Engines are built on the first start (minutes, per GPU) and kept
+    # in trt_cache. Off until it is measured (SPEED_PLAN.md, E3); needs the TensorRT libraries next to onnxruntime-gpu
+    trt: bool = False
+    trt_fp16: bool = True  # engines in fp16, built from the fp32 files (eye16.onnx is not needed for this)
+    trt_cache: str = ""  # engine folder; empty = <onnx_dir>/trt_cache
 
 
 @dataclass
