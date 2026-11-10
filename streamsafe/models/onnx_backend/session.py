@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+LAST_DEVICE = ""  # device of the last session opened ("cuda" / "dml" / "cpu"), for the run report
 PROVIDERS = {"cuda": "CUDAExecutionProvider", "dml": "DmlExecutionProvider", "cpu": "CPUExecutionProvider"}
 ORDER = ("cuda", "dml", "cpu")
 
@@ -42,6 +43,8 @@ def open_session(path: str | Path, allow_cpu: bool = False):
     session = ort.InferenceSession(str(path), sess_options=opts, providers=chosen)
     if device_of(session) == "cpu" and not allow_cpu:  # the GPU provider failed to initialise for this model
         raise RuntimeError(f"{Path(path).name} could not start on the GPU ({chosen[0]})")
+    global LAST_DEVICE
+    LAST_DEVICE = "onnx-" + device_of(session)
     return session
 
 

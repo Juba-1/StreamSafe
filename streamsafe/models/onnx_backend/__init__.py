@@ -61,16 +61,19 @@ def load_onnx_models(cfg: Config) -> Models:
         cfg.garment.pose_repo: cfg.garment.pose_revision,
     }
     files = verify(folder, pins)
+    if cfg.backend.eye_fp16 and "eye16.onnx" not in files:
+        raise ValueError("EYE_FP16=1 but the model folder has no eye16.onnx: export it (tools/export_onnx.py ... eye16)")
     want = f"rfdetr RFDETRSeg{cfg.detector.det_model}"
     if files["detector.onnx"].get("model") != want:
         raise ValueError(f"detector.onnx is {files['detector.onnx'].get('model')!r}, the config wants {want!r}")
     cpu = cfg.backend.allow_cpu
+    eye_file = "eye16.onnx" if cfg.backend.eye_fp16 else "eye.onnx"
     scene = None
     if cfg.eye.scene_prior or cfg.scene.scene_guard:
         scene = OnnxSigLIPScene(folder, head=scene_head(cfg), allow_cpu=cpu)
     return Models(
         detector=OnnxRFDETR(folder / "detector.onnx", cfg.detector.det_thr, cpu),
-        eye=OnnxRadioEye(folder / "eye.onnx", cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cpu),
+        eye=OnnxRadioEye(folder / eye_file, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cpu),
         pose=OnnxViTPose(folder / "pose.onnx", cpu),
         scene=scene,
         hud=hud_reader(cfg),

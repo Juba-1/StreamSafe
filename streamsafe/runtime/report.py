@@ -57,8 +57,11 @@ def write_outputs(report: dict, stats_path: str, diag_path: str, decisions_log: 
 
 
 def device_name() -> str:
-    """GPU the models run on (``cpu`` when torch is not loaded in this process)."""
+    """What the models run on: the CUDA device name (PyTorch, or ONNX Runtime on CUDA), "directml", or "cpu"."""
     torch = sys.modules.get("torch")
-    if torch is None or not torch.cuda.is_available():
-        return "cpu"
-    return torch.cuda.get_device_name(0)
+    if torch is not None and torch.cuda.is_available():
+        return torch.cuda.get_device_name(0)
+    session = sys.modules.get("streamsafe.models.onnx_backend.session")
+    if session is not None and session.LAST_DEVICE:
+        return session.LAST_DEVICE
+    return "cpu"

@@ -1,6 +1,6 @@
 """Export every model the engine uses to ONNX, so it runs on any GPU through ONNX Runtime.
 
-    python -m tools.export_onnx OUT_DIR [detector] [pose] [scene] [eye]   (default: all four)
+    python -m tools.export_onnx OUT_DIR [detector] [pose] [scene] [eye] [eye16]   (default: all)
 
 Writes into OUT_DIR:
   detector.onnx          RF-DETR-Seg (official rfdetr exporter), fixed 1x3xRxR input
@@ -126,7 +126,20 @@ def export_eye(cfg: Config, out: Path) -> dict:
     return {name: dict(meta) for name in ("eye.onnx", "eye.onnx.data")}
 
 
-EXPORTERS = {"detector": export_detector, "pose": export_pose, "scene": export_scene, "eye": export_eye}
+def export_eye16(cfg: Config, out: Path) -> dict:
+    """fp16 copy of eye.onnx (export ``eye`` first). Inputs and outputs stay fp32; the engine's code is unchanged."""
+    import onnx
+    from onnxconverter_common import float16
+
+    graph = onnx.load(str(out / "eye.onnx"), load_external_data=True)
+    half = float16.convert_float_to_float16(graph, keep_io_types=True, disable_shape_infer=True)
+    onnx.save_model(half, str(out / "eye16.onnx"), save_as_external_data=True, all_tensors_to_one_file=True, location="eye16.onnx.data")
+    e = cfg.eye
+    meta = {"repo": e.eye_repo, "revision": e.eye_revision, "input_hw": [e.eye_h, e.eye_w], "precision": "fp16"}
+    return {name: dict(meta) for name in ("eye16.onnx", "eye16.onnx.data")}
+
+
+EXPORTERS = {"detector": export_detector, "pose": export_pose, "scene": export_scene, "eye": export_eye, "eye16": export_eye16}
 
 
 def main(argv: list[str]) -> None:

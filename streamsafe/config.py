@@ -26,6 +26,7 @@ class BackendConfig:
     backend: str = "torch"
     onnx_dir: str = ""  # folder written by tools/export_onnx.py (checked against its manifest.json at start)
     allow_cpu: bool = False  # tests only: without a GPU the onnx backend refuses to start instead of crawling
+    eye_fp16: bool = False  # onnx: the eye in fp16 (eye16.onnx: half the memory, faster on most GPUs); run 56 checks it
 
 
 @dataclass
