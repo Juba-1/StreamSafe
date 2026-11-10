@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from streamsafe.config import Config
     from streamsafe.models import Models
 
-REQUIRED = ("detector.onnx", "eye.onnx", "pose.onnx", "scene_vision.onnx", "scene_text.npy", "scene_logit.npy")
+REQUIRED = ("detector.onnx", "eye.onnx", "eye.onnx.data", "pose.onnx", "scene_vision.onnx", "scene_text.npy", "scene_logit.npy")
 
 
 def verify(folder: Path, pins: dict[str, str]) -> dict:

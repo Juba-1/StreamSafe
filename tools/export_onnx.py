@@ -105,17 +105,25 @@ class _Eye(torch.nn.Module):
 
 
 def export_eye(cfg: Config, out: Path) -> dict:
+    """The exporter writes a >2 GB model as one file per tensor: export into a scratch folder, then save it
+    as eye.onnx + one eye.onnx.data, so the manifest covers every byte the engine loads."""
+    import onnx
     from transformers import AutoModel
 
     e = cfg.eye
     model = AutoModel.from_pretrained(e.eye_repo, revision=e.eye_revision, trust_remote_code=True).float().eval()
+    scratch = out / "_eye"
+    scratch.mkdir(exist_ok=True)
     torch.onnx.export(
-        _Eye(model), (torch.rand(2, 3, e.eye_h, e.eye_w),), str(out / "eye.onnx"), input_names=["pixels"],
+        _Eye(model), (torch.rand(2, 3, e.eye_h, e.eye_w),), str(scratch / "eye.onnx"), input_names=["pixels"],
         output_names=["summary"], dynamic_axes={"pixels": {0: "n"}, "summary": {0: "n"}}, opset_version=OPSET, dynamo=False,
         external_data=True,
     )  # fmt: skip
+    graph = onnx.load(str(scratch / "eye.onnx"), load_external_data=True)
+    onnx.save_model(graph, str(out / "eye.onnx"), save_as_external_data=True, all_tensors_to_one_file=True, location="eye.onnx.data")
+    shutil.rmtree(scratch)
     meta = {"repo": e.eye_repo, "revision": e.eye_revision, "input_hw": [e.eye_h, e.eye_w]}
-    return {name.name: dict(meta) for name in out.glob("eye.onnx*")}
+    return {name: dict(meta) for name in ("eye.onnx", "eye.onnx.data")}
 
 
 EXPORTERS = {"detector": export_detector, "pose": export_pose, "scene": export_scene, "eye": export_eye}
