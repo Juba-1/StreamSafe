@@ -100,7 +100,10 @@ def load_logo(path: str) -> np.ndarray | None:
     """BGRA logo image, or None when no / unreadable path."""
     if not path:
         return None
-    logo = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    try:  # np.fromfile + imdecode: cv2.imread cannot open non-ASCII paths on Windows (an Arabic user name)
+        logo = cv2.imdecode(np.fromfile(path, np.uint8), cv2.IMREAD_UNCHANGED)
+    except OSError:
+        return None
     if logo is None:
         return None
     if logo.ndim == 2:
