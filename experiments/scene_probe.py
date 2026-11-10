@@ -27,7 +27,8 @@ import numpy as np
 from streamsafe.analysis.scene import hud_hit
 from streamsafe.config import Config
 from streamsafe.io.sources import VideoFileSource
-from streamsafe.models.torch_backend.scene import EXPLICIT_PROMPTS, OTHER_PROMPTS, SWIM_PROMPTS, SigLIPScene
+from streamsafe.models.scene_common import EXPLICIT_PROMPTS, OTHER_PROMPTS, SWIM_PROMPTS
+from streamsafe.models.torch_backend.scene import SigLIPScene
 
 PROMPTS = SWIM_PROMPTS + EXPLICIT_PROMPTS + OTHER_PROMPTS
 THUMB = (320, 180)

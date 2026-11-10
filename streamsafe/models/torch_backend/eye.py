@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-from PIL import Image
 
+from streamsafe.models import eye_common
 from streamsafe.models.heads import RiskHeads
 from streamsafe.models.torch_backend.device import DEVICE
 
@@ -37,10 +37,7 @@ class RadioEye:
             return self.model(x)[0].float()
 
     def embed(self, crops: list[np.ndarray]) -> np.ndarray:
-        # PIL bicubic (antialiased) exactly as in head training - cv2.resize changes the scores
-        size = (self.width, self.height)
-        batch = np.stack([np.asarray(Image.fromarray(c).resize(size, Image.BICUBIC)) for c in crops])
-        x = torch.from_numpy(batch).to(DEVICE).permute(0, 3, 1, 2).float().div(255)
+        x = torch.from_numpy(eye_common.prepare(crops, self.width, self.height)).to(DEVICE)
         return torch.nn.functional.normalize(self._forward(x), dim=-1).cpu().numpy()
 
     def prisk(self, emb: np.ndarray) -> np.ndarray:

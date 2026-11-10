@@ -20,6 +20,15 @@ class DetectorConfig:
 
 
 @dataclass
+class BackendConfig:
+    # torch: PyTorch + CUDA (NVIDIA only; research and benchmarks). onnx: ONNX Runtime on NVIDIA (CUDA), any
+    # DirectX 12 GPU on Windows (DirectML: NVIDIA, AMD, Intel) or the CPU - the product path
+    backend: str = "torch"
+    onnx_dir: str = ""  # folder written by tools/export_onnx.py (checked against its manifest.json at start)
+    allow_cpu: bool = False  # tests only: without a GPU the onnx backend refuses to start instead of crawling
+
+
+@dataclass
 class EyeConfig:
     # Every downloaded model is pinned to an exact Hub commit (here, scene_revision, pose_revision): an upstream
     # change can never reach a streamer's PC unreviewed. The eye also runs the repo's own Python code
@@ -146,6 +155,7 @@ class OutputConfig:
 
 @dataclass
 class Config:
+    backend: BackendConfig = field(default_factory=BackendConfig)
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     eye: EyeConfig = field(default_factory=EyeConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
