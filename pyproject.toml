@@ -2,11 +2,15 @@
 name = "streamsafe"
 version = "3.0.0"
 description = "Real-time covering of risky characters in game streams, before viewers see them"
-requires-python = ">=3.10"
+requires-python = ">=3.11"  # 3.11+: precise sleep on Windows (the output clock)
 dependencies = ["numpy>=1.26", "opencv-python>=4.9", "pillow>=10"]
 
 [project.optional-dependencies]
-models = ["torch>=2.4", "transformers>=4.57", "rfdetr", "einops", "timm", "accelerate"]
+models = ["torch>=2.4", "transformers>=4.57", "rfdetr", "einops", "timm", "accelerate"]  # research / export
+# product runtime: ONNX Runtime. The two wheels cannot be installed together: one per build
+onnx-nvidia = ["onnxruntime-gpu>=1.20"]
+onnx-directml = ["onnxruntime-directml>=1.20"]
+export = ["onnx", "onnxscript"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
@@ -21,7 +25,7 @@ include = ["streamsafe*"]
 
 [tool.ruff]
 line-length = 140
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "C4", "PIE", "RET"]
