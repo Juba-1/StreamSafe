@@ -12,7 +12,9 @@ from __future__ import annotations
 import queue
 import shutil
 import subprocess
+import sys
 import threading
+import time
 from typing import Protocol
 
 import cv2
@@ -87,15 +89,27 @@ class FFmpegSink:
 
 
 class WindowSink:
-    """Needs an OpenCV build with GUI support (``opencv-python``, not ``-headless``)."""
+    """The window OBS captures (Window Capture "StreamSafe Output"). Needs an OpenCV build with GUI support
+    (``opencv-python``, not ``-headless``).
+
+    Fixed size (the output frame, never scaled by dragging). Windows stops drawing a minimised window and OBS
+    then captures nothing, so on Windows a minimised window is restored at once without taking the focus
+    (``restored`` counts it); the OBS guard also shows the slate whenever the captured window is empty."""
+
+    CHECK_S = 0.25
 
     def __init__(self, title: str = WINDOW_TITLE) -> None:
         self.title = title
-        cv2.namedWindow(title, cv2.WINDOW_NORMAL)
+        self.restored = 0
+        self._next_check = 0.0
+        cv2.namedWindow(title, cv2.WINDOW_AUTOSIZE)
 
     def write(self, frame: np.ndarray) -> None:
         cv2.imshow(self.title, frame)
         cv2.waitKey(1)
+        if sys.platform == "win32" and time.monotonic() >= self._next_check:
+            self._next_check = time.monotonic() + self.CHECK_S
+            self.restored += _restore_if_minimised(self.title)
 
     def close(self) -> None:
         cv2.destroyWindow(self.title)
@@ -153,3 +167,15 @@ def open_sink(spec: str, size: tuple[int, int], fps: float = 30.0, preview_size:
     if "://" in spec:
         return ThreadedSink(FFmpegSink(spec, size, fps))
     return ThreadedSink(VideoFileSink(spec, fps, preview_size))
+
+
+def _restore_if_minimised(title: str) -> int:
+    """Windows only: un-minimise the window ``title`` without activating it. 1 if it was minimised."""
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    hwnd = user32.FindWindowW(None, title)
+    if hwnd and user32.IsIconic(hwnd):
+        user32.ShowWindow(hwnd, 4)  # SW_SHOWNOACTIVATE
+        return 1
+    return 0

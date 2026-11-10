@@ -122,6 +122,7 @@ def _worker_main(
     ring = np.ndarray((N_SLOTS, h, w, 3), np.uint8, buffer=shm.buf)
     last = -1
     step = max(1, cfg.runtime.step_every)
+    parent = mp.parent_process()
     try:
         while not done.is_set():
             fid = latest.value
@@ -129,6 +130,8 @@ def _worker_main(
             # policy counts decisions (release, hand-off, coasting), so a faster GPU must not change what it does,
             # and the streamer's GPU is not kept busy for nothing (OBS shares it)
             if fid < last + step:
+                if parent is not None and not parent.is_alive():
+                    break  # the engine was killed (Task Manager): free the GPU instead of lingering
                 time.sleep(0.001)
                 continue
             slot = fid % N_SLOTS

@@ -122,11 +122,14 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
 
 
 # -------------------------------------------------------------------------------------- realtime
+RESTART_AFTER_FAILS = 30  # consecutive failed decisions (3 s at 10/s) -> a new analyzer process
+RESTART_BACKOFF_S = 10.0
+
+
 def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, factory: AnalyzerFactory) -> dict[str, Any]:
     rt = cfg.runtime
     full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
-    worker = AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE)
-    worker.start()
+    worker = _Workers(lambda: AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE))
     gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps, brand=cfg.brand)
     frames: dict[int, tuple[float, Any]] = {}  # frame id -> (capture time, frame)
     cap = int((rt.delay + rt.max_late_s + 1.0) * rt.fps)  # frames held at most, even if the output stalls
@@ -161,8 +164,18 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
             capture_done.set()
 
     def receive() -> None:
-        for decision in worker.results():
-            gate.add_decision(decision)
+        while True:
+            failed = 0
+            for decision in worker.current.results():
+                gate.add_decision(decision)
+                failed = 0 if decision.ok else failed + 1
+                if failed >= RESTART_AFTER_FAILS:
+                    break  # e.g. a lost GPU device: every decision fails
+            if worker.stopping.is_set():
+                return
+            # the analyzer died or keeps failing: viewers get the slate (no decisions) while a new one loads
+            stats["worker_restarts"].append(round(time.perf_counter(), 1))
+            worker.restart(stats)
 
     threading.Thread(target=capture, name="capture", daemon=True).start()
     receiver = threading.Thread(target=receive, name="decisions", daemon=True)
@@ -213,15 +226,69 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
         if obs is not None:
             obs.close()
             stats["obs_write_errors"].append(obs.errors)
-        worker.stop()
-        receiver.join(timeout=60)
-        worker.close()
+        worker.shutdown(receiver)
     gate.finish()
 
     stats.update(gate.stats)
-    gpu = worker.stats.pop("device", ["?"])[0]
-    n_dec = len(worker.stats.get("ms_total", []))
-    extra = dict(mode="realtime", gpu=gpu, delay_s=rt.delay, frames_in=v, dropped_frames=v - shown)
-    report = summarize(stats, worker.stats, shown, n_dec, rt.fps, extra)
-    write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, worker.diag, gate.log)
+    last = worker.current
+    gpu = last.stats.pop("device", ["?"])[0]
+    n_dec = len(last.stats.get("ms_total", []))
+    restarts = len(stats.get("worker_restarts", []))
+    extra = dict(mode="realtime", gpu=gpu, delay_s=rt.delay, frames_in=v, dropped_frames=v - shown, worker_restarts=restarts)
+    report = summarize(stats, last.stats, shown, n_dec, rt.fps, extra)
+    write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, last.diag, gate.log)
     return report
+
+
+class _Workers:
+    """The current analyzer process, replaced when it dies or keeps failing. ``submit`` always goes to the
+    current one; while a replacement loads, frames get no decisions and the gate shows the slate."""
+
+    def __init__(self, make: Callable[[], AnalyzerWorker]) -> None:
+        self._make = make
+        self.stopping = threading.Event()
+        self._last_restart = -1e9
+        self._lock = threading.Lock()
+        self._accepting = True
+        self.current = make()
+        self.current.start()
+
+    def submit(self, frame_id: int, frame: np.ndarray, cut: bool) -> None:
+        with self._lock:  # never write into a ring that is being released
+            if self._accepting:
+                self.current.submit(frame_id, frame, cut)
+
+    def shutdown(self, receiver: threading.Thread) -> None:
+        self.stopping.set()
+        stopped = self.current
+        stopped.stop()
+        receiver.join(timeout=60)  # it collects the analyzer's final stats
+        with self._lock:
+            self._accepting = False
+        if self.current is not stopped:  # a replacement finished loading while we were stopping
+            self.current.stop()
+        self.current.close()
+
+    def restart(self, stats: dict[str, list]) -> None:
+        with self._lock:
+            self._accepting = False
+        old = self.current
+        old.stop(timeout=5.0)
+        old.close()
+        if time.monotonic() - self._last_restart < 60.0:  # failing again soon: do not spin, slate meanwhile
+            self.stopping.wait(RESTART_BACKOFF_S)
+        self._last_restart = time.monotonic()
+        while not self.stopping.is_set():
+            new = self._make()
+            try:
+                new.start()
+            except Exception as exc:  # models fail to load again: keep the slate, try again later
+                stats["worker_start_errors"].append(f"{exc!r:.200}")
+                new.stop(timeout=5.0)
+                new.close()
+                self.stopping.wait(RESTART_BACKOFF_S)
+                continue
+            with self._lock:
+                self.current = new
+                self._accepting = True
+            return
