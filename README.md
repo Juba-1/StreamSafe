@@ -49,9 +49,9 @@ output frame from the decisions next to it (same shot only) and moves each garme
 | Release rule | A person is uncovered only after 1 s of clear evidence. A big person seen for the first time needs a stronger score to be covered (no flash covers on faces). | `analysis/risk.py` |
 | Following | Garments follow their person between decisions (motion estimate), are steadied by a small per-person filter, and fast movers get a margin in their direction of motion. | `render/motion.py`, `render/smooth.py`, `garment/builder.py` |
 | Scene layer | Explicit scenes (trained scene head, HUD prompts): whole-screen card + game-audio mute, with lead and tail times. | `analysis/scene.py` |
-| Fail closed | No decision for a frame, a failed or stale decision, a cut with no fresh decision, a crashed analyzer: the last protected frame is repeated for at most 2 frames, then the slate. | `runtime/gate.py` |
+| Fail closed | No decision for a frame, a failed or stale decision, a cut with no fresh decision, decisions too far apart (a slow GPU, `max_span`), a crashed analyzer: the last protected frame is repeated for at most 2 frames, then the slate. A crashed or failing analyzer is restarted (slate while it loads). | `runtime/gate.py`, `runtime/runner.py` |
 | Bounded latency | A frame more than 0.5 s late is dropped, never shown late, so delay and memory cannot grow. | `runtime/runner.py` |
-| OBS guard | No heartbeat from the engine for 0.5 s: OBS shows the slate and mutes game audio. | `obs/streamsafe_guard.lua` |
+| OBS guard | Slate + game-audio mute when: no heartbeat for 0.5 s, the captured output window is empty, a named game-audio source is missing, or the streamer presses the PANIC hotkey. The raw game source on air is switched back to the protected scene. | `obs/streamsafe_guard.lua` |
 | Brand | Garment colour and chest logo, slate and scene-card image/colour/text are streamer settings. | `config.py` (`GarmentConfig`, `BrandConfig`) |
 
 Rules the code keeps:
@@ -62,6 +62,11 @@ Rules the code keeps:
 - **Swappable models.** The engine only talks to the protocols in `models/base.py`.
 
 ## Models
+
+Two backends run the same models (`BACKEND`): `torch` (PyTorch + CUDA, NVIDIA only: research, benchmarks,
+export) and `onnx` (ONNX Runtime: NVIDIA via CUDA, any DirectX 12 GPU on Windows via DirectML; the product path).
+`tools/export_onnx.py` writes the ONNX folder with a `manifest.json` (sha256 + pins) that the engine checks before
+loading anything. Without a GPU the onnx backend refuses to start (never a silent CPU fallback).
 
 All are downloaded from the Hugging Face Hub at a **pinned commit** (`*_revision` in `config.py`). Nothing new
 reaches a streamer's PC until someone moves the pin on purpose.
@@ -106,7 +111,8 @@ Set any of them from the environment by its upper-case name. CLI flags override 
 | `SCENE_IMAGE` / `SCENE_TEXT` | | the explicit-scene card |
 | `HUD_OCR` | `HUD_OCR=1` | read the game's on-screen prompts (needs `rapidocr_onnxruntime==1.2.3`) |
 | `SMOOTH`, `MOTION_MARGIN` | `SMOOTH=0` | steady placement and fast-mover margin (both on by default) |
-| `OBS_STATE` | `OBS_STATE=C:\StreamSafe\state.json` | state file read by the OBS guard script |
+| `BACKEND` / `ONNX_DIR` | `BACKEND=onnx ONNX_DIR=C:\StreamSafe\models` | model backend and the exported model folder |
+| `OBS_STATE` | `OBS_STATE=C:\ProgramData\StreamSafe\state.txt` | state file read by the OBS guard script (ASCII path) |
 
 ## Security notes
 
