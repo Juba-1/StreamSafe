@@ -3,7 +3,8 @@
 Why a process: the renderer must hit its 33 ms deadline every frame; sharing one interpreter
 (GIL) with the analyzer caused bursts of late frames on busy CPUs. Frames go to the worker
 through a shared-memory ring (no pickling of images); the worker always takes the NEWEST frame,
-skipping older ones, so a slow analyzer lowers the decision rate instead of building a backlog.
+skipping older ones, so a slow analyzer lowers the decision rate instead of building a backlog. A fast one
+is held to one decision every ``step_every`` frames.
 Decisions come back through a queue.
 """
 
@@ -120,10 +121,14 @@ def _worker_main(
     shm = shared_memory.SharedMemory(name=shm_name)
     ring = np.ndarray((N_SLOTS, h, w, 3), np.uint8, buffer=shm.buf)
     last = -1
+    step = max(1, cfg.runtime.step_every)
     try:
         while not done.is_set():
             fid = latest.value
-            if fid <= last:
+            # at most one decision every ``step`` frames (10/s at 30 fps), as in the offline benchmarks: the
+            # policy counts decisions (release, hand-off, coasting), so a faster GPU must not change what it does,
+            # and the streamer's GPU is not kept busy for nothing (OBS shares it)
+            if fid < last + step:
                 time.sleep(0.001)
                 continue
             slot = fid % N_SLOTS

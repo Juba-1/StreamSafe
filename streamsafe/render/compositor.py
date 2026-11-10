@@ -25,11 +25,19 @@ MAX_INTERP_JUMP = 0.6  # of the layer size: larger centroid jumps are not the sa
 DrawLog = list[list[int]]
 
 
-def usable_decisions(v: int, keys: Sequence[int], cut_between: Callable[[int, int], bool], max_gap: int) -> list[int]:
-    """Frame ids of the decisions (k0 <= v < k1, sorted ``keys``) allowed to protect frame v."""
+def usable_decisions(
+    v: int, keys: Sequence[int], cut_between: Callable[[int, int], bool], max_gap: int, max_span: int | None = None
+) -> list[int]:
+    """Frame ids of the decisions (k0 <= v < k1, sorted ``keys``) allowed to protect frame v.
+    ``max_span``: two decisions of the same shot farther apart than this protect nothing in between (the
+    analyzer is too slow: a person walking in between them would show) -> the caller fails closed."""
     i = bisect_right(keys, v)
     k0 = keys[i - 1] if i > 0 else None
     k1 = keys[i] if i < len(keys) else None
+    if max_span is not None:
+        if k0 is not None and k1 is not None and k0 < v and k1 - k0 > max_span and not cut_between(k0, k1):
+            return []
+        max_gap = min(max_gap, max_span)  # one-sided (next to a cut, or the analyzer far behind): same limit
     use = []
     if k0 is not None and v - k0 <= max_gap and not cut_between(k0, v):
         use.append(k0)

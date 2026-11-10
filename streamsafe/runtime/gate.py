@@ -1,6 +1,7 @@
 """Fail-closed output gate: turns (frame, decisions) into the frame viewers see.
 
-  * a frame is drawn only with decisions from its own shot, at most ``max_gap`` frames away;
+  * a frame is drawn only with decisions from its own shot, at most ``max_gap`` frames away, and only when the
+    decisions around it are at most ``max_span`` frames apart (a too-slow analyzer fails closed);
   * no usable decision, or a failed one -> the last protected frame is repeated for up to ``hold``
     frames (a one-frame flash between two cuts), then the full-screen slate;
   * a usable decision with ``scene`` (explicit scene) -> the full-screen scene card; frames up to
@@ -109,7 +110,7 @@ class OutputGate:
         t0 = time.perf_counter()
         with self._lock:
             self._shown = v
-            ids = usable_decisions(v, self._keys, self._cut_between, self.cfg.max_gap)
+            ids = usable_decisions(v, self._keys, self._cut_between, self.cfg.max_gap, self.cfg.max_span)
             decisions = [self._decisions[k] for k in ids]
             scene = any(d.scene for d in decisions) or self._scene_ahead(v, 0)
             scene_soon = self._scene_ahead(v, self._lead)

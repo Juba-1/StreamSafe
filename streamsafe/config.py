@@ -119,6 +119,10 @@ class RenderConfig:
     motion: bool = True  # every garment follows its own person to the frame being shown
     mc_min: float = 0.12  # minimum phase-correlation response to trust a motion estimate
     max_gap: int = 18  # a decision may protect frames at most this far away (same shot only)
+    # two decisions of one shot more than this many frames apart protect nothing in between: slate instead.
+    # Fable review (TESTED, stub models): at 1 decision/s a person walking in showed on 39 of ~135 frames with
+    # no slate. 9 frames = 3.3 decisions/s at 30 fps; the engine aims at 10/s (step_every 3)
+    max_span: int = 9
     hold: int = 2  # a gap of at most this many frames repeats the last protected frame
     # steady placement (render/smooth.py): alpha-beta filter per person; numbers only, no image work
     smooth: bool = True  # run 47: shaking -40..47 % (p90), coverage unchanged, render +<1 ms
@@ -136,7 +140,7 @@ class RenderConfig:
 @dataclass
 class RuntimeConfig:
     mode: str = "realtime"  # realtime: analyzer in its own process, real clock; offline: deterministic
-    step_every: int = 3  # offline mode analyses every N-th frame
+    step_every: int = 3  # one decision every N frames at most (offline: exactly), 10/s at 30 fps
     delay: float = 2.0  # stream delay in seconds: frame f is shown at capture_time(f) + delay
     fps: float = 30.0  # output frame rate
     secs: float = 1e9  # stop after this many seconds (file inputs)

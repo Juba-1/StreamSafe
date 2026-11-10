@@ -67,6 +67,12 @@ def test_usable_decisions_window_and_cuts():
     assert usable_decisions(10, keys, no_cut, 18) == [6]  # 30 is 20 frames away
     assert usable_decisions(4, keys, lambda a, b: a < 5 <= b, 18) == [3]  # cut at 5 between 4 and 6
     assert usable_decisions(50, keys, no_cut, 18) == []
+    # a too-slow analyzer: 6 -> 30 is 24 frames, more than max_span 9, so nothing in between is protected
+    assert usable_decisions(14, keys, no_cut, 18, 9) == []
+    assert usable_decisions(6, keys, no_cut, 18, 9) == [6]  # the decision's own frame stays drawable
+    assert usable_decisions(4, keys, no_cut, 18, 9) == [3, 6]  # normal cadence (3 frames)
+    assert usable_decisions(14, keys, lambda a, b: a < 20 <= b, 18, 9) == [6]  # 30 is in the next shot
+    assert usable_decisions(17, keys, lambda a, b: a < 20 <= b, 18, 9) == []  # 6 is 11 frames back
 
 
 # ------------------------------------------------------------------------------------- config
