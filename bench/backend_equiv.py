@@ -21,8 +21,16 @@ from streamsafe.models.torch_backend import load_torch_models
 from streamsafe.types import ANALYSIS_SIZE
 
 
+def _iou(a, b) -> float:
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
 def main(video: str, onnx_dir: str, head_dir: str, n: int = 60) -> None:
-    cfg = Config.from_env(env={}, head_dir=head_dir, onnx_dir=onnx_dir)
+    cfg = Config.from_env(head_dir=head_dir, onnx_dir=onnx_dir)  # EYE_FP16=1 compares the fp16 eye
     t, o = load_torch_models(cfg), load_onnx_models(cfg)
     cap = cv2.VideoCapture(video)
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -41,10 +49,12 @@ def main(video: str, onnx_dir: str, head_dir: str, n: int = 60) -> None:
         det["frames"] += 1
         if len(a) != len(b):
             det["count_mismatch"] += 1
-        else:
-            for (ba, ma), (bb, mb) in zip(a, b, strict=True):
-                det["box_px"].append(float(np.abs(np.array(ba) - np.array(bb)).max()))
-                det["mask_iou"].append(float((ma & mb).sum() / max(1, (ma | mb).sum())))
+        for ba, ma in a:  # each PyTorch person against the ONNX person that overlaps it most (order can differ)
+            if not b:
+                break
+            bb, mb = max(b, key=lambda d: _iou(ba, d[0]))
+            det["box_px"].append(float(np.abs(np.array(ba) - np.array(bb)).max()))
+            det["mask_iou"].append(float((ma & mb).sum() / max(1, (ma | mb).sum())))
         boxes = [bx for bx, _ in b if bx[3] - bx[1] >= cfg.detector.min_h]
         if boxes:
             s = full.shape[1] / ANALYSIS_SIZE[0]
