@@ -14,6 +14,7 @@ docstring has its exact usage.
 | `mux_audio` | Review copy with sound, silenced where the engine muted it | protected video + original + stats -> mp4 |
 | `summ` | One summary line per engine run | engine stdout -> text |
 | `soak` | Does the live path stay healthy for hours? Late / dropped frames, memory per process | clips + minutes -> soak report |
+| `onnx_speed` | How fast is one exported model on this GPU, per batch size (first run, steady, after a size change, bound to the GPU)? | one `.onnx` file -> JSON line |
 | `eye_equiv` | Does the eye still score as before (after a dependency or revision change)? | head dir + reference crops -> pass/fail |
 
 Typical review loop (GPU pod):

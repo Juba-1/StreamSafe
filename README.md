@@ -47,6 +47,7 @@ output frame from the decisions next to it (same shot only) and moves each garme
 |---|---|---|
 | Person garments | Each risky person (the eye's score above the threshold) gets an opaque garment shaped by their pose. Small people get a plain full cover. | `analysis/risk.py`, `garment/` |
 | Release rule | A person is uncovered only after 1 s of clear evidence. A big person seen for the first time needs a stronger score to be covered (no flash covers on faces). | `analysis/risk.py` |
+| Eye budget (optional) | With `EYE_BUDGET` the eye looks at a limited number of people per decision, biggest first. Whoever waits for a look is covered until it comes; a wait never counts toward a release. | `analysis/eye_schedule.py` |
 | Following | Garments follow their person between decisions (motion estimate), are steadied by a small per-person filter, and fast movers get a margin in their direction of motion. | `render/motion.py`, `render/smooth.py`, `garment/builder.py` |
 | Scene layer | Explicit scenes (trained scene head, HUD prompts): whole-screen card + game-audio mute, with lead and tail times. | `analysis/scene.py` |
 | Fail closed | No decision for a frame, a failed or stale decision, a cut with no fresh decision, decisions too far apart (a slow GPU, `max_span`), a crashed analyzer: the last protected frame is repeated for at most 2 frames, then the slate. A crashed or failing analyzer is restarted (slate while it loads). | `runtime/gate.py`, `runtime/runner.py` |
@@ -113,6 +114,11 @@ Set any of them from the environment by its upper-case name. CLI flags override 
 | `SMOOTH`, `MOTION_MARGIN` | `SMOOTH=0` | steady placement and fast-mover margin (both on by default) |
 | `BACKEND` / `ONNX_DIR` | `BACKEND=onnx ONNX_DIR=C:\StreamSafe\models` | model backend and the exported model folder |
 | `OBS_STATE` | `OBS_STATE=C:\ProgramData\StreamSafe\state.txt` | state file read by the OBS guard script (ASCII path) |
+| `EYE_FP16` | `EYE_FP16=1` | onnx: the eye in fp16 (`eye16.onnx`) |
+| `EYE_BUDGET` | `EYE_BUDGET=6` | at most this many eye crops per decision; people waiting for their look are covered meanwhile (0 = off) |
+| `TRT` / `TRT_CACHE` | `TRT=1` | onnx on NVIDIA: TensorRT in front of CUDA; engines are built on the first start and kept in the cache folder |
+
+`EYE_BUDGET` and `TRT` are off by default until the GPU runs in `SPEED_PLAN.md` have measured them.
 
 ## Security notes
 

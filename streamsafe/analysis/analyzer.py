@@ -1,7 +1,8 @@
 """One decision for one frame:
 
     scene layer (explicit scene -> whole-screen cover, nothing else runs)
-    -> detect people -> eye (skipped for people matched by motion) -> track ids -> risk policy
+    -> detect people -> eye (skipped for people matched by motion; with an eye budget, put off for some: they
+       are covered until their look, ``analysis/eye_schedule.py``) -> track ids -> risk policy
     -> pose (covered people only) -> one garment layer per covered person
 
 Any exception produces ``Decision(ok=False)``: the renderer then fails closed for that frame.
@@ -15,10 +16,11 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
+from streamsafe.analysis.eye_schedule import EyeScheduler
 from streamsafe.analysis.hud_thread import HudThread
 from streamsafe.analysis.risk import RiskPolicy
 from streamsafe.analysis.scene import SceneLatch
-from streamsafe.analysis.tracks import Tracker, box_iou
+from streamsafe.analysis.tracks import GarmentMemory, Tracker, box_iou
 from streamsafe.config import Config
 from streamsafe.garment.builder import GarmentBuilder, SafePerson, choose_mode
 from streamsafe.models import Models
@@ -36,6 +38,9 @@ COAST_FREE_IOU = 0.1  # a detection overlapping a lost person's last box this mu
 # the frame). Mid-size and small people coasting made floating garments in fast scenes (run 52 volleyball)
 COAST_MIN_H = 0.35  # x frame height
 SAFE_P = 0.2  # people below this (x scale) are "clearly safe": garments never spill onto them
+# every batch size the eye and the pose model can meet is run once at start: ONNX Runtime, cuDNN and DirectML
+# prepare kernels per input shape the first time they see it, and that pause in a live crowd would be a slate
+WARM_EYE, WARM_POSE = 16, 8
 
 
 class Analyzer:
@@ -45,6 +50,7 @@ class Analyzer:
         self.thr = cfg.risk.thr or models.eye.thr
         self.scale = self.thr / 0.40
         self.tracker = Tracker()
+        self.eyes = EyeScheduler(cfg.eye)
         self.policy = RiskPolicy(cfg.risk, self.thr, models.eye.prisk)
         self.garments = GarmentBuilder(cfg.garment, output_scale)
         self.p_swim = 0.0
@@ -60,8 +66,10 @@ class Analyzer:
         w, h = ANALYSIS_SIZE
         blank = np.zeros((h, w, 3), np.uint8)
         self.models.detector(blank)
-        self.models.eye.embed([blank[:120, :60]])
-        self.models.pose(blank, [(10, 10, 60, 120)])
+        for n in range(1, min(WARM_EYE, self.cfg.eye.eye_budget or WARM_EYE) + 1):
+            self.models.eye.embed([blank[:120, :60]] * n)
+        for n in range(1, WARM_POSE + 1):
+            self.models.pose(blank, [(10, 10, 60, 120)] * n)
         if self.models.scene is not None:
             self.models.scene(cv2.cvtColor(blank, cv2.COLOR_BGR2RGB))
         if self.models.hud is not None:
@@ -103,13 +111,18 @@ class Analyzer:
         people, crops = self.detect(rgb, full, full_bgr=True)
         timings["detect"], clock = _lap(clock)
 
-        st["eye_skipped"].append(self.tracker.motion_hints(people, cut, cfg.eye.eye_every))
-        need = [j for j, p in enumerate(people) if not p.stale]
-        if need:
-            emb = self.models.eye.embed([crops[j] for j in need])
-            for j, e, p in zip(need, emb, self.models.eye.prisk(emb), strict=True):
+        looks = self.eyes.plan(people, self.tracker, cut)
+        st["eye_skipped"].append(looks.skipped)
+        if looks.look:
+            emb = self.models.eye.embed([crops[j] for j in looks.look])
+            for j, e, p in zip(looks.look, emb, self.models.eye.prisk(emb), strict=True):
                 people[j].emb, people[j].p = e, float(p)
-        st["embedded"].append(len(need))
+        st["embedded"].append(len(looks.look))
+        if cfg.eye.eye_budget > 0:
+            st["eye_put_off"].append(looks.put_off)
+            st["eye_early"].append(looks.early)
+        waiting = [people[j] for j in looks.waiting]  # not seen and not tracked yet: covered, outside the tracker
+        people = [p for p in people if p.tid >= -1]  # waiting ids are below -1
         timings["eye"], clock = _lap(clock)
 
         self.tracker.assign(people, cut)
@@ -124,7 +137,7 @@ class Analyzer:
             self.latch.mark_close(t)  # a body close-up: the whole frame is hidden instead of one huge garment
             st["close_cards"].append(1)
             return Decision(frame_id=frame_id, ok=True, scene=True, n_people=len(people), n_risky=len(risky))
-        plan = [(p, choose_mode(p.height, self.tracker.tracks[p.tid].garment, cfg.garment.small_h)) for p in risky]
+        plan = [(p, self._mode(p)) for p in risky]
         dressed = [p for p, mode in plan if mode == "full"]
         poses = dict(zip(map(id, dressed), self.models.pose(rgb, [p.box for p in dressed]), strict=True)) if dressed else {}
         timings["pose"], clock = _lap(clock)
@@ -144,10 +157,18 @@ class Analyzer:
             for p in people:
                 if p.tid not in covered and (ref := make_motion_ref(gray, p.mask, p.box)) is not None:
                     refs[p.tid] = ref
-        timings["garment"], _ = _lap(clock)
-
         for layer in layers:
             self.tracker.tracks[layer.tid].last_layer = layer
+        for person in waiting:  # a plain cover: nothing is known about them yet, and they have no track to keep it
+            layer = self.garments.build(im, person, "small", GarmentMemory(), safe, self.tracker.decision, cut)
+            if layer is not None:
+                if gray is not None:
+                    layer.motion = make_motion_ref(gray, person.mask, person.box)
+                layers.append(layer)
+        timings["garment"], _ = _lap(clock)
+
+        people = people + waiting
+        risky = risky + waiting
         st["coasted"].append(self._coast(people, layers, cut))
 
         if cfg.output.diag_out:
@@ -162,6 +183,14 @@ class Analyzer:
             people=[(p.tid, p.box) for p in people],
             refs=refs,
         )
+
+    def _mode(self, person: Person) -> str:
+        """Garment look for a covered person. Someone covered only while their look is put off gets the plain
+        cover, and their garment memory stays as it is: nothing says yet that they need a dress."""
+        track = self.tracker.tracks[person.tid]
+        if person.put_off and not track.risk.risky:
+            return "small"
+        return choose_mode(person.height, track.garment, self.cfg.garment.small_h)
 
     def _coast(self, people: list, layers: list, cut: bool) -> int:
         """Covered people the detector missed this time keep their last garment for a few decisions.
