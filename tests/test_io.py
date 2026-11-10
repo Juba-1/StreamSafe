@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import socket
 import subprocess
+import sys
 import time
 
 import numpy as np
@@ -79,3 +80,19 @@ def test_srt_input_realtime_pipeline(tmp_path):
     assert s["decisions"] > 3  # 2-core CI box shared with two ffmpeg encoders
     n_written = sum(1 for _ in FFmpegSource(out, (1920, 1080), 30.0).frames())
     assert n_written == s["frames_out"]
+
+
+def test_ffmpeg_input_args_and_60fps_input_becomes_30fps():
+    """A 60 fps feed (OBS virtual camera at 60) is resampled to the engine's 30 fps, so frame counts and the
+    clock agree (the delay buffer is sized in frames)."""
+    src = FFmpegSource("testsrc=size=1280x720:rate=60:duration=2", (640, 360), 30.0, input_args=("-f", "lavfi"), live=False)
+    n = sum(1 for _ in src.frames())
+    src.close()
+    assert 58 <= n <= 61
+
+
+def test_device_by_name_needs_windows():
+    if sys.platform == "win32":
+        pytest.skip("Windows opens devices by name through FFmpeg dshow")
+    with pytest.raises(ValueError, match="Windows"):
+        open_source("device:OBS Virtual Camera")

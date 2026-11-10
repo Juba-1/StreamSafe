@@ -3,8 +3,8 @@
   * ``VideoFileSource``  - a video file, resampled to the engine's frame rate (tests, benchmarks)
   * ``FFmpegSource``     - anything FFmpeg can read live: ``srt://`` (OBS "Custom Output" / SRT
                            stream), ``rtmp://``, ``udp://``, HTTP / HLS ...
-  * ``DeviceSource``     - a capture device, e.g. "OBS Virtual Camera" (OBS Studio -> Virtual
-                           Camera, output type "Source" = just the game capture)
+  * ``DeviceSource``     - a capture device by index; by name on Windows ("OBS Virtual Camera": OBS Studio
+                           -> Virtual Camera, output type "Source" = just the game capture) through FFmpeg
 ``live`` tells the runner whether the source paces itself (live) or must be paced (file).
 """
 
@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable, Iterator
 from typing import Protocol
 
@@ -109,15 +110,24 @@ class FFmpegSource:
     Network inputs are live (newest frame wins); file paths / ``file:`` URLs are read in order.
     """
 
-    def __init__(self, url: str, size: tuple[int, int] = DEFAULT_SIZE, fps: float = 30.0, ffmpeg: str = "ffmpeg") -> None:
+    def __init__(
+        self,
+        url: str,
+        size: tuple[int, int] = DEFAULT_SIZE,
+        fps: float = 30.0,
+        ffmpeg: str = "ffmpeg",
+        input_args: tuple[str, ...] = (),
+        live: bool | None = None,
+    ) -> None:
         exe = shutil.which(ffmpeg)
         if exe is None:
             raise FileNotFoundError("ffmpeg not found on PATH")
         self.size, self.fps, self.url = fit_16x9(*size), fps, url
-        self.live = url.split("://", 1)[0].lower() in LIVE_SCHEMES
+        self.live = url.split("://", 1)[0].lower() in LIVE_SCHEMES if live is None else live
         w, h = self.size
-        # no "-fflags nobuffer": with FFmpeg 6.1 it decodes nothing from mp4 files or SRT/mpegts (tested)
-        cmd = [exe, "-hide_banner", "-loglevel", "error", "-i", url,
+        # no "-fflags nobuffer": with FFmpeg 6.1 it decodes nothing from mp4 files or SRT/mpegts (tested).
+        # "fps=" makes any input rate (OBS virtual camera at 60 fps) the engine's rate
+        cmd = [exe, "-hide_banner", "-loglevel", "error", *input_args, "-i", url,
                "-an", "-vf", f"scale={w}:{h},fps={fps}", "-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]  # fmt: skip
         self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, bufsize=w * h * 3)
         self._live_reader = _LatestFrames(self._read_one) if self.live else None  # start draining at once
@@ -146,15 +156,22 @@ class FFmpegSource:
                 self._proc.kill()
 
 
+def windows_device(name: str, size: tuple[int, int] = DEFAULT_SIZE, fps: float = 30.0) -> FFmpegSource:
+    """A DirectShow device by its name on Windows ("OBS Virtual Camera"), through FFmpeg: OpenCV's DirectShow
+    backend opens devices by index only (Fable review), and an index changes when a webcam is plugged in."""
+    args = ("-f", "dshow", "-rtbufsize", "256M")
+    return FFmpegSource(f"video={name}", size, fps, input_args=args, live=True)
+
+
 class DeviceSource:
-    """A capture device by index ("0") or by name ("OBS Virtual Camera", Windows only)."""
+    """A capture device by index ("0"). Frames arriving faster than ``fps`` (a 60 fps device) are thinned to
+    ``fps`` so the engine's frame count and the clock agree."""
 
     live = True
 
     def __init__(self, device: str, size: tuple[int, int] = DEFAULT_SIZE, fps: float = 30.0) -> None:
         backend = cv2.CAP_DSHOW if sys.platform == "win32" else cv2.CAP_ANY
-        target = int(device) if device.isdigit() else f"video={device}"
-        self._cap = cv2.VideoCapture(target, backend)
+        self._cap = cv2.VideoCapture(int(device), backend)
         if not self._cap.isOpened():
             raise ConnectionError(f"cannot open capture device: {device}")
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, size[0])
@@ -162,11 +179,18 @@ class DeviceSource:
         self._cap.set(cv2.CAP_PROP_FPS, fps)
         self.size = fit_16x9(*size)
         self.fps = fps
+        self._next = 0.0
         self._live_reader = _LatestFrames(self._read_one)
 
     def _read_one(self) -> np.ndarray | None:
-        ok, frame = self._cap.read()
-        return _fit(frame, self.size) if ok else None
+        while True:
+            ok, frame = self._cap.read()
+            if not ok:
+                return None
+            now = time.monotonic()
+            if now >= self._next:  # keep this frame; the next is due one period later (no drift)
+                self._next = max(self._next + 1.0 / self.fps, now - 0.5 / self.fps)
+                return _fit(frame, self.size)
 
     def frames(self) -> Iterator[np.ndarray]:
         yield from self._live_reader
@@ -180,7 +204,12 @@ def open_source(spec: str, fps: float = 30.0, max_seconds: float = 1e9, size: tu
 
     ``size``: output frame size; None = the file's own size (live inputs default to 1080p)."""
     if spec.startswith("device:"):
-        return DeviceSource(spec[len("device:") :], size or DEFAULT_SIZE, fps)
+        device = spec[len("device:") :]
+        if device.isdigit():
+            return DeviceSource(device, size or DEFAULT_SIZE, fps)
+        if sys.platform != "win32":
+            raise ValueError(f"capture devices by name need Windows; use an index here: {spec!r}")
+        return windows_device(device, size or DEFAULT_SIZE, fps)
     if "://" in spec:
         return FFmpegSource(spec, size or DEFAULT_SIZE, fps)
     return VideoFileSource(spec, fps, max_seconds, size)
