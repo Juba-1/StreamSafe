@@ -40,6 +40,12 @@ jobs:
       - name: "install (Windows, DirectML runtime)"
         if: runner.os == 'Windows'
         run: pip install -e ".[dev]" onnxruntime-directml onnx
+      - name: ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
       - name: tests
         run: python -m pytest -q
       - name: DirectML smoke
