@@ -126,14 +126,39 @@ def export_eye(cfg: Config, out: Path) -> dict:
     return {name: dict(meta) for name in ("eye.onnx", "eye.onnx.data")}
 
 
-def export_eye16(cfg: Config, out: Path) -> dict:
-    """fp16 copy of eye.onnx (export ``eye`` first). Inputs and outputs stay fp32; the engine's code is unchanged."""
-    import onnx
-    from onnxconverter_common import float16
+class _Eye16(torch.nn.Module):
+    """fp32 in and out, fp16 inside: the engine's code and the manifest's input contract stay the same."""
 
-    graph = onnx.load(str(out / "eye.onnx"), load_external_data=True)
-    half = float16.convert_float_to_float16(graph, keep_io_types=True, disable_shape_infer=True)
-    onnx.save_model(half, str(out / "eye16.onnx"), save_as_external_data=True, all_tensors_to_one_file=True, location="eye16.onnx.data")
+    def __init__(self, model):
+        super().__init__()
+        self.model = model
+
+    def forward(self, x):
+        return self.model(x.half())[0].float()
+
+
+def export_eye16(cfg: Config, out: Path) -> dict:
+    """The eye exported in fp16 straight from PyTorch on an NVIDIA GPU. (Run 57: converting eye.onnx afterwards with
+    onnxconverter_common left fp32 and fp16 mixed in the patch embedder's MatMul and the file would not load.)"""
+    import onnx
+    from transformers import AutoModel
+
+    if not torch.cuda.is_available():
+        raise RuntimeError("eye16 is exported on an NVIDIA GPU (the fp16 graph is traced on CUDA)")
+    e = cfg.eye
+    model = AutoModel.from_pretrained(e.eye_repo, revision=e.eye_revision, trust_remote_code=True).half().cuda().eval()
+    scratch = out / "_eye16"
+    scratch.mkdir(exist_ok=True)
+    torch.onnx.export(
+        _Eye16(model), (torch.rand(2, 3, e.eye_h, e.eye_w, device="cuda"),), str(scratch / "eye16.onnx"), input_names=["pixels"],
+        output_names=["summary"], dynamic_axes={"pixels": {0: "n"}, "summary": {0: "n"}}, opset_version=OPSET, dynamo=False,
+        external_data=True,
+    )  # fmt: skip
+    graph = onnx.load(str(scratch / "eye16.onnx"), load_external_data=True)
+    onnx.save_model(graph, str(out / "eye16.onnx"), save_as_external_data=True, all_tensors_to_one_file=True, location="eye16.onnx.data")
+    shutil.rmtree(scratch)
+    del model
+    torch.cuda.empty_cache()
     e = cfg.eye
     meta = {"repo": e.eye_repo, "revision": e.eye_revision, "input_hw": [e.eye_h, e.eye_w], "precision": "fp16"}
     return {name: dict(meta) for name in ("eye16.onnx", "eye16.onnx.data")}
