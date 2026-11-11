@@ -34,10 +34,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - name: install (Linux: CPU onnxruntime)
+      - name: "install (Linux, CPU onnxruntime)"
         if: runner.os == 'Linux'
         run: pip install -e ".[dev]" onnxruntime onnx
-      - name: install (Windows: the DirectML edition's runtime)
+      - name: "install (Windows, DirectML runtime)"
         if: runner.os == 'Windows'
         run: pip install -e ".[dev]" onnxruntime-directml onnx
       - name: tests
