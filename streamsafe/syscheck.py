@@ -1,4 +1,4 @@
-"""System checker: can this PC protect a live stream? ``python -m streamsafe.syscheck [--models DIR] [--json]``.
+"""System checker: can this PC protect a live stream? ``python -m streamsafe.syscheck [--models DIR] [--engines] [--json]``.
 
 Run by the installer before the first start and by the app's "check my PC" button. Every check gives
 ok / warn / fail plus a plain-language fix in Arabic and English, so a streamer (not a programmer) knows what to do.
@@ -86,7 +86,9 @@ def _run(cmd: list[str]) -> str:
         return ""
 
 
-def _gpus() -> list[Gpu]:
+def nvidia_gpus() -> list[Gpu]:
+    """Every NVIDIA card with its driver version, as the driver's own tool reports them (nvidia-smi is installed
+    with the driver). Also what a TensorRT engine is tied to (``models/onnx_backend/engines.py``)."""
     found: list[Gpu] = []
     out = _run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader,nounits"])
     for line in out.strip().splitlines():
@@ -94,6 +96,11 @@ def _gpus() -> list[Gpu]:
         if len(parts) == 3:
             mem = float(parts[1]) / 1024 if parts[1].replace(".", "", 1).isdigit() else None
             found.append(Gpu(parts[0], "nvidia", mem, parts[2]))
+    return found
+
+
+def _gpus() -> list[Gpu]:
+    found = nvidia_gpus()
     if platform.system() == "Windows":
         ps = "Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name + '|' + $_.AdapterRAM + '|' + $_.DriverVersion }"
         for line in _run(["powershell", "-NoProfile", "-Command", ps]).strip().splitlines():
@@ -270,7 +277,32 @@ def check_models(folder: str, quick: bool) -> Check:
     return Check("models", OK, f"models in {folder}" + (" (sizes only)" if quick else " (sha256 verified)"))
 
 
-def run_checks(probes: Probes | None = None, models: str = "", quick: bool = False) -> list[Check]:
+def check_engines(folder: str, quick: bool) -> Check:
+    """Optional (``--engines``, NVIDIA edition): is there a TensorRT engine for every model, built for this card,
+    this driver and these libraries? "No" is a warning, not a failure: the app prepares them before the stream
+    starts (``python -m streamsafe.prepare``, minutes), and without them the engine runs on CUDA and says so."""
+    from streamsafe import prepare
+    from streamsafe.config import Config
+
+    fix_ar = "تجهيز كرت الشاشة ما اكتمل. البرنامج يجهّزه قبل أول بث (يأخذ دقائق، مرة واحدة)."
+    fix_en = "The graphics card is not prepared yet. StreamSafe does it before the first stream (a few minutes, once)."
+    try:
+        rows = prepare.status(Config.from_env(onnx_dir=folder, trt=True), quick)
+    except (OSError, ValueError, KeyError, RuntimeError) as e:
+        return Check(
+            "engines",
+            WARN,
+            f"TensorRT cannot be used: {e}",
+            "الوضع السريع لكروت إنفيديا غير متاح، والبرنامج يشتغل على الوضع الأبطأ. حدّث تعريف الكرت أو أعد تثبيت نسخة إنفيديا.",
+            "The fast NVIDIA mode is not available; StreamSafe runs in the slower mode. Update the driver or reinstall the NVIDIA edition.",
+        )
+    waiting = [f"{label} ({why})" for label, _, why in rows if why]
+    if waiting:
+        return Check("engines", WARN, f"TensorRT engines not ready: {'; '.join(waiting)}", fix_ar, fix_en)
+    return Check("engines", OK, f"TensorRT engines ready ({len(rows)}/{len(rows)})" + (" (sizes only)" if quick else ""))
+
+
+def run_checks(probes: Probes | None = None, models: str = "", quick: bool = False, engines: bool = False) -> list[Check]:
     p = probes or Probes()
     gpu_check, gpu = check_gpu(p)
     checks = [check_os(p), check_python(p), gpu_check, check_runtime(p, gpu), check_ram(p)]
@@ -278,6 +310,8 @@ def run_checks(probes: Probes | None = None, models: str = "", quick: bool = Fal
     checks += [check_disk(p, state_dir), check_ffmpeg(p), check_obs(p)]
     if models:
         checks.append(check_models(models, quick))
+        if engines:
+            checks.append(check_engines(models, quick))
     return checks
 
 
@@ -291,10 +325,11 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="streamsafe.syscheck", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--models", default=os.environ.get("ONNX_DIR", ""), help="ONNX model folder to verify")
     ap.add_argument("--quick", action="store_true", help="check model sizes only, not sha256")
+    ap.add_argument("--engines", action="store_true", help="with --models: are the TensorRT engines ready (NVIDIA edition)?")
     ap.add_argument("--json", action="store_true", help="machine-readable output for the installer / app")
     ap.add_argument("--lang", choices=["ar", "en"], default="en")
     args = ap.parse_args(argv)
-    checks = run_checks(models=args.models, quick=args.quick)
+    checks = run_checks(models=args.models, quick=args.quick, engines=args.engines)
     result = verdict(checks)
     if args.json:
         print(json.dumps({"verdict": result, "checks": [asdict(c) for c in checks]}, ensure_ascii=False, indent=1))

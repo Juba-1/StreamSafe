@@ -10,6 +10,9 @@ models = ["torch>=2.4", "transformers>=4.57", "rfdetr", "einops", "timm", "accel
 # product runtime: ONNX Runtime. The two wheels cannot be installed together: one per build
 onnx-nvidia = ["onnxruntime-gpu>=1.20"]
 onnx-directml = ["onnxruntime-directml>=1.20"]
+# the NVIDIA product path (TRT=1): the pair run 57 measured. TensorRT's major version must be the one this
+# ONNX Runtime was built for, so both are pinned; move them together (docs/NVIDIA_TRT.md)
+onnx-tensorrt = ["onnxruntime-gpu==1.22.*", "tensorrt-cu12==10.9.*"]
 export = ["onnx", "onnxscript"]
 dev = ["pytest>=8", "ruff>=0.6"]
 

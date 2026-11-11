@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from streamsafe.config import Config
     from streamsafe.models import Models
+    from streamsafe.models.onnx_backend.session import Shapes, Trt
 
 REQUIRED = ("detector.onnx", "eye.onnx", "eye.onnx.data", "pose.onnx", "scene_vision.onnx", "scene_text.npy", "scene_logit.npy")
 
@@ -48,14 +50,8 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def load_onnx_models(cfg: Config) -> Models:
-    from streamsafe.models import Models, hud_reader, scene_head
-    from streamsafe.models.onnx_backend.detector import OnnxRFDETR
-    from streamsafe.models.onnx_backend.eye import OnnxRadioEye
-    from streamsafe.models.onnx_backend.pose import OnnxViTPose
-    from streamsafe.models.onnx_backend.scene import OnnxSigLIPScene
-    from streamsafe.models.onnx_backend.session import Trt
-
+def checked_files(cfg: Config) -> dict:
+    """The model folder verified against its manifest and against what the config asks for."""
     folder = Path(cfg.backend.onnx_dir)
     pins = {
         cfg.eye.eye_repo: cfg.eye.eye_revision,
@@ -68,16 +64,61 @@ def load_onnx_models(cfg: Config) -> Models:
     want = f"rfdetr RFDETRSeg{cfg.detector.det_model}"
     if files["detector.onnx"].get("model") != want:
         raise ValueError(f"detector.onnx is {files['detector.onnx'].get('model')!r}, the config wants {want!r}")
+    return files
+
+
+def eye_file(cfg: Config) -> str:
+    return "eye16.onnx" if cfg.backend.eye_fp16 else "eye.onnx"
+
+
+def uses_scene(cfg: Config) -> bool:
+    return cfg.eye.scene_prior or cfg.scene.scene_guard
+
+
+def trt_settings(cfg: Config, files: dict, **changes) -> Trt:
+    """The TensorRT settings of this config (``changes``: what the prepare step sets differently)."""
+    from streamsafe.models.onnx_backend.session import Trt
+
+    b = cfg.backend
+    cache = b.trt_cache or str(Path(b.onnx_dir) / "trt_cache")
+    return Trt(**{**dict(cache=cache, fp16=b.trt_fp16, files=files, build=b.trt_build, libs=b.trt_libs), **changes})
+
+
+def trt_models(cfg: Config) -> list[tuple[str, str, Shapes | None]]:
+    """(label, file, batch range) of every model that gets a TensorRT engine with this config, in loading order.
+    The engine below and ``streamsafe.prepare`` both go by this list, so what was prepared is what is loaded."""
+    from streamsafe.models.onnx_backend import eye, pose
+
+    models: list[tuple[str, str, Shapes | None]] = [("scene", "scene_vision.onnx", None)] if uses_scene(cfg) else []
+    return [
+        *models,
+        ("detector", "detector.onnx", None),  # fixed input shapes: no batch range
+        ("eye", eye_file(cfg), eye.shapes(cfg.eye.eye_w, cfg.eye.eye_h)),
+        ("pose", "pose.onnx", pose.SHAPES),
+    ]
+
+
+def load_onnx_models(cfg: Config) -> Models:
+    from streamsafe.models import Models, hud_reader, scene_head
+    from streamsafe.models.onnx_backend import session
+    from streamsafe.models.onnx_backend.detector import OnnxRFDETR
+    from streamsafe.models.onnx_backend.eye import OnnxRadioEye
+    from streamsafe.models.onnx_backend.pose import OnnxViTPose
+    from streamsafe.models.onnx_backend.scene import OnnxSigLIPScene
+
+    folder = Path(cfg.backend.onnx_dir)
+    files = checked_files(cfg)
     cpu = cfg.backend.allow_cpu
-    trt = Trt(cfg.backend.trt_cache or str(folder / "trt_cache"), cfg.backend.trt_fp16, files) if cfg.backend.trt else None
-    eye_file = "eye16.onnx" if cfg.backend.eye_fp16 else "eye.onnx"
-    scene = None
-    if cfg.eye.scene_prior or cfg.scene.scene_guard:
-        scene = OnnxSigLIPScene(folder, head=scene_head(cfg), allow_cpu=cpu, trt=trt)
-    return Models(
+    trt = trt_settings(cfg, files) if cfg.backend.trt else None
+    session.reset()
+    scene = OnnxSigLIPScene(folder, head=scene_head(cfg), allow_cpu=cpu, trt=trt) if uses_scene(cfg) else None
+    models = Models(
         detector=OnnxRFDETR(folder / "detector.onnx", cfg.detector.det_thr, cpu, trt),
-        eye=OnnxRadioEye(folder / eye_file, cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cpu, trt, cfg.eye.eye_budget or 4),
+        eye=OnnxRadioEye(folder / eye_file(cfg), cfg.eye.eye_w, cfg.eye.eye_h, cfg.eye.head_dir, cpu, trt),
         pose=OnnxViTPose(folder / "pose.onnx", cpu, trt),
         scene=scene,
         hud=hud_reader(cfg),
     )
+    for note in session.notes():  # a model off its fast path, or an engine built at this start: said at once,
+        print(f"STREAMSAFE_DEVICE {session.device_summary()} | {note}", file=sys.stderr, flush=True)  # not only in the final report
+    return models

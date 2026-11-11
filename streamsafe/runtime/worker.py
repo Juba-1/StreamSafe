@@ -22,7 +22,7 @@ from typing import Any
 import numpy as np
 
 from streamsafe.config import Config
-from streamsafe.runtime.report import device_name
+from streamsafe.runtime.report import device_stats
 from streamsafe.runtime.threads import limit_threads
 from streamsafe.types import ANALYSIS_SIZE, Decision
 
@@ -116,6 +116,9 @@ def _worker_main(
     analyzer = factory(cfg, output_scale)
     limit_threads()  # again: the models may have imported torch
     analyzer.warmup()
+    slow = getattr(getattr(analyzer, "headroom", None), "warning", lambda: "")()
+    if slow:  # below the decision rate: said at start, not only in the final report
+        print(f"STREAMSAFE_SLOW {slow}", file=sys.stderr, flush=True)
     ready.set()
     w, h = frame_size
     shm = shared_memory.SharedMemory(name=shm_name)
@@ -146,7 +149,7 @@ def _worker_main(
     finally:
         stats = dict(getattr(analyzer, "stats", {}))
         stats["vram_gb"] = [_peak_vram_gb()]
-        stats["device"] = [device_name()]
+        device_stats(stats)
         out.put((_END, stats, getattr(analyzer, "diag", [])))
         del ring
         shm.close()

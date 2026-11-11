@@ -39,6 +39,9 @@ class OnnxRFDETR:
 
 
 def _postprocess(boxes: np.ndarray, logits: np.ndarray, masks: np.ndarray, w: int, h: int, thr: float):
+    if not (np.isfinite(logits).all() and np.isfinite(boxes).all()):
+        # NaN compares false with everything: "score > threshold" would quietly find nobody. Fail the decision
+        raise ValueError("the detector returned non-finite numbers")
     q, c = logits.shape
     prob = 1.0 / (1.0 + np.exp(-logits.astype(np.float32).reshape(-1)))
     order = np.argsort(-prob, kind="stable")[: min(NUM_SELECT, q * c)]

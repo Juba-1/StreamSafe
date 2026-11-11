@@ -27,11 +27,18 @@ class BackendConfig:
     onnx_dir: str = ""  # folder written by tools/export_onnx.py (checked against its manifest.json at start)
     allow_cpu: bool = False  # tests only: without a GPU the onnx backend refuses to start instead of crawling
     eye_fp16: bool = False  # onnx: the eye in fp16 (eye16.onnx: half the memory, faster on most GPUs); run 56 checks it
-    # onnx on NVIDIA: TensorRT in front of CUDA. Engines are built on the first start (minutes, per GPU) and kept
-    # in trt_cache. Off until it is measured (SPEED_PLAN.md, E3); needs the TensorRT libraries next to onnxruntime-gpu
+    # onnx on NVIDIA: TensorRT in front of CUDA, the NVIDIA product path (run 57, RTX 3090: 74 ms per decision
+    # against 168 on CUDA fp32). One engine per model is built for this card, driver and TensorRT (minutes) by
+    # ``python -m streamsafe.prepare`` and kept in trt_cache. A model TensorRT cannot run runs on CUDA and the run
+    # report says so. Off by default: the app turns it on for the NVIDIA edition (docs/NVIDIA_TRT.md)
     trt: bool = False
     trt_fp16: bool = True  # engines in fp16, built from the fp32 files (eye16.onnx is not needed for this)
-    trt_cache: str = ""  # engine folder; empty = <onnx_dir>/trt_cache
+    trt_cache: str = ""  # engine folder, writable by the streamer's own user only; empty = <onnx_dir>/trt_cache
+    # an engine that is not ready when the engine starts (never prepared, new driver, damaged) is built there and
+    # then: the start takes minutes longer, a restart in mid-stream means that long on the slate. 0: never build
+    # at start; CUDA runs that model until ``streamsafe.prepare`` has run, and the run report says so
+    trt_build: bool = True
+    trt_libs: str = ""  # folder with the TensorRT libraries (installer); empty = the pip package / the system path
 
 
 @dataclass
@@ -49,6 +56,11 @@ class EyeConfig:
     # With a limit the biggest people are looked at first and whoever has to wait is covered until the eye has
     # seen them (analysis/eye_schedule.py): a slow GPU then covers a few more people instead of showing the slate
     eye_budget: int = 0
+    # realtime only, and only with eye_budget = 0: set the budget once at start from this PC's own measured model
+    # times (analysis/headroom.py). It stays 0 where a full eye batch fits well inside the slate limit (a fast
+    # TensorRT path) and comes on where it does not (CUDA after a TensorRT failure, a small card). Off until a
+    # GPU run has checked the rule (SPEED_PLAN.md, E9)
+    eye_budget_auto: bool = False
     eye_max_age: int = 9  # with a budget: a covered person's look waits behind everybody else at most this long
     scene_prior: bool = True  # beach / pool scenes lower the threshold slightly
     full_res_crops: bool = True  # eye crops from the native frame (run36: women 63->77%, men 54->47%)

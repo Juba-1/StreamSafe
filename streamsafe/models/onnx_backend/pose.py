@@ -8,17 +8,18 @@ import numpy as np
 
 from streamsafe.models import vitpose_common as vp
 from streamsafe.models.base import Keypoints
-from streamsafe.models.onnx_backend.session import Trt, open_session
+from streamsafe.models.onnx_backend.session import Shapes, Trt, open_session
 from streamsafe.types import Box
 
 MAX_BATCH = 16  # people per run: a fixed upper end for the TensorRT engine (and for GPU memory)
 INPUT = "pixels"  # the input's name in tools/export_onnx.py
+# the pose model's batch range for TensorRT (the engine and ``streamsafe.prepare`` must ask for the same one)
+SHAPES: Shapes = {INPUT: tuple((n, 3, vp.INPUT_H, vp.INPUT_W) for n in (1, 2, MAX_BATCH))}
 
 
 class OnnxViTPose:
     def __init__(self, path: str | Path, allow_cpu: bool = False, trt: Trt | None = None) -> None:
-        batches = (1, 2, MAX_BATCH)
-        self.session = open_session(path, allow_cpu, trt, {INPUT: tuple((n, 3, vp.INPUT_H, vp.INPUT_W) for n in batches)})
+        self.session = open_session(path, allow_cpu, trt, SHAPES)
         self.input_name = self.session.get_inputs()[0].name
         if self.input_name != INPUT:
             raise ValueError(f"{Path(path).name}: input is {self.input_name!r}, expected {INPUT!r}: re-export")

@@ -7,6 +7,8 @@ The session is opened exactly as the engine opens it, so the engine's settings p
 (eye.onnx vs eye16.onnx). Prints one line ``ONNX_SPEED <json>``:
 
   load_s      opening the session (with TRT=1: building the engine the first time, loading it afterwards)
+  note        with TRT=1: what happened to the engine ("engine built in ...", "" = loaded from the cache), or why
+              TensorRT was not used and CUDA runs the model (then ``device`` is "cuda")
   per batch size n:
     first_ms    the first run at this size: what a live stream pays if the size was not warmed up at start
     p50 / p95   steady runs, numpy in and out (how the engine calls it)
@@ -28,7 +30,7 @@ from pathlib import Path
 import numpy as np
 
 from streamsafe.config import Config
-from streamsafe.models.onnx_backend.session import Trt, device_of, open_session
+from streamsafe.models.onnx_backend.session import OPENED, Trt, device_of, open_session
 
 
 def _ms(fn) -> float:
@@ -56,7 +58,9 @@ def measure(path: str | Path, batches: list[int], runs: int = 30, cfg: Config | 
     path = Path(path)
     manifest = path.parent / "manifest.json"
     files = json.loads(manifest.read_text())["files"] if manifest.exists() else {}
-    trt = Trt(cfg.backend.trt_cache or str(path.parent / "trt_cache"), cfg.backend.trt_fp16, files) if cfg.backend.trt else None
+    b = cfg.backend
+    cache = b.trt_cache or str(path.parent / "trt_cache")
+    trt = Trt(cache, b.trt_fp16, files, b.trt_build, libs=b.trt_libs) if b.trt else None
 
     shapes = None
     if trt is not None:  # the engine gives TensorRT its batch range too (models/onnx_backend/eye.py, pose.py)
@@ -75,6 +79,7 @@ def measure(path: str | Path, batches: list[int], runs: int = 30, cfg: Config | 
     device = device_of(session)
 
     out: dict = dict(model=path.name, device=device, providers=session.get_providers(), load_s=round(load_s, 2), batch={})
+    out["note"] = OPENED[-1].note  # TRT=1: "engine built in ..." the first time, "" when loaded from the cache, or why CUDA runs it
     for n, x in feeds.items():
         first = _ms(lambda x=x: session.run(None, {inp.name: x}))
         steady = sorted(_ms(lambda x=x: session.run(None, {inp.name: x})) for _ in range(runs))

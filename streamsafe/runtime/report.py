@@ -57,11 +57,35 @@ def write_outputs(report: dict, stats_path: str, diag_path: str, decisions_log: 
 
 
 def device_name() -> str:
-    """What the models run on: the CUDA device name (PyTorch, or ONNX Runtime on CUDA), "directml", or "cpu"."""
+    """What the models run on: the CUDA device name (PyTorch), or the ONNX Runtime device(s): "onnx-trt",
+    "onnx-cuda", "onnx-dml"; "onnx-trt+cuda" when some model is not on TensorRT. Otherwise "cpu"."""
     torch = sys.modules.get("torch")
     if torch is not None and torch.cuda.is_available():
         return torch.cuda.get_device_name(0)
     session = sys.modules.get("streamsafe.models.onnx_backend.session")
-    if session is not None and session.LAST_DEVICE:
-        return session.LAST_DEVICE
+    if session is not None and session.device_summary():
+        return session.device_summary()
     return "cpu"
+
+
+def device_notes() -> list[str]:
+    """Per model: why it is not on the device that was asked for (TensorRT fell back to CUDA), or what happened
+    to its engine at this start (built, rebuilt). Empty when every model started on its fast path from the cache."""
+    session = sys.modules.get("streamsafe.models.onnx_backend.session")
+    return session.notes() if session is not None else []
+
+
+def device_stats(stats: dict) -> None:
+    """Add the device facts of this process to an analyzer's stats (the analyzer may live in a worker process)."""
+    stats["device"] = [device_name()]
+    stats["device_notes"] = device_notes()
+
+
+def device_summary(stats: dict) -> dict:
+    """Take the device facts out of an analyzer's stats, as fields of the run summary:
+    ``gpu``, ``device_notes`` and ``headroom`` (the model times measured at start, ``analysis/headroom.py``)."""
+    return dict(
+        gpu=stats.pop("device", ["?"])[0],
+        device_notes=list(stats.pop("device_notes", [])),
+        headroom=next(iter(stats.pop("headroom", [])), None),
+    )

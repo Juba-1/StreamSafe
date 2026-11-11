@@ -27,7 +27,7 @@ from streamsafe.io.sinks import FrameSink
 from streamsafe.io.sources import FrameSource
 from streamsafe.runtime.cuts import CutDetector
 from streamsafe.runtime.gate import OutputGate
-from streamsafe.runtime.report import device_name, summarize, write_outputs
+from streamsafe.runtime.report import device_stats, device_summary, summarize, write_outputs
 from streamsafe.runtime.threads import limit_threads
 from streamsafe.runtime.worker import AnalyzerWorker
 from streamsafe.types import ANALYSIS_SIZE
@@ -116,7 +116,9 @@ def _run_offline(cfg: Config, source: FrameSource, sink: FrameSink | None, facto
     gate.finish()
 
     n_dec = len(analyzer.stats.get("ms_total", []))
-    report = summarize(gate.stats, analyzer.stats, emitted, n_dec, rt.fps, dict(mode="offline", gpu=device_name()))
+    device_stats(analyzer.stats)
+    extra = dict(mode="offline", **device_summary(analyzer.stats))
+    report = summarize(gate.stats, analyzer.stats, emitted, n_dec, rt.fps, extra)
     write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, analyzer.diag, gate.log)
     return report
 
@@ -231,10 +233,10 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
 
     stats.update(gate.stats)
     last = worker.current
-    gpu = last.stats.pop("device", ["?"])[0]
+    device = device_summary(last.stats)
     n_dec = len(last.stats.get("ms_total", []))
     restarts = len(stats.get("worker_restarts", []))
-    extra = dict(mode="realtime", gpu=gpu, delay_s=rt.delay, frames_in=v, dropped_frames=v - shown, worker_restarts=restarts)
+    extra = dict(mode="realtime", **device, delay_s=rt.delay, frames_in=v, dropped_frames=v - shown, worker_restarts=restarts)
     report = summarize(stats, last.stats, shown, n_dec, rt.fps, extra)
     write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, last.diag, gate.log)
     return report
