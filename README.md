@@ -29,8 +29,9 @@ output frame from the decisions next to it (same shot only) and moves each garme
 |---|---|
 | `streamsafe/config.py` | every setting with its default and the reason for it; each one can be set from the environment |
 | `streamsafe/types.py` | data passed between stages: `Person`, `Layer`, `Decision`, `MotionRef` |
-| `streamsafe/models/` | model protocols (`base.py`), risk heads (`heads.py`), HUD reader (`ocr_hud.py`), PyTorch backend |
-| `streamsafe/analysis/` | `tracks.py` who is who, `risk.py` who must be covered, `scene.py` whole-screen cover, `analyzer.py` one decision |
+| `streamsafe/models/` | model protocols (`base.py`), risk heads (`heads.py`), HUD reader (`ocr_hud.py`), PyTorch backend, ONNX backend (`onnx_backend/`: sessions, TensorRT engine cache) |
+| `streamsafe/syscheck.py`, `prepare.py` | "can this PC protect a stream?" and "build the TensorRT engines": run by the installer and the app |
+| `streamsafe/analysis/` | `tracks.py` who is who, `risk.py` who must be covered, `scene.py` whole-screen cover, `analyzer.py` one decision, `eye_schedule.py` / `headroom.py` the eye's work per decision |
 | `streamsafe/garment/` | `shapes.py` where the garment goes, `fabric.py` how it looks (colour, logo), `builder.py` one layer per person |
 | `streamsafe/render/` | `compositor.py` drawing, `motion.py` following, `smooth.py` steady placement, `slate.py` slate and scene card |
 | `streamsafe/runtime/` | `runner.py` realtime/offline loop, `worker.py` analyzer process, `gate.py` fail-closed output, `cuts.py`, `report.py` |
@@ -39,7 +40,7 @@ output frame from the decisions next to it (same shot only) and moves each garme
 | `bench/` | measure and review the engine (metrics, side-by-side videos, soak test). See `bench/README.md` |
 | `training/` | build the eye's heads and the scene head from labeled crops. See `training/README.md` |
 | `experiments/` | one-off research scripts behind past decisions. Not used by the engine. See `experiments/README.md` |
-| `tests/` | stand-in models: end-to-end, failure injection, I/O, OBS guard, equivalence with the previous engine |
+| `tests/` | stand-in models: end-to-end, failure injection, I/O, OBS guard, engine cache and TensorRT fallback (faked runtime), equivalence with the previous engine |
 
 ## What protects the stream
 
@@ -50,7 +51,7 @@ output frame from the decisions next to it (same shot only) and moves each garme
 | Eye budget (optional) | With `EYE_BUDGET` the eye looks at a limited number of people per decision, biggest first. Whoever waits for a look is covered until it comes; a wait never counts toward a release. | `analysis/eye_schedule.py` |
 | Following | Garments follow their person between decisions (motion estimate), are steadied by a small per-person filter, and fast movers get a margin in their direction of motion. | `render/motion.py`, `render/smooth.py`, `garment/builder.py` |
 | Scene layer | Explicit scenes (trained scene head, HUD prompts): whole-screen card + game-audio mute, with lead and tail times. | `analysis/scene.py` |
-| Fail closed | No decision for a frame, a failed or stale decision, a cut with no fresh decision, decisions too far apart (a slow GPU, `max_span`), a crashed analyzer: the last protected frame is repeated for at most 2 frames, then the slate. A crashed or failing analyzer is restarted (slate while it loads). | `runtime/gate.py`, `runtime/runner.py` |
+| Fail closed | No decision for a frame, a failed or stale decision (an exception, or a model answering NaN), a cut with no fresh decision, decisions too far apart (a slow GPU, `max_span`), a crashed analyzer: the last protected frame is repeated for at most 2 frames, then the slate. A crashed or failing analyzer is restarted (slate while it loads). | `runtime/gate.py`, `runtime/runner.py` |
 | Bounded latency | A frame more than 0.5 s late is dropped, never shown late, so delay and memory cannot grow. | `runtime/runner.py` |
 | OBS guard | Slate + game-audio mute when: no heartbeat for 0.5 s, the captured output window is empty, a named game-audio source is missing, or the streamer presses the PANIC hotkey. The raw game source on air is switched back to the protected scene. | `obs/streamsafe_guard.lua` |
 | Brand | Garment colour and chest logo, slate and scene-card image/colour/text are streamer settings. | `config.py` (`GarmentConfig`, `BrandConfig`) |
@@ -65,9 +66,16 @@ Rules the code keeps:
 ## Models
 
 Two backends run the same models (`BACKEND`): `torch` (PyTorch + CUDA, NVIDIA only: research, benchmarks,
-export) and `onnx` (ONNX Runtime: NVIDIA via CUDA, any DirectX 12 GPU on Windows via DirectML; the product path).
-`tools/export_onnx.py` writes the ONNX folder with a `manifest.json` (sha256 + pins) that the engine checks before
-loading anything. Without a GPU the onnx backend refuses to start (never a silent CPU fallback).
+export) and `onnx` (ONNX Runtime: NVIDIA via TensorRT or CUDA, any DirectX 12 GPU on Windows via DirectML; the
+product path). `tools/export_onnx.py` writes the ONNX folder with a `manifest.json` (sha256 + pins) that the engine
+checks before loading anything. Without a GPU the onnx backend refuses to start (never a silent CPU fallback).
+
+NVIDIA product path: `TRT=1` (`docs/NVIDIA_TRT.md`). TensorRT compiles each model into an engine for this card
+and driver; `python -m streamsafe.prepare --models DIR` builds or verifies them before the stream (about 3
+minutes the first time and after a driver update). An engine is loaded only if its seal matches the model, the
+card, the driver and the library versions and every file matches its sha256. A model TensorRT cannot run runs
+on CUDA, and the run report says so (`summary.gpu`, `summary.device_notes`). The report also carries the model
+times measured at start (`summary.headroom`) and the engine warns at start when this PC cannot hold 10 decisions/s.
 
 All are downloaded from the Hugging Face Hub at a **pinned commit** (`*_revision` in `config.py`). Nothing new
 reaches a streamer's PC until someone moves the pin on purpose.
@@ -116,9 +124,13 @@ Set any of them from the environment by its upper-case name. CLI flags override 
 | `OBS_STATE` | `OBS_STATE=C:\ProgramData\StreamSafe\state.txt` | state file read by the OBS guard script (ASCII path) |
 | `EYE_FP16` | `EYE_FP16=1` | onnx: the eye in fp16 (`eye16.onnx`) |
 | `EYE_BUDGET` | `EYE_BUDGET=6` | at most this many eye crops per decision; people waiting for their look are covered meanwhile (0 = off) |
-| `TRT` / `TRT_CACHE` | `TRT=1` | onnx on NVIDIA: TensorRT in front of CUDA; engines are built on the first start and kept in the cache folder |
+| `EYE_BUDGET_AUTO` | `EYE_BUDGET_AUTO=1` | realtime: set the eye budget once at start from this PC's measured model times; none on a fast path |
+| `TRT` / `TRT_CACHE` | `TRT=1` | onnx on NVIDIA: TensorRT in front of CUDA; engines are kept in the cache folder (the streamer's own user only) |
+| `TRT_BUILD` | `TRT_BUILD=0` | 0: never build an engine at engine start (`streamsafe.prepare` did it); a model without a ready engine runs on CUDA |
+| `TRT_LIBS` | `TRT_LIBS=C:\StreamSafe\tensorrt` | folder with the TensorRT libraries when they are not the pip package |
 
-`EYE_BUDGET` and `TRT` are off by default until the GPU runs in `SPEED_PLAN.md` have measured them.
+`TRT` is off by default because the default must start on any GPU; the NVIDIA edition turns it on (run 57
+measured it, `SPEED_PLAN.md`). `EYE_BUDGET` and `EYE_BUDGET_AUTO` are off until a GPU run has measured them.
 
 ## Security notes
 
@@ -134,7 +146,7 @@ Set any of them from the environment by its upper-case name. CLI flags override 
 ```bash
 pip install -e ".[dev]"
 ruff check . && ruff format --check .
-pytest                       # ~4 min on 2 CPU cores; no GPU or model download needed
+pytest                       # ~6 min on 2 CPU cores; no GPU or model download needed
 ```
 
 `tests/test_equivalence.py` runs the previous engine (`engine2_ref`, set `STREAMSAFE_REF`) next to this one with

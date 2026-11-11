@@ -11,6 +11,7 @@ StreamSafe ships or downloads these models. Each keeps its own license; the lice
 | usyd-community/vitpose-base-simple | pose (garment shape) | Apache-2.0 | ViTPose authors |
 | RapidOCR (`rapidocr_onnxruntime`), optional | HUD reader | Apache-2.0 | RapidAI |
 | ONNX Runtime | model runtime | MIT | Copyright Microsoft Corporation |
+| NVIDIA TensorRT 10.9 libraries (NVIDIA edition only) | compiles and runs the models on NVIDIA cards (`TRT=1`) | NVIDIA software license with the TensorRT supplement (proprietary; `LICENSE.txt` in the `tensorrt_cu12_libs` wheel) | **Open before shipping:** its distribution clause (12.1) names the libnvinfer and libnvinfer_plugin libraries only; see `docs/NVIDIA_TRT.md` section 1 |
 
 The NVIDIA Open Model License also asks users of the model to follow NVIDIA's Trustworthy AI terms; StreamSafe uses
 the eye only to decide which on-screen characters to cover.
