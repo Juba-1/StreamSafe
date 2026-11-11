@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from collections.abc import Callable
 
 import cv2
 import numpy as np
 
+from streamsafe.analysis import headroom
 from streamsafe.analysis.eye_schedule import EyeScheduler
 from streamsafe.analysis.hud_thread import HudThread
 from streamsafe.analysis.risk import RiskPolicy
@@ -60,13 +62,16 @@ class Analyzer:
         self.hud = HudThread(models.hud) if models.hud is not None and cfg.scene.hud_ocr else None
         self.stats: defaultdict[str, list] = defaultdict(list)
         self.diag: list = []
+        self.headroom: headroom.Headroom | None = None  # this PC's measured model times, set by ``warmup``
 
-    def warmup(self) -> None:
-        """One pass of every model so the first real frame does not pay for lazy initialisation."""
+    def warmup(self, clock: Callable[[], float] = time.perf_counter) -> None:
+        """One pass of every model so the first real frame does not pay for lazy initialisation, then the
+        model times of this PC (``analysis/headroom.py``): they go into the run report, and with
+        ``eye_budget_auto`` they set the eye budget, once, before the first decision."""
         w, h = ANALYSIS_SIZE
         blank = np.zeros((h, w, 3), np.uint8)
         self.models.detector(blank)
-        for n in range(1, min(WARM_EYE, self.cfg.eye.eye_budget or WARM_EYE) + 1):
+        for n in range(1, min(WARM_EYE, self.eyes.budget or WARM_EYE) + 1):
             self.models.eye.embed([blank[:120, :60]] * n)
         for n in range(1, WARM_POSE + 1):
             self.models.pose(blank, [(10, 10, 60, 120)] * n)
@@ -74,6 +79,13 @@ class Analyzer:
             self.models.scene(cv2.cvtColor(blank, cv2.COLOR_BGR2RGB))
         if self.models.hud is not None:
             self.models.hud(blank)
+        self.headroom = headroom.measure(self.models, self.cfg, clock)
+        report = self.headroom.as_dict()
+        # an explicit EYE_BUDGET wins; offline never follows the clock (the same result on any machine)
+        if self.cfg.eye.eye_budget_auto and self.eyes.budget == 0 and self.cfg.runtime.mode == "realtime":
+            self.eyes.budget = self.headroom.budget
+            report["budget_applied"] = self.eyes.budget
+        self.stats["headroom"] = [report]
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
         """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
@@ -115,10 +127,14 @@ class Analyzer:
         st["eye_skipped"].append(looks.skipped)
         if looks.look:
             emb = self.models.eye.embed([crops[j] for j in looks.look])
-            for j, e, p in zip(looks.look, emb, self.models.eye.prisk(emb), strict=True):
+            scores = self.models.eye.prisk(emb)
+            if not np.isfinite(scores).all():
+                # NaN compares false with every threshold: the person would count as safe. Fail the decision
+                raise ValueError("the eye returned a non-finite score")
+            for j, e, p in zip(looks.look, emb, scores, strict=True):
                 people[j].emb, people[j].p = e, float(p)
         st["embedded"].append(len(looks.look))
-        if cfg.eye.eye_budget > 0:
+        if self.eyes.budget > 0:
             st["eye_put_off"].append(looks.put_off)
             st["eye_early"].append(looks.early)
         waiting = [people[j] for j in looks.waiting]  # not seen and not tracked yet: covered, outside the tracker
@@ -242,6 +258,8 @@ class Analyzer:
             every = cfg.scene.scene_every_s if cfg.scene.scene_guard else SCENE_EVERY_S
             if cut or t - self._scene_at >= every:
                 self.p_swim, p = models.scene(rgb)
+                if not np.isfinite([self.p_swim, 0.0 if p is None else p]).all():
+                    raise ValueError("the scene model returned a non-finite score")  # NaN would read as "no scene"
                 self._scene_at = t
                 p_explicit = p if cfg.scene.scene_guard else None  # None: no trained head -> HUD only
         hits: list[tuple[int, float]] = []

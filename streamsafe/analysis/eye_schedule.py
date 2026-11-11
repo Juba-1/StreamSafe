@@ -48,6 +48,9 @@ class Looks:
 class EyeScheduler:
     def __init__(self, cfg: EyeConfig) -> None:
         self.cfg = cfg
+        # crops per decision, 0 = no limit. Set once before the first decision (the config, or the analyzer's
+        # warm-up with ``eye_budget_auto``) and not changed afterwards
+        self.budget = cfg.eye_budget
         self._owed: dict[int, int] = {}  # track id -> decisions its look has been put off so far
         self._waiting: list[tuple[int, np.ndarray, int]] = []  # people without a track: (waiting id, mask / 4, decisions waited)
         self._next_id = FIRST_WAITING_ID
@@ -58,7 +61,7 @@ class EyeScheduler:
     def plan(self, people: list[Person], tracker: Tracker, cut: bool) -> Looks:
         """Marks every person as looked at now (untouched), carried by motion (``stale``) or put off
         (``put_off``), and returns the indices to embed."""
-        cfg, budget = self.cfg, self.cfg.eye_budget
+        cfg, budget = self.cfg, self.budget
         skipped = tracker.motion_hints(people, cut, cfg.eye_every)
         need = [j for j, p in enumerate(people) if not p.stale]
         if budget <= 0:
