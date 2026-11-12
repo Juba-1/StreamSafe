@@ -79,7 +79,8 @@ def test_srt_input_realtime_pipeline(tmp_path):
     assert s["frames_out"] >= 60  # a 2-core CI box may drop a few late frames (never shows them late)
     assert s["analyzer_errors"] == 0
     assert s["decisions"] > 3  # 2-core CI box shared with two ffmpeg encoders
-    n_written = sum(1 for _ in FFmpegSource(out, (1920, 1080), 30.0).frames())
+    # picture only: with sound, the reader starts the picture at the sound's first instant (one repeated frame)
+    n_written = sum(1 for _ in FFmpegSource(out, (1920, 1080), 30.0, audio=False).frames())
     assert n_written == s["frames_out"]
 
 

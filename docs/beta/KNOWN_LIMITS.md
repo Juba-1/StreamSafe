@@ -10,7 +10,7 @@ This is what we know does not work or is not proven yet. If you hit something no
 3. **A PC graphics card is needed.** No graphics card, no start (it never falls back to the CPU). NVIDIA RTX 3060 or better is recommended. AMD and Intel run slower and were measured less. We have not tested every card; the memory and speed thresholds in `check` are estimates.
 4. **Running the game on the same PC.** StreamSafe uses the GPU too, so the game and StreamSafe compete for it. We have not measured this. Expect lower game FPS, or more full-screen slates, on weaker cards.
 5. **Latency.** The picture reaches viewers about 2 seconds late (plus the platform's own delay). Chat will feel late. A shorter delay is possible but is not tested for safety.
-6. **Setup A sends video only.** In the SRT setup, game sound and mic are not forwarded to the platform. Use setup B for sound.
+6. **Setup A mutes the mic with the game.** In the SRT setup OBS sends one mixed sound track (game + mic). StreamSafe delays it with the picture and silences all of it while a full-screen cover is on. Use setup B if the mic must stay on.
 7. **Setup B needs a careful OBS setup** (hidden scene, virtual camera, script, sync offsets). It is easy to get something wrong; use the 10-second kill test and a private stream.
 8. **Fixed output quality.** The stream out of StreamSafe is 30 frames per second, H.264 at 6 Mbps, 16:9. You cannot change this in the beta.
 9. **Windows only.** Live streaming is supported on Windows 10/11.
@@ -27,7 +27,7 @@ This is what we know does not work or is not proven yet. If you hit something no
 3. **لازم كرت شاشة في الكمبيوتر.** بدون كرت ما يشتغل (ما يرجع للمعالج أبدًا). الأفضل NVIDIA RTX 3060 أو أعلى. كروت AMD وIntel أبطأ وقياساتها أقل. ما جرّبنا كل الكروت؛ حدود الذاكرة والسرعة في `check` تقديرية.
 4. **تشغيل اللعبة على نفس الجهاز.** StreamSafe يستخدم كرت الشاشة برضو، فاللعبة والبرنامج يتنافسون عليه. ما قسنا هذا. توقع نزول في فريمات اللعبة أو شاشات تغطية أكثر على الكروت الأضعف.
 5. **التأخير.** الصورة توصل المشاهدين متأخرة حوالي ثانيتين (غير تأخير المنصة). الشات بيحسّونه متأخر. تأخير أقصر ممكن لكنه ما انختبر من ناحية الأمان.
-6. **الطريقة A ترسل فيديو فقط.** في طريقة SRT صوت اللعبة والمايك ما يتحولون للمنصة. للصوت استخدم الطريقة B.
+6. **الطريقة A تكتم المايك مع اللعبة.** في طريقة SRT يرسل OBS مسار صوت واحد مخلوط (اللعبة + المايك). StreamSafe يأخّره مع الصورة ويكتمه كله طول ما التغطية الكاملة موجودة. لو لازم المايك يبقى شغال استخدم الطريقة B.
 7. **الطريقة B تحتاج ضبط دقيق في OBS** (مشهد مخفي، كاميرا افتراضية، سكربت، تأخير الصوت). سهل تغلط فيها؛ سوّ اختبار القتل (Task Manager) في ثواني وجرّب على بث خاص.
 8. **جودة الإخراج ثابتة.** البث الخارج من StreamSafe 30 فريم بالثانية، H.264 بسرعة 6 ميجابت، بنسبة 16:9. ما تقدر تغيّرها في النسخة التجريبية.
 9. **ويندوز فقط.** البث المباشر مدعوم على ويندوز 10 و11.

@@ -7,7 +7,8 @@ Every engine setting can also be set from the environment (see ``streamsafe/conf
 Examples
   # benchmark a file deterministically
   python -m streamsafe --input trailer.mp4 --output review.mp4 --mode offline
-  # OBS streams to us over SRT, we stream the protected picture to Kick
+  # OBS streams to us over SRT, we stream the protected picture to Kick (with its sound, delayed alike and
+  # silent while the game audio is muted)
   python -m streamsafe --input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest>/app/<key>"
   # OBS Virtual Camera (output type "Source" = the game capture) in, a window for OBS to capture out
   python -m streamsafe --input "device:OBS Virtual Camera" --output window
@@ -50,8 +51,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     cfg = config_from_args(args)
     size = tuple(int(v) for v in args.size.lower().split("x")) if args.size else None
-    source = open_source(args.input, cfg.runtime.fps, cfg.runtime.secs, size)  # type: ignore[arg-type]
-    sinks = [open_sink(spec, source.size, cfg.runtime.fps) for spec in args.output]
+    source = open_source(args.input, cfg.runtime.fps, cfg.runtime.secs, size, cfg.output.audio)  # type: ignore[arg-type]
+    sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio) for spec in args.output]
     sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
     try:
         report = run(cfg, source, sink)

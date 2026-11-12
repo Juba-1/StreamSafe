@@ -177,6 +177,9 @@ class RuntimeConfig:
 class OutputConfig:
     stats_out: str = ""  # optional JSON with timings / counters
     diag_out: str = ""  # optional JSON log of every decision and every drawn garment
+    # FFmpeg inputs / outputs (SRT in, RTMP out) carry the sound: delayed with the picture, silent while muted.
+    # 0 = picture only, as before sound was added (a fallback if a sender's sound ever breaks the input)
+    audio: bool = True
     obs_state: str = ""  # state file for the OBS guard script (obs/streamsafe_guard.lua): heartbeat + mute
 
 

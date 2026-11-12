@@ -23,7 +23,7 @@ import numpy as np
 from streamsafe.analysis.analyzer import Analyzer
 from streamsafe.config import Config
 from streamsafe.io.obs_link import ObsStateWriter
-from streamsafe.io.sinks import FrameSink
+from streamsafe.io.sinks import FrameSink, takes_audio
 from streamsafe.io.sources import FrameSource
 from streamsafe.runtime.cuts import CutDetector
 from streamsafe.runtime.gate import OutputGate
@@ -133,7 +133,12 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
     worker = _Workers(lambda: AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE))
     gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps, brand=cfg.brand)
-    frames: dict[int, tuple[float, Any]] = {}  # frame id -> (capture time, frame)
+    frames: dict[int, tuple[float, Any, int]] = {}  # frame id -> (capture time, frame, its number in the source)
+    # sound travels with its frame: taken from the source by the frame's own number when the frame is shown
+    sound_of = getattr(source, "audio_chunk", None) if takes_audio(sink) else None
+    if sound_of is not None and hasattr(source, "audio_keep"):
+        source.audio_keep(rt.delay + rt.max_late_s + 2.0)  # sound is kept as long as a frame can wait
+    n_sound = n_no_sound = 0
     cap = int((rt.delay + rt.max_late_s + 1.0) * rt.fps)  # frames held at most, even if the output stalls
     n_captured = 0  # frame ids below this have been captured (a missing one was dropped)
     lock = threading.Lock()
@@ -155,8 +160,9 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                 cut = cuts(frame)
                 gate.mark_cut(fid, cut)
                 worker.submit(fid, frame if full_res else _to_analysis(frame), cut)
+                number = source.frame_index if sound_of is not None else fid  # type: ignore[attr-defined]
                 with lock:
-                    frames[fid] = (captured, frame)
+                    frames[fid] = (captured, frame, number)
                     n_captured = fid + 1
                     if len(frames) > cap:  # output stalled: forget the oldest, keep memory bounded
                         del frames[min(frames)]
@@ -205,7 +211,7 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                         continue
                     time.sleep(0.001)
                     continue
-                captured, frame = item
+                captured, frame, number = item
                 due = captured + rt.delay
                 if time.perf_counter() - due > rt.max_late_s:
                     stats["dropped_frames"].append(v)  # never shown: skipping it costs a stutter, never safety
@@ -215,7 +221,16 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                 while time.perf_counter() < due:
                     time.sleep(0.0005)
                 out = gate.render(v, frame)
-                if sink is not None:
+                if sink is not None and takes_audio(sink):
+                    # fail closed: sound only for a frame that is shown, not muted and not full-screen, and only
+                    # that frame's own samples; anything else (also "not arrived") is silence
+                    sound = None
+                    if sound_of is not None and not gate.muted and out is not gate.slate and out is not gate.card:
+                        sound = sound_of(number)
+                        n_sound += sound is not None
+                        n_no_sound += sound is None
+                    sink.write(out, sound)  # type: ignore[call-arg]
+                elif sink is not None:
                     sink.write(out)
                 if obs is not None:
                     obs.update(v, gate.muted, out is gate.slate or out is gate.card)
@@ -248,6 +263,9 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
         dropped_frames=v - shown,
         worker_restarts=restarts,
         stopped_by_user=stopped_by_user,
+        # frames sent with their sound / frames that should have had sound but none was there (silence instead)
+        audio_frames=n_sound,
+        audio_missing_frames=n_no_sound if getattr(source, "has_audio", False) else 0,
     )
     report = summarize(stats, last.stats, shown, n_dec, rt.fps, extra)
     write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, last.diag, gate.log)

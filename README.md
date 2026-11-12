@@ -105,7 +105,8 @@ python -m streamsafe --input trailer.mp4 --output review.mp4 --head-dir heads/ -
 Live with OBS (console + capture card): follow `docs/OBS_SETUP.md`. In short, OBS Virtual Camera (hidden raw
 scene) goes in, `--output window` comes out, and OBS captures that window. The guard script handles the slate and
 mutes the audio. The other way is SRT in, platform out:
-`--input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest>/<key>"` (video only).
+`--input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest>/<key>"`. This path carries the sound OBS
+sends (one mix): delayed exactly like the picture, silent while the gate mutes (`io/avpipe.py`; `AUDIO=0` = picture only).
 
 ## Settings
 
@@ -121,6 +122,7 @@ Set any of them from the environment by its upper-case name. CLI flags override 
 | `HUD_OCR` | `HUD_OCR=1` | read the game's on-screen prompts (needs `rapidocr_onnxruntime==1.2.3`) |
 | `SMOOTH`, `MOTION_MARGIN` | `SMOOTH=0` | steady placement and fast-mover margin (both on by default) |
 | `BACKEND` / `ONNX_DIR` | `BACKEND=onnx ONNX_DIR=C:\StreamSafe\models` | model backend and the exported model folder |
+| `AUDIO` | `AUDIO=0` | SRT in / RTMP out without the sound track (default: sound on) |
 | `OBS_STATE` | `OBS_STATE=C:\ProgramData\StreamSafe\state.txt` | state file read by the OBS guard script (ASCII path) |
 | `EYE_FP16` | `EYE_FP16=1` | onnx: the eye in fp16 (`eye16.onnx`) |
 | `EYE_BUDGET` | `EYE_BUDGET=6` | at most this many eye crops per decision; people waiting for their look are covered meanwhile (0 = off) |

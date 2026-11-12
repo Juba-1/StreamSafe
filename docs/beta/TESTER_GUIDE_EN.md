@@ -65,9 +65,11 @@ It prints `preparing 1/4 ...` and ends with `PREPARE_OK`. If it ends with `PREPA
 Use **A** if you can: it is simple and your stream key never leaves the one command you type. Use **B** if you
 need StreamSafe's picture inside an OBS scene.
 
-> **Sound in setup A (current beta):** StreamSafe reads and sends **video only**. Game sound and your mic do **not**
-> reach the platform in A. So for now A is good for picture tests (a private or unlisted stream, no sound);
-> use B when you need sound. Tell us how much this blocks you in the feedback form.
+> **Sound in setup A:** StreamSafe passes on the sound OBS sends (game + mic, as one mix), delayed by the same
+> amount as the picture, so they stay in sync without any OBS sync offsets. While a full-screen cover is on, the
+> whole mix is silent in A, **your mic too** (OBS sends one mixed track; StreamSafe cannot tell the game from your
+> voice). If your mic must stay on during covers, use B. Sound in A is new: please do the clap test on a private
+> stream and tell us in the feedback form.
 
 ### Setup A: OBS sends to StreamSafe (SRT), StreamSafe sends to the platform
 
@@ -132,7 +134,8 @@ Game capture (hidden "Game Raw")  ->  OBS Virtual Camera  ->  StreamSafe  ->  wi
 
 When StreamSafe sees an explicit scene, it covers the **whole screen** with a card and **mutes the game**. That is the
 intended behaviour, not a bug. It also shows the full-screen slate for a moment when it starts, and when something is wrong or slow.
-Your mic stays on. When the scene is over, picture and sound come back by themselves.
+In setup B your mic stays on; in setup A the mic is silent too while the cover is on (see the note in section 4).
+When the scene is over, picture and sound come back by themselves.
 
 ## 7. If it covers too much or too little
 
@@ -185,7 +188,7 @@ Other problems:
 | Stream shows the slate all the time | Look at the Command Prompt for errors. A slow PC causes this: close other programs and tell us your card |
 | Nothing arrives in setup A | Start StreamSafe **before** OBS. Check `srt://127.0.0.1:9000` in OBS (no key) and that the command has `?mode=listener` |
 | Nothing arrives on the platform | Check the server/key, and that your platform accepts `rtmps://` |
-| No sound in setup A | Expected in this beta (video only). Use setup B |
+| No sound in setup A | Check that OBS itself has sound (the mixer bars move) and that you run the current StreamSafe build. Silence during a full-screen cover, and for about half a second after it, is intended |
 | Window `StreamSafe Output` not found in OBS | StreamSafe must be running first; use "Window Capture" and pick it from the list |
 | Slate stuck after restarting StreamSafe (B) | Check the state file path is `C:\ProgramData\StreamSafe\state.txt` and English letters only |
 

@@ -27,7 +27,7 @@ Fill one per session. Send it with the report files from `%LOCALAPPDATA%\StreamS
 14. Did the stream to viewers stay smooth? Any buffering or drops? / هل بقي البث للمشاهدين سلس؟ تقطيع أو فصل؟
 15. Did StreamSafe crash, freeze, or restart itself? What happened just before? / هل البرنامج وقف أو تجمد أو أعاد التشغيل؟ وش صار قبلها؟
 16. Delay: was ~2 s ok? Would you accept less, or more for better safety? Was chat or your voice out of sync? / التأخير: هل ثانيتين مقبول؟ تقبل أقل أو أكثر مقابل حماية أحسن؟ هل الشات أو صوتك طلع غير متزامن؟
-17. In setup A: how much does "video only, no sound" block you? / في الطريقة A: كم يعطلك إن البث بدون صوت؟
+17. In setup A: was the sound in sync with the picture (clap test)? Does the mic going silent during a full-screen cover block you? / في الطريقة A: هل الصوت متزامن مع الصورة (اختبار التصفيقة)؟ وهل كتم المايك وقت التغطية الكاملة يعطلك؟
 
 ## D. Use and trust / الاستخدام والثقة
 
