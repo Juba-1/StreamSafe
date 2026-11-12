@@ -13,6 +13,7 @@ Anything that is always left-to-right (an address, a key, a path) is left-aligne
 from __future__ import annotations
 
 import contextlib
+import os
 import queue
 import sys
 import threading
@@ -21,7 +22,7 @@ from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk
 
 from streamsafe.app import build_info, controller, engine, i18n, modelpack, paths, release, updates
-from streamsafe.app import settings as S
+from streamsafe.app import settings as cfg
 from streamsafe.branding import PRODUCT_NAME
 
 FONT = "Segoe UI"
@@ -135,7 +136,7 @@ class App(tk.Tk):
         tabs = [(self.home, "tab_home"), (self.sets, "tab_settings"), (self.chk, "tab_check")]
         for frame, key in tabs[::-1] if self.rtl else tabs:  # Arabic: the first tab at the right
             self.nb.add(frame, text=self.tr(key))
-        self.nb.select(self.home)
+        self.nb.select({"settings": self.sets, "check": self.chk}.get(os.environ.get("STREAMSAFE_TAB", ""), self.home))  # CI screenshots
         self.build_home()
         self.build_settings()
         self.build_check()
@@ -233,16 +234,16 @@ class App(tk.Tk):
             self.pack_row(fr, fill="x")
 
         self.label(s, self.tr("sec_in"), font=(FONT, 11, "bold")).pack(fill="x")
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("in_srt"), value=S.INPUT_SRT, variable=v("input", tk.StringVar, "")))
+        self.pack_row(ttk.Radiobutton(s, text=self.tr("in_srt"), value=cfg.INPUT_SRT, variable=v("input", tk.StringVar, "")))
         field(s, self.tr("srt_port"), v("srt_port", tk.StringVar, ""), 8)
         self.srt_hint = self.label(s, "", fg="#6b7785", font=(FONT, 9))
         self.pack_row(self.srt_hint, fill="x")
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("in_camera"), value=S.INPUT_CAMERA, variable=v("input", tk.StringVar, "")))
+        self.pack_row(ttk.Radiobutton(s, text=self.tr("in_camera"), value=cfg.INPUT_CAMERA, variable=v("input", tk.StringVar, "")))
         field(s, self.tr("camera_name"), v("camera", tk.StringVar, ""))
         ttk.Separator(s).pack(fill="x", pady=10)
         self.label(s, self.tr("sec_out"), font=(FONT, 11, "bold")).pack(fill="x")
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("out_window"), value=S.OUTPUT_WINDOW, variable=v("output", tk.StringVar, "")))
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("out_rtmp"), value=S.OUTPUT_RTMP, variable=v("output", tk.StringVar, "")))
+        self.pack_row(ttk.Radiobutton(s, text=self.tr("out_window"), value=cfg.OUTPUT_WINDOW, variable=v("output", tk.StringVar, "")))
+        self.pack_row(ttk.Radiobutton(s, text=self.tr("out_rtmp"), value=cfg.OUTPUT_RTMP, variable=v("output", tk.StringVar, "")))
         field(s, self.tr("rtmp_url"), v("rtmp_url", tk.StringVar, ""))
         field(s, self.tr("stream_key"), v("key", tk.StringVar, ""), show="•")
         self.pack_row(ttk.Checkbutton(s, text=self.tr("remember_key"), variable=v("remember", tk.BooleanVar, False)))
@@ -253,10 +254,12 @@ class App(tk.Tk):
         self.label(s, self.tr("open_obs"), font=(FONT, 11, "bold")).pack(fill="x")
         for key, path in (("obs_state", paths.obs_state_file(self.ctrl.env)), ("obs_script", paths.obs_script())):
             fr = tk.Frame(s, bg="white")
-            ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda p=str(path): self.copy(p)).pack(side="left" if not self.rtl else "right", padx=4)
-            tk.Label(fr, text=self.tr(key, path=path), bg="white", fg="#44505e", font=(FONT, 8), anchor="w", justify="left", wraplength=470).pack(
-                side="right" if self.rtl else "left", fill="x", expand=True
+            ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda p=str(path): self.copy(p)).pack(
+                side="left" if not self.rtl else "right", padx=4
             )
+            tk.Label(
+                fr, text=self.tr(key, path=path), bg="white", fg="#44505e", font=(FONT, 8), anchor="w", justify="left", wraplength=470
+            ).pack(side="right" if self.rtl else "left", fill="x", expand=True)
             self.pack_row(fr, fill="x")
         v("input", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
         v("srt_port", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
@@ -517,18 +520,24 @@ class App(tk.Tk):
                 return self.tr("pack_bad", why=str(exc))
             except (OSError, InterruptedError):
                 return self.tr("install_cancelled") if self._cancel.is_set() else self.tr("src_network", why="disk")
-            except Exception as exc:  # fetch.Cancelled and anything unexpected: nothing was changed
+            except Exception as exc:  # fetch.CancelledError and anything unexpected: nothing was changed
                 return self.tr("install_cancelled") if self._cancel.is_set() else self.tr("src_other", why=str(exc))
             return ""
 
-        self.job("models", work, lambda err: self.message.configure(text=err or self.tr("install_done"), fg="#b3261e" if err else "#1b7f3b"))
+        self.job(
+            "models", work, lambda err: self.message.configure(text=err or self.tr("install_done"), fg="#b3261e" if err else "#1b7f3b")
+        )
 
     def enable_nvidia(self) -> None:
         def work() -> str:
-            why = self.ctrl.enable_nvidia(lambda w, d, t: self.on_progress("nvidia_" + ("downloading" if t > 1000 else "preparing"), d, t), self._cancel)
+            why = self.ctrl.enable_nvidia(
+                lambda w, d, t: self.on_progress("nvidia_" + ("downloading" if t > 1000 else "preparing"), d, t), self._cancel
+            )
             return self.tr("nvidia_failed", why=why) if why else ""
 
-        self.job("nvidia", work, lambda err: self.message.configure(text=err or self.tr("nvidia_ready"), fg="#b3261e" if err else "#1b7f3b"))
+        self.job(
+            "nvidia", work, lambda err: self.message.configure(text=err or self.tr("nvidia_ready"), fg="#b3261e" if err else "#1b7f3b")
+        )
 
     def decline_nvidia(self) -> None:
         self.ctrl.settings.nvidia_declined = True
@@ -576,7 +585,14 @@ class App(tk.Tk):
                 return self.tr("update_failed", why=str(exc)) if not self._cancel.is_set() else self.tr("install_cancelled")
             return ""
 
-        self.job("update", work, lambda err: (self.message.configure(text=err or self.tr("update_done"), fg="#b3261e" if err else "#1b7f3b"), self.show_update_row()))
+        self.job(
+            "update",
+            work,
+            lambda err: (
+                self.message.configure(text=err or self.tr("update_done"), fg="#b3261e" if err else "#1b7f3b"),
+                self.show_update_row(),
+            ),
+        )
 
     def roll_back(self) -> None:
         try:

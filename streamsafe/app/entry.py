@@ -4,14 +4,16 @@
     <name>.exe prepare                 build / verify the per-PC engines (NVIDIA TensorRT)
     <name>.exe run --input ... --output ...   the stream filter (same options as python -m streamsafe)
     <name>.exe gpu-probe               which device ONNX Runtime really reaches (one JSON line)
+    <name>.exe about [--json]          version, build date, beta expiry, folders in use
+    <name>.exe encoder-probe           which H.264 encoder of the bundled FFmpeg works on this PC
     <name>.exe ui                      the window (what <name>App.exe opens)
 
 In the installed program the product settings are filled in where the environment does not set them
 (``product_defaults``): the ONNX backend, the model folder ``<data>/models`` (or ``--models DIR``), the heads,
 the OBS state file, the engine cache, and the NVIDIA runtime with TensorRT when its libraries are installed.
 ``run --output env:NAME`` takes the output address from the environment variable NAME, so a stream key never has
-to be on this program's command line. A beta build past its date refuses ``run`` (exit code 4), and so does a build without usable risk heads (5): it
-never streams, so it can never stream uncovered.
+to be on this program's command line. A beta build past its date refuses ``run`` (exit code 4), and so does a
+build without usable risk heads (5): it never streams, so it can never stream uncovered.
 """
 
 from __future__ import annotations
@@ -88,6 +90,39 @@ def _is_window_exe() -> bool:
     return paths.is_frozen() and Path(sys.executable).stem.lower() == GUI_EXE.lower()
 
 
+def about(as_json: bool) -> int:
+    import json
+
+    from streamsafe.app import build_info, updates
+
+    facts = {
+        "product": PRODUCT_NAME,
+        "version": updates.current_version(),
+        "build_date": build_info.BUILD_DATE,
+        "expires": build_info.EXPIRES,
+        "days_left": updates.days_left(),
+        "expired": updates.expired(),
+        "frozen": paths.is_frozen(),
+        "program_dir": str(paths.app_dir()),
+        "data_dir": str(paths.data_dir()),
+        "ffmpeg": paths.find_ffmpeg(),
+    }
+    print(json.dumps(facts, ensure_ascii=False) if as_json else "\n".join(f"{k}: {v}" for k, v in facts.items()))
+    return 0
+
+
+def encoder_probe() -> int:
+    import json
+
+    from streamsafe.app import encoders
+
+    ffmpeg = paths.find_ffmpeg()
+    listed = sorted(encoders.listed(ffmpeg)) if ffmpeg else []
+    chosen = encoders.choose(ffmpeg) if ffmpeg else ""
+    print("ENCODER_PROBE " + json.dumps({"ffmpeg": ffmpeg, "listed": listed, "chosen": chosen}), flush=True)
+    return 0 if chosen else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     _utf8_streams()
     # the analyzer runs in a child process and a frozen exe re-enters here for it: the runtime choice (inherited
@@ -110,6 +145,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"STREAMSAFE_RUNTIME nvidia not used: {why}", file=sys.stderr, flush=True)
             if cmd == "run":  # asked for and not there: say so and stop, never start on an unknown runtime
                 return USAGE_EXIT
+    if cmd == "about":
+        return about("--json" in rest)
+    if cmd == "encoder-probe":
+        return encoder_probe()
     if cmd == "check":
         from streamsafe.syscheck import main as m
 

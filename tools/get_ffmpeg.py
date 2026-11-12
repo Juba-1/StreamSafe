@@ -34,7 +34,7 @@ def sha256_file(path: Path) -> str:
 def fetch(url: str, dest: Path) -> None:
     if not url.startswith("https://"):
         raise SystemExit(f"refused: not https: {url}")
-    with urllib.request.urlopen(url, timeout=120) as resp, open(dest, "wb") as out:  # noqa: S310 - https checked above
+    with urllib.request.urlopen(url, timeout=120) as resp, open(dest, "wb") as out:
         shutil.copyfileobj(resp, out, 1 << 20)
 
 

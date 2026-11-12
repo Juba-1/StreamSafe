@@ -38,7 +38,12 @@ def _files(folder: Path, base: str, names: list[str]) -> dict[str, dict]:
 def build_payload(args: argparse.Namespace) -> dict:
     payload: dict = {"format": updates.FORMAT, "product": updates.PRODUCT, "serial": args.serial}
     if args.app_version:
-        payload["app"] = {"version": args.app_version, "url": args.app_url or "", "notes_ar": args.notes_ar or "", "notes_en": args.notes_en or ""}
+        payload["app"] = {
+            "version": args.app_version,
+            "url": args.app_url or "",
+            "notes_ar": args.notes_ar or "",
+            "notes_en": args.notes_en or "",
+        }
     if args.models_dir:
         folder = Path(args.models_dir)
         listed = list(json.loads((folder / "manifest.json").read_text(encoding="utf-8"))["files"])
@@ -62,7 +67,18 @@ def main(argv: list[str] | None = None) -> int:
     sg.add_argument("--private", required=True)
     sg.add_argument("--serial", type=int, required=True)
     sg.add_argument("--out", required=True)
-    for name in ("app-version", "app-url", "notes-ar", "notes-en", "models-dir", "models-url", "models-version", "heads-dir", "heads-url", "heads-version"):
+    for name in (
+        "app-version",
+        "app-url",
+        "notes-ar",
+        "notes-en",
+        "models-dir",
+        "models-url",
+        "models-version",
+        "heads-dir",
+        "heads-url",
+        "heads-version",
+    ):
         sg.add_argument(f"--{name}")
     args = ap.parse_args(argv)
     raw = serialization.Encoding.Raw, serialization.PublicFormat.Raw

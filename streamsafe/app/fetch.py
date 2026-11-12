@@ -32,7 +32,7 @@ class IntegrityError(DownloadError):
     """The bytes received are not the pinned ones (sha256 or size): they were deleted."""
 
 
-class Cancelled(DownloadError):
+class CancelledError(DownloadError):
     pass
 
 
@@ -111,14 +111,14 @@ def download(
                 with open(part, "ab" if have else "wb") as f:
                     while chunk := resp.read(CHUNK):
                         if cancel is not None and cancel.is_set():
-                            raise Cancelled("cancelled")
+                            raise CancelledError("cancelled")
                         have += len(chunk)
                         if limit and have > limit:
                             raise IntegrityError("the server sent more bytes than the pinned size")
                         f.write(chunk)
                         if progress:
                             progress(have, total)
-    except Cancelled:
+    except CancelledError:
         raise  # the part file stays: the next try continues it
     except IntegrityError:
         part.unlink(missing_ok=True)

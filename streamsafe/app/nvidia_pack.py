@@ -70,7 +70,7 @@ def install(
     need_free_gb: float = release.NVIDIA_DISK_GB,
 ) -> None:
     """Download, verify and unpack every wheel, then move the set into place. Raises NvidiaPackError or
-    ``fetch.Cancelled``; partly downloaded wheels are kept so the next try continues them."""
+    ``fetch.CancelledError``; partly downloaded wheels are kept so the next try continues them."""
     nvidia.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(nvidia).free / 1e9
     if free < need_free_gb:
@@ -97,10 +97,10 @@ def install(
                     return name if name.startswith(keep) else None
 
                 unpack.extract(archive, stage, choose, MAX_WHEEL_UNPACKED, cancel=cancel)
-            except fetch.Cancelled:
+            except fetch.CancelledError:
                 raise
             except InterruptedError as exc:
-                raise fetch.Cancelled("cancelled") from exc
+                raise fetch.CancelledError("cancelled") from exc
             except (fetch.DownloadError, unpack.UnsafeArchiveError, OSError) as exc:
                 raise NvidiaPackError(f"{wheel.name}: {exc}") from exc
             done += wheel.size or archive.stat().st_size

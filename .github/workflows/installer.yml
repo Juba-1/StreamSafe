@@ -1,0 +1,78 @@
+name: installer
+
+# Builds the Windows beta installer (Inno Setup, per user, no admin) and tests it on a clean Windows runner:
+# silent install -> installed program checks -> the window starts and closes (screenshots) -> silent uninstall.
+# Run by hand (Actions tab, "Run workflow") or by pushing a v* tag. The installer is the artifact "StreamSafe-Beta-Setup".
+on:
+  workflow_dispatch:
+    inputs:
+      beta_days:
+        description: "Beta length in days from today (the build stops starting streams after it)"
+        default: "30"
+      nvidia_runtime_test:
+        description: "Also test the NVIDIA runtime switch (downloads about 3.5 GB of NVIDIA libraries; no GPU needed)"
+        type: boolean
+        default: false
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: install build tools
+        run: pip install -e . onnxruntime-directml "pyinstaller>=6.10,<7"
+      - name: "build facts: version, expiry date (default +30 days), exe version resources"
+        id: meta
+        shell: pwsh
+        run: python tools/build_meta.py --days ${{ inputs.beta_days || 30 }} --build ${{ github.run_number }} --out build
+      - name: "risk heads (a v* tag needs the real ones; a test build gets marked placeholders)"
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") { python tools/make_heads.py build --require-real } else { python tools/make_heads.py build }
+      - name: "FFmpeg (LGPL build pinned by sha256)"
+        run: python tools/get_ffmpeg.py build
+      - name: "program (PyInstaller, one folder, two exe)"
+        run: pyinstaller --noconfirm --clean --distpath dist --workpath build/pyi tools/streamsafe.spec
+      - name: "installer (Inno Setup)"
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppName=${{ steps.meta.outputs.product }}" "/DAppVersion=${{ steps.meta.outputs.version }}" `
+            "/DPublisher=${{ steps.meta.outputs.publisher }}" "/DAppGuid=${{ steps.meta.outputs.app_guid }}" `
+            "/DCliExe=${{ steps.meta.outputs.cli_exe }}" "/DGuiExe=${{ steps.meta.outputs.gui_exe }}" `
+            "/DSourceDir=$PWD\dist\${{ steps.meta.outputs.product }}" "/DOutDir=$PWD\dist-installer" `
+            "/DOutName=${{ steps.meta.outputs.installer }}" "/DExpires=${{ steps.meta.outputs.expires }}" installer\StreamSafe.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-ChildItem dist-installer | Select-Object Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StreamSafe-Beta-Setup
+          path: dist-installer/*.exe
+          retention-days: 30
+          if-no-files-found: error
+      - name: "smoke: silent install, installed program, window, silent uninstall"
+        shell: pwsh
+        run: >
+          ./tools/ci_installer_smoke.ps1
+          -Installer "$PWD\dist-installer\${{ steps.meta.outputs.installer }}.exe" -OutDir "$PWD\smoke"
+          -Product "${{ steps.meta.outputs.product }}" -CliExe "${{ steps.meta.outputs.cli_exe }}" -GuiExe "${{ steps.meta.outputs.gui_exe }}"
+          -AppGuid "${{ steps.meta.outputs.app_guid }}" -Version "${{ steps.meta.outputs.version }}" -Expires "${{ steps.meta.outputs.expires }}"
+          ${{ github.ref_type == 'tag' && '-RealHeads' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-smoke
+          path: smoke
+          retention-days: 30
+          if-no-files-found: warn

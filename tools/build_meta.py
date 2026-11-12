@@ -28,7 +28,8 @@ from streamsafe.branding import CLI_EXE, GUI_EXE, INSTALLER_APP_ID, PRODUCT_NAME
 
 VERSION_TEMPLATE = """# UTF-8
 VSVersionInfo(
-  ffi=FixedFileInfo(filevers=({a}, {b}, {c}, {d}), prodvers=({a}, {b}, {c}, {d}), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  ffi=FixedFileInfo(
+    filevers=({a}, {b}, {c}, {d}), prodvers=({a}, {b}, {c}, {d}), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', {company!r}),

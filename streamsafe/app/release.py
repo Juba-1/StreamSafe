@@ -113,6 +113,7 @@ NVIDIA_LICENSE_URLS = (
     "https://docs.nvidia.com/deeplearning/cudnn/latest/reference/eula.html",
 )
 
+
 # every host the app itself may contact (the stream output goes where the streamer points it)
 def allowed_hosts() -> set[str]:
     from urllib.parse import urlsplit

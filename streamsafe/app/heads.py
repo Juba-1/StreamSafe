@@ -46,7 +46,7 @@ def version(folder: Path) -> int:
 
 
 def problem(folder: Path) -> str:
-    """"" when ``folder`` holds heads the engine can load, otherwise why not."""
+    """ "" when ``folder`` holds heads the engine can load, otherwise why not."""
     from streamsafe.models.heads import RiskHeads
 
     if (folder / PLACEHOLDER).exists():
@@ -70,7 +70,7 @@ def best(env: Mapping[str, str] | None = None, app_folder: Path | None = None) -
 
 
 def why_not(env: Mapping[str, str] | None = None, app_folder: Path | None = None) -> str:
-    """"" when some heads can be used, otherwise ``missing`` / ``placeholder`` / the reason."""
+    """ "" when some heads can be used, otherwise ``missing`` / ``placeholder`` / the reason."""
     if best(env, app_folder) is not None:
         return ""
     shipped = app_folder if app_folder is not None else paths.bundled_heads_dir()
@@ -107,9 +107,15 @@ def install_files(
                 raise HeadsError(f"the update's entry for {name} is incomplete")
             try:
                 part = fetch.download(
-                    str(meta.get("url", "")), downloads / f"head-{str(meta.get('sha256', ''))[:16]}", str(meta.get("sha256", "")), size, None, cancel, allow_http
+                    str(meta.get("url", "")),
+                    downloads / f"head-{str(meta.get('sha256', ''))[:16]}",
+                    str(meta.get("sha256", "")),
+                    size,
+                    None,
+                    cancel,
+                    allow_http,
                 )
-            except fetch.Cancelled:
+            except fetch.CancelledError:
                 raise
             except fetch.DownloadError as exc:
                 raise HeadsError(f"{name}: {exc}") from exc

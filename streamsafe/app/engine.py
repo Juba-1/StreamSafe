@@ -248,7 +248,11 @@ def kill_tree(proc: subprocess.Popen) -> None:
     if sys.platform == "win32":
         with contextlib.suppress(OSError, subprocess.SubprocessError):
             subprocess.run(
-                ["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True, timeout=15, check=False, creationflags=_no_window_flags()
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                capture_output=True,
+                timeout=15,
+                check=False,
+                creationflags=_no_window_flags(),
             )
     with contextlib.suppress(OSError):
         proc.kill()
@@ -309,6 +313,6 @@ def last_report(reports: Path) -> Path | None:
 def open_file(path: Path) -> None:
     """Open a file or folder with the program Windows has for it (the report: Notepad)."""
     if sys.platform == "win32":
-        os.startfile(str(path))  # type: ignore[attr-defined]  # noqa: S606
+        os.startfile(str(path))  # type: ignore[attr-defined]
     else:
         subprocess.Popen(["xdg-open", str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

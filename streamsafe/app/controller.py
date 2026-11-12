@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from streamsafe.app import engine, fetch, heads, keystore, modelpack, nvidia_pack, paths, release, runtime_select, updates
+from streamsafe.app import engine, heads, keystore, modelpack, nvidia_pack, paths, release, updates
 from streamsafe.app import settings as settings_mod
 from streamsafe.app.settings import OUTPUT_RTMP, Settings
 
@@ -137,7 +137,9 @@ class Controller:
         return bool(gpu) and any(w in str(gpu.get("detail", "")).lower() for w in ("nvidia", "geforce", "quadro", "rtx"))
 
     # --- models -------------------------------------------------------------------------------------------
-    def install_models(self, source: str, location: str = "", progress: Progress | None = None, cancel: threading.Event | None = None) -> None:
+    def install_models(
+        self, source: str, location: str = "", progress: Progress | None = None, cancel: threading.Event | None = None
+    ) -> None:
         """``source``: "download" (``release.MODEL_BASE_URL``), "zip" or "folder" (``location``).
         Raises modelpack.SourceError / PackError."""
         models = paths.models_dir(self.env)

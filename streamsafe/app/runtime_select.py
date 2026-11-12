@@ -13,6 +13,7 @@ stays in use.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 from collections.abc import MutableMapping
@@ -55,9 +56,7 @@ def activate(env: MutableMapping[str, str] | None = None, sys_path: list[str] | 
     env["PATH"] = os.pathsep.join([*dirs, env.get("PATH", "")])
     if sys.platform == "win32" and env is os.environ:
         for d in dirs:
-            try:
+            with contextlib.suppress(OSError):
                 os.add_dll_directory(d)
-            except OSError:
-                pass
     _ACTIVE.append(site)
     return ""

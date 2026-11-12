@@ -308,8 +308,16 @@ def install_files(
                     _tell(progress, "downloading", base + got, total)
 
                 try:
-                    part = fetch.download(str(meta.get("url", "")), downloads / f"update-{meta['sha256'][:16]}", meta["sha256"], size, step, cancel, allow_http)
-                except fetch.Cancelled:
+                    part = fetch.download(
+                        str(meta.get("url", "")),
+                        downloads / f"update-{meta['sha256'][:16]}",
+                        meta["sha256"],
+                        size,
+                        step,
+                        cancel,
+                        allow_http,
+                    )
+                except fetch.CancelledError:
                     raise
                 except fetch.DownloadError as exc:
                     raise SourceError(source_error(exc).kind, f"{name}: {exc}") from exc

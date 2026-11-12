@@ -241,7 +241,9 @@ def check_disk(p: Probes, path: str) -> Check:
 def check_ffmpeg(p: Probes) -> Check:
     if p.which("ffmpeg"):
         return Check("ffmpeg", OK, "FFmpeg found")
-    return Check("ffmpeg", FAIL, "FFmpeg not found", "ملف FFmpeg ناقص. أعد تثبيت البرنامج.", f"FFmpeg is missing. Reinstall {PRODUCT_NAME}.")
+    return Check(
+        "ffmpeg", FAIL, "FFmpeg not found", "ملف FFmpeg ناقص. أعد تثبيت البرنامج.", f"FFmpeg is missing. Reinstall {PRODUCT_NAME}."
+    )
 
 
 def check_obs(p: Probes) -> Check:
@@ -295,8 +297,10 @@ def check_engines(folder: str, quick: bool) -> Check:
             "engines",
             WARN,
             f"TensorRT cannot be used: {e}",
-            "الوضع السريع لكروت إنفيديا غير متاح، والبرنامج يشتغل على الوضع الأبطأ. حدّث تعريف الكرت أو أعد تثبيت الوضع السريع من نافذة البرنامج.",
-            f"The fast NVIDIA mode is not available; {PRODUCT_NAME} runs in the slower mode. Update the driver or install the fast mode again from the app window.",
+            "الوضع السريع لكروت إنفيديا غير متاح، والبرنامج يشتغل على الوضع الأبطأ. "
+            "حدّث تعريف الكرت أو أعد تثبيت الوضع السريع من نافذة البرنامج.",
+            f"The fast NVIDIA mode is not available; {PRODUCT_NAME} runs in the slower mode. "
+            "Update the driver or install the fast mode again from the app window.",
         )
     waiting = [f"{label} ({why})" for label, _, why in rows if why]
     if waiting:

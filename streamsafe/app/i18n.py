@@ -25,7 +25,10 @@ TEXT: dict[str, tuple[str, str]] = {
     "st_failed": ("توقف بسبب خطأ", "Stopped by an error"),
     "st_blocked": ("غير جاهز", "Not ready"),
     "st_hint_protected": ("البث يمر عبر الحماية.", "The stream is going through the protection."),
-    "st_hint_covered": ("الشاشة مغطاة كاملة الآن، لن يرى المشاهدون شيئًا حتى يتأكد البرنامج.", "The whole picture is covered; viewers see nothing until the program is sure."),
+    "st_hint_covered": (
+        "الشاشة مغطاة كاملة الآن، لن يرى المشاهدون شيئًا حتى يتأكد البرنامج.",
+        "The whole picture is covered; viewers see nothing until the program is sure.",
+    ),
     "st_hint_stopped": ("اضغط «ابدأ الحماية» عشان يبدأ البث المحمي.", "Press Start protection to begin the protected stream."),
     # --- beta ---
     "beta_days": ("نسخة تجريبية: تنتهي بعد {days} يوم ({date}).", "Beta version: ends in {days} days ({date})."),
@@ -55,7 +58,10 @@ TEXT: dict[str, tuple[str, str]] = {
     "chk_heads": ("ملفات القرار", "Decision files"),
     # --- setup (models / NVIDIA) ---
     "sec_setup": ("التجهيز", "Setup"),
-    "models_needed": ("النماذج غير مثبتة. تنزيلها يحتاج اتصال إنترنت ومساحة كبيرة (مرة واحدة).", "The models are not installed. Downloading needs internet and a lot of disk space (once)."),
+    "models_needed": (
+        "النماذج غير مثبتة. تنزيلها يحتاج اتصال إنترنت ومساحة كبيرة (مرة واحدة).",
+        "The models are not installed. Downloading needs internet and a lot of disk space (once).",
+    ),
     "models_ok": ("النماذج جاهزة.", "Models are ready."),
     "models_bad": ("النماذج ناقصة أو تالفة: {why}", "Models are missing or damaged: {why}"),
     "download_models": ("نزّل النماذج", "Download models"),
@@ -84,7 +90,7 @@ TEXT: dict[str, tuple[str, str]] = {
     "p_copying": ("نسخ الملفات", "Copying files"),
     "p_verifying": ("التحقق من الملفات", "Verifying files"),
     "install_done": ("تم تثبيت النماذج.", "The models are installed."),
-    "install_cancelled": ("أُلغي التثبيت. ما تغير شي.", "Cancelled. Nothing was changed."),
+    "install_cancelled": ("أُلغي التثبيت. ما تغير شي.", "CancelledError. Nothing was changed."),
     "nvidia_offer": (
         "عندك كرت إنفيديا: الوضع السريع يحتاج تنزيل مكتبات إنفيديا (حوالي {gb} جيجا) ثم تجهيز الكرت (حوالي 4 دقائق، مرة واحدة). بدونه البرنامج يشتغل لكن أبطأ.",
         "You have an NVIDIA card: the fast mode downloads NVIDIA libraries (about {gb} GB) and then prepares the card (about 4 minutes, once). Without it the program works, only slower.",
@@ -94,13 +100,19 @@ TEXT: dict[str, tuple[str, str]] = {
     "nvidia_ready": ("الوضع السريع لإنفيديا جاهز.", "Fast NVIDIA mode is ready."),
     "nvidia_downloading": ("تنزيل مكتبات إنفيديا", "Downloading NVIDIA libraries"),
     "nvidia_preparing": ("تجهيز كرت إنفيديا (حوالي 4 دقائق)", "Preparing the NVIDIA card (about 4 minutes)"),
-    "nvidia_failed": ("تعذر تفعيل الوضع السريع: {why}. البرنامج يكمل بالوضع العادي.", "Fast mode could not be enabled: {why}. The program continues in the normal mode."),
+    "nvidia_failed": (
+        "تعذر تفعيل الوضع السريع: {why}. البرنامج يكمل بالوضع العادي.",
+        "Fast mode could not be enabled: {why}. The program continues in the normal mode.",
+    ),
     # --- settings ---
     "sec_in": ("الدخل (من OBS)", "Input (from OBS)"),
     "in_srt": ("OBS يرسل عبر SRT", "OBS sends over SRT"),
     "in_camera": ("كاميرا OBS الافتراضية", "OBS Virtual Camera"),
     "srt_port": ("المنفذ", "Port"),
-    "srt_hint": ("في OBS: الإعدادات > البث > الخدمة: مخصص، السيرفر: srt://127.0.0.1:{port}", "In OBS: Settings > Stream > Service: Custom, Server: srt://127.0.0.1:{port}"),
+    "srt_hint": (
+        "في OBS: الإعدادات > البث > الخدمة: مخصص، السيرفر: srt://127.0.0.1:{port}",
+        "In OBS: Settings > Stream > Service: Custom, Server: srt://127.0.0.1:{port}",
+    ),
     "camera_name": ("اسم الكاميرا", "Camera name"),
     "sec_out": ("الخرج (للمشاهدين)", "Output (to viewers)"),
     "out_window": ("نافذة يلتقطها OBS", "A window that OBS captures"),
@@ -108,7 +120,10 @@ TEXT: dict[str, tuple[str, str]] = {
     "rtmp_url": ("عنوان البث (بدون المفتاح)", "Stream address (without the key)"),
     "stream_key": ("مفتاح البث", "Stream key"),
     "remember_key": ("احفظ المفتاح على هذا الجهاز (محمي بحساب ويندوز)", "Remember the key on this PC (protected by your Windows account)"),
-    "key_no_store": ("هذا الجهاز ما فيه مخزن محمي: المفتاح يبقى فقط طول ما النافذة مفتوحة.", "This PC has no protected store: the key stays only while the window is open."),
+    "key_no_store": (
+        "هذا الجهاز ما فيه مخزن محمي: المفتاح يبقى فقط طول ما النافذة مفتوحة.",
+        "This PC has no protected store: the key stays only while the window is open.",
+    ),
     "delay": ("التأخير (ثانية)", "Delay (seconds)"),
     "bad_port": ("المنفذ لازم يكون بين 1024 و 65535.", "The port must be between 1024 and 65535."),
     "bad_camera": ("اكتب اسم الكاميرا.", "Enter the camera name."),
@@ -128,7 +143,10 @@ TEXT: dict[str, tuple[str, str]] = {
     "not_ready": ("ما يمديك تبدأ الآن: {why}", "Cannot start now: {why}"),
     "why_models": ("النماذج غير جاهزة", "the models are not ready"),
     "why_heads": ("ملفات القرار غير موجودة أو غير صالحة", "the decision files are missing or invalid"),
-    "why_heads_placeholder": ("هذه نسخة اختبار بملفات قرار تجريبية: لا تبث بها", "this is a test build with placeholder decision files: do not stream with it"),
+    "why_heads_placeholder": (
+        "هذه نسخة اختبار بملفات قرار تجريبية: لا تبث بها",
+        "this is a test build with placeholder decision files: do not stream with it",
+    ),
     "why_expired": ("انتهت النسخة التجريبية", "the beta ended"),
     "why_check": ("الفحص فيه أخطاء حمراء", "the check has red items"),
     "why_running": ("الحماية تعمل أصلًا", "protection is already running"),
@@ -137,7 +155,10 @@ TEXT: dict[str, tuple[str, str]] = {
     "engine_no_encoder": ("ما لقينا مشفّر فيديو يشتغل على جهازك: لم يبدأ البث.", "No video encoder works on this PC: nothing was streamed."),
     "engine_no_heads": ("ملفات القرار غير صالحة: لم يبدأ البث.", "The decision files are not valid: nothing was streamed."),
     # --- updates ---
-    "update_app": ("نسخة جديدة من البرنامج: {version}. نزّلها من الفريق وثبّتها فوق القديمة.", "A new version of the program: {version}. Get it from the team and install it over the old one."),
+    "update_app": (
+        "نسخة جديدة من البرنامج: {version}. نزّلها من الفريق وثبّتها فوق القديمة.",
+        "A new version of the program: {version}. Get it from the team and install it over the old one.",
+    ),
     "update_data": ("فيه تحديث للنماذج / ملفات القرار.", "There is an update for the models / decision files."),
     "update_button": ("حدّث الآن", "Update now"),
     "update_done": ("تم التحديث. النسخة السابقة محفوظة.", "Updated. The previous version is kept."),

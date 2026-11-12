@@ -5,5 +5,5 @@ try:
     from streamsafe.app import runtime_select
 
     runtime_select.activate()
-except Exception:  # noqa: S110 - nothing may stop the program from starting; entry.main reports the reason later
+except Exception:
     pass
