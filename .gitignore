@@ -7,3 +7,6 @@ __pycache__/
 *.ts
 *.json
 !pyproject.toml
+
+!installer/ffmpeg.lock.json
+!installer/heads/heads.json
