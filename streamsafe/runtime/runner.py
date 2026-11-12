@@ -186,44 +186,48 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     obs = ObsStateWriter(cfg.output.obs_state) if cfg.output.obs_state else None
     live = LiveLog(rt.live_log_s)
     v = shown = 0
+    stopped_by_user = False
     try:
-        while True:
-            with lock:
-                item = frames.pop(v, None)
-                waiting, gone = len(frames), v < n_captured
-            if item is None and gone:  # dropped while waiting (output stalled)
-                stats["dropped_frames"].append(v)
-                v += 1
-                continue
-            if item is None:
-                if capture_done.is_set():
-                    with lock:
-                        if v not in frames:
-                            break
+        try:
+            while True:
+                with lock:
+                    item = frames.pop(v, None)
+                    waiting, gone = len(frames), v < n_captured
+                if item is None and gone:  # dropped while waiting (output stalled)
+                    stats["dropped_frames"].append(v)
+                    v += 1
                     continue
-                time.sleep(0.001)
-                continue
-            captured, frame = item
-            due = captured + rt.delay
-            if time.perf_counter() - due > rt.max_late_s:
-                stats["dropped_frames"].append(v)  # never shown: skipping it costs a stutter, never safety
+                if item is None:
+                    if capture_done.is_set():
+                        with lock:
+                            if v not in frames:
+                                break
+                        continue
+                    time.sleep(0.001)
+                    continue
+                captured, frame = item
+                due = captured + rt.delay
+                if time.perf_counter() - due > rt.max_late_s:
+                    stats["dropped_frames"].append(v)  # never shown: skipping it costs a stutter, never safety
+                    gate.forget_before(v - KEEP_DECISIONS)
+                    v += 1
+                    continue
+                while time.perf_counter() < due:
+                    time.sleep(0.0005)
+                out = gate.render(v, frame)
+                if sink is not None:
+                    sink.write(out)
+                if obs is not None:
+                    obs.update(v, gate.muted, out is gate.slate or out is gate.card)
+                late = 1000 * (time.perf_counter() - due)
+                stats["emit_lateness_ms"].append(late)
+                stats["late_frames"].append(int(late > LATE_MS))
                 gate.forget_before(v - KEEP_DECISIONS)
+                live.tick(v, late, waiting, len(stats["dropped_frames"]))
                 v += 1
-                continue
-            while time.perf_counter() < due:
-                time.sleep(0.0005)
-            out = gate.render(v, frame)
-            if sink is not None:
-                sink.write(out)
-            if obs is not None:
-                obs.update(v, gate.muted, out is gate.slate or out is gate.card)
-            late = 1000 * (time.perf_counter() - due)
-            stats["emit_lateness_ms"].append(late)
-            stats["late_frames"].append(int(late > LATE_MS))
-            gate.forget_before(v - KEEP_DECISIONS)
-            live.tick(v, late, waiting, len(stats["dropped_frames"]))
-            v += 1
-            shown += 1
+                shown += 1
+        except KeyboardInterrupt:  # Ctrl+C: stop showing frames, but still close cleanly and write the report
+            stopped_by_user = True
     finally:
         if obs is not None:
             obs.close()
@@ -236,7 +240,15 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
     device = device_summary(last.stats)
     n_dec = len(last.stats.get("ms_total", []))
     restarts = len(stats.get("worker_restarts", []))
-    extra = dict(mode="realtime", **device, delay_s=rt.delay, frames_in=v, dropped_frames=v - shown, worker_restarts=restarts)
+    extra = dict(
+        mode="realtime",
+        **device,
+        delay_s=rt.delay,
+        frames_in=v,
+        dropped_frames=v - shown,
+        worker_restarts=restarts,
+        stopped_by_user=stopped_by_user,
+    )
     report = summarize(stats, last.stats, shown, n_dec, rt.fps, extra)
     write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, last.diag, gate.log)
     return report

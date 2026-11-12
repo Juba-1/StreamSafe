@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
     try:
         report = run(cfg, source, sink)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:  # interrupted outside the frame loop (start-up or shutdown): nothing to report
         return 130
     finally:
         source.close()

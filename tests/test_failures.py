@@ -68,3 +68,23 @@ def test_slow_output_drops_frames_instead_of_drifting(tmp_path):
     assert s["dropped_frames"] > 30, "a third of the frames cannot be shown in time"
     assert s["frames_out"] == len(sink.frames) == 180 - s["dropped_frames"]
     assert report["emit_lateness_ms"]["max"] < 200 + 50 + 100, "max_late_s + one slow write + scheduling; never grows"
+
+
+class InterruptingSink(MemorySink):
+    """The streamer presses Ctrl+C after some frames."""
+
+    def write(self, frame) -> None:
+        super().write(frame)
+        if len(self.frames) == 40:
+            raise KeyboardInterrupt
+
+
+def test_ctrl_c_still_closes_cleanly_and_reports(tmp_path):
+    path = str(tmp_path / "walk.mp4")
+    make_video(path, n=150, cut_at=10**6)
+    cfg = Config.from_env(env={}, mode="realtime", delay=0.5)
+    from tests.stubs import stub_analyzer
+
+    report = run(cfg, VideoFileSource(path, 30.0), InterruptingSink(), factory=stub_analyzer)
+    assert report["summary"]["stopped_by_user"] is True
+    assert report["summary"]["frames_out"] == 39, "the frame being written when Ctrl+C came is not counted as shown"
