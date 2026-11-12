@@ -15,6 +15,10 @@ on:
         default: false
   push:
     tags: ["v*"]
+    # the branch builds too (the installer is developed on branch `installer`; a workflow that lives only on a
+    # non-default branch cannot be started by hand)
+    branches: [installer]
+    paths: [".github/workflows/installer.yml", "installer/**", "tools/**", "streamsafe/**", "pyproject.toml"]
 
 permissions:
   contents: read
