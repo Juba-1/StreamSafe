@@ -141,7 +141,7 @@ def _cannot_build(cache: str, emit: Emit) -> str:
 
     try:
         if providers()[0] != PROVIDERS["cuda"]:
-            return "TensorRT needs an NVIDIA graphics card and the NVIDIA edition of StreamSafe (onnxruntime-gpu)"
+            return "TensorRT needs an NVIDIA graphics card and the NVIDIA runtime (onnxruntime-gpu)"
     except (ImportError, RuntimeError) as exc:
         return f"ONNX Runtime cannot be used ({exc})"
     try:

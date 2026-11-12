@@ -1,31 +1,9 @@
-"""Entry point of the frozen Windows build (StreamSafe.exe).
+"""Entry script of the frozen Windows build: ``<name>.exe`` (console) and ``<name>App.exe`` (the window) are both
+built from it. Everything it does is in ``streamsafe/app/entry.py``."""
 
-StreamSafe.exe check [--json]      system check (GPU, runtime, FFmpeg, OBS, models)
-StreamSafe.exe prepare --models D  build/verify the per-PC engines (NVIDIA TensorRT)
-StreamSafe.exe run --input ... --output ...   the stream filter (same options as python -m streamsafe)
-"""
-
-import multiprocessing
 import sys
 
-
-def main() -> int:
-    for stream in (sys.stdout, sys.stderr):  # Windows consoles default to a code page that cannot print Arabic
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8", errors="replace")
-    multiprocessing.freeze_support()  # the analyzer runs in a child process; a frozen exe re-enters here
-    cmd, rest = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
-    if cmd == "check":
-        from streamsafe.syscheck import main as m
-    elif cmd == "prepare":
-        from streamsafe.prepare import main as m
-    elif cmd == "run":
-        from streamsafe.cli import main as m
-    else:
-        print(__doc__)
-        return 0 if cmd in ("", "-h", "--help") else 2
-    return m(rest)
-
+from streamsafe.app.entry import main
 
 if __name__ == "__main__":
     sys.exit(main())

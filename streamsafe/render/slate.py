@@ -8,13 +8,14 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from streamsafe.branding import PRODUCT_NAME
 from streamsafe.config import BrandConfig
 from streamsafe.garment.fabric import load_logo, parse_color
 
 BACKGROUND = (40, 28, 22)  # BGR
-SLATE_TEXT = "StreamSafe - back in a moment"
+SLATE_TEXT = f"{PRODUCT_NAME} - back in a moment"
 SCENE_BACKGROUND = (52, 36, 30)
-SCENE_TEXT = "StreamSafe - scene hidden"
+SCENE_TEXT = f"{PRODUCT_NAME} - scene hidden"
 IMAGE_HEIGHT = 0.62  # share of the frame height the image may use (with text: a little less)
 
 

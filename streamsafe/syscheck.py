@@ -20,12 +20,13 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from streamsafe.branding import PRODUCT_NAME
+
 OK, WARN, FAIL = "ok", "warn", "fail"
 MIN_PYTHON = (3, 11)
 MIN_VRAM_GB = 6.0  # estimate: fp32 eye 2.6 GB + detector/pose/scene + frames; fp16 eye roughly halves the eye
 MIN_RAM_GB = 8.0  # estimate: the delay buffer + models on the host side
 MIN_DISK_GB = 2.0  # reports, logs and the ONNX Runtime engine cache
-WINDOWS_STATE_DIR = r"C:\ProgramData\StreamSafe"  # ASCII on purpose: the OBS Lua guard cannot open non-ASCII paths
 OBS_PATHS = (r"C:\Program Files\obs-studio\bin\64bit\obs64.exe", r"C:\Program Files (x86)\obs-studio\bin\64bit\obs64.exe")
 
 
@@ -143,7 +144,7 @@ def check_python(p: Probes) -> Check:
         FAIL,
         f"Python {v[0]}.{v[1]} is too old",
         "أعد تثبيت البرنامج من المثبّت الرسمي.",
-        "Reinstall StreamSafe with the official installer.",
+        f"Reinstall {PRODUCT_NAME} with the official installer.",
     )
 
 
@@ -176,8 +177,8 @@ def check_gpu(p: Probes) -> tuple[Check, Gpu | None]:
                 "gpu",
                 WARN,
                 f"{best.name}: {best.vram_gb:.1f} GB video memory (we suggest {MIN_VRAM_GB:.0f} GB+)",
-                "ذاكرة كرت الشاشة قليلة. شغّل الوضع الخفيف وسكّر البرامج الثانية وقت البث.",
-                "Low video memory: use light mode and close other apps while streaming.",
+                "ذاكرة كرت الشاشة قليلة. سكّر البرامج الثانية اللي تستخدم الكرت وقت البث؛ ممكن تطلع شاشة التغطية الكاملة أكثر.",
+                "Low video memory: close other apps that use the graphics card while streaming; the full-screen cover may show more often.",
             ),
             best,
         )
@@ -193,7 +194,7 @@ def check_runtime(p: Probes, gpu: Gpu | None) -> Check:
             FAIL,
             "ONNX Runtime is not installed",
             "الملفات ناقصة. أعد تثبيت البرنامج.",
-            "Files are missing. Reinstall StreamSafe.",
+            f"Files are missing. Reinstall {PRODUCT_NAME}.",
         )
     if "CUDAExecutionProvider" in providers:
         return Check("runtime", OK, "NVIDIA CUDA")
@@ -203,8 +204,8 @@ def check_runtime(p: Probes, gpu: Gpu | None) -> Check:
                 "runtime",
                 WARN,
                 "DirectML on an NVIDIA card (works, slower than the NVIDIA package)",
-                "عندك كرت إنفيديا: ثبّت نسخة إنفيديا من البرنامج عشان تكون أسرع.",
-                "You have an NVIDIA card: install the NVIDIA edition for more speed.",
+                "عندك كرت إنفيديا: ثبّت «الوضع السريع لإنفيديا» من نافذة البرنامج عشان يكون أسرع.",
+                "You have an NVIDIA card: install the fast NVIDIA mode from the app window for more speed.",
             )
         return Check("runtime", OK, "DirectML (DirectX 12)")
     return Check(
@@ -212,7 +213,7 @@ def check_runtime(p: Probes, gpu: Gpu | None) -> Check:
         FAIL,
         f"no GPU runtime (have: {providers})",
         "البرنامج ما يقدر يستخدم كرت الشاشة. حدّث تعريف الكرت وويندوز ثم أعد الفحص.",
-        "StreamSafe cannot use your graphics card. Update the driver and Windows, then check again.",
+        f"{PRODUCT_NAME} cannot use your graphics card. Update the driver and Windows, then check again.",
     )
 
 
@@ -240,7 +241,7 @@ def check_disk(p: Probes, path: str) -> Check:
 def check_ffmpeg(p: Probes) -> Check:
     if p.which("ffmpeg"):
         return Check("ffmpeg", OK, "FFmpeg found")
-    return Check("ffmpeg", FAIL, "FFmpeg not found", "ملف FFmpeg ناقص. أعد تثبيت البرنامج.", "FFmpeg is missing. Reinstall StreamSafe.")
+    return Check("ffmpeg", FAIL, "FFmpeg not found", "ملف FFmpeg ناقص. أعد تثبيت البرنامج.", f"FFmpeg is missing. Reinstall {PRODUCT_NAME}.")
 
 
 def check_obs(p: Probes) -> Check:
@@ -262,7 +263,8 @@ def check_models(folder: str, quick: bool) -> Check:
     from streamsafe.models.onnx_backend import REQUIRED, verify
 
     path = Path(folder)
-    fix_ar, fix_en = "ملفات النموذج ناقصة أو تالفة. أعد تثبيت البرنامج.", "Model files are missing or damaged. Reinstall StreamSafe."
+    fix_ar = "ملفات النماذج ناقصة أو تالفة. افتح نافذة البرنامج ونزّل النماذج من جديد (أو اختر ملف النماذج اللي أرسلناه لك)."
+    fix_en = "Model files are missing or damaged. Open the app window and get the models again (or pick the model file we sent you)."
     try:
         if quick:
             files = json.loads((path / "manifest.json").read_text())["files"]
@@ -285,7 +287,7 @@ def check_engines(folder: str, quick: bool) -> Check:
     from streamsafe.config import Config
 
     fix_ar = "تجهيز كرت الشاشة ما اكتمل. البرنامج يجهّزه قبل أول بث (يأخذ دقائق، مرة واحدة)."
-    fix_en = "The graphics card is not prepared yet. StreamSafe does it before the first stream (a few minutes, once)."
+    fix_en = f"The graphics card is not prepared yet. {PRODUCT_NAME} does it before the first stream (a few minutes, once)."
     try:
         rows = prepare.status(Config.from_env(onnx_dir=folder, trt=True), quick)
     except (OSError, ValueError, KeyError, RuntimeError) as e:
@@ -293,8 +295,8 @@ def check_engines(folder: str, quick: bool) -> Check:
             "engines",
             WARN,
             f"TensorRT cannot be used: {e}",
-            "الوضع السريع لكروت إنفيديا غير متاح، والبرنامج يشتغل على الوضع الأبطأ. حدّث تعريف الكرت أو أعد تثبيت نسخة إنفيديا.",
-            "The fast NVIDIA mode is not available; StreamSafe runs in the slower mode. Update the driver or reinstall the NVIDIA edition.",
+            "الوضع السريع لكروت إنفيديا غير متاح، والبرنامج يشتغل على الوضع الأبطأ. حدّث تعريف الكرت أو أعد تثبيت الوضع السريع من نافذة البرنامج.",
+            f"The fast NVIDIA mode is not available; {PRODUCT_NAME} runs in the slower mode. Update the driver or install the fast mode again from the app window.",
         )
     waiting = [f"{label} ({why})" for label, _, why in rows if why]
     if waiting:
@@ -306,13 +308,24 @@ def run_checks(probes: Probes | None = None, models: str = "", quick: bool = Fal
     p = probes or Probes()
     gpu_check, gpu = check_gpu(p)
     checks = [check_os(p), check_python(p), gpu_check, check_runtime(p, gpu), check_ram(p)]
-    state_dir = WINDOWS_STATE_DIR if p.system() == "Windows" and p.exists(WINDOWS_STATE_DIR) else os.getcwd()
-    checks += [check_disk(p, state_dir), check_ffmpeg(p), check_obs(p)]
+    checks += [check_disk(p, _data_disk(p)), check_ffmpeg(p), check_obs(p)]
     if models:
         checks.append(check_models(models, quick))
         if engines:
             checks.append(check_engines(models, quick))
     return checks
+
+
+def _data_disk(p: Probes) -> str:
+    """Where models, engines and reports are written: the user's data folder, or the nearest folder above it
+    that exists already (the first start creates the rest)."""
+    from streamsafe.app import paths
+
+    folder = paths.data_dir()
+    for candidate in (folder, *folder.parents):
+        if p.exists(str(candidate)):
+            return str(candidate)
+    return os.getcwd()
 
 
 def verdict(checks: list[Check]) -> str:

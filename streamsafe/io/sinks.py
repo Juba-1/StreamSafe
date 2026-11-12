@@ -23,9 +23,10 @@ from typing import Protocol
 import cv2
 import numpy as np
 
+from streamsafe.branding import PRODUCT_NAME
 from streamsafe.io.avpipe import AUDIO_RATE, AviWriter
 
-WINDOW_TITLE = "StreamSafe Output"
+WINDOW_TITLE = f"{PRODUCT_NAME} Output"
 
 
 class FrameSink(Protocol):

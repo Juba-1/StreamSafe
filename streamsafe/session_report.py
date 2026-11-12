@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from streamsafe import __version__
+from streamsafe.branding import PRODUCT_NAME
 
 # full-picture covers that are not the normal per-character cover
 WARN_FAILCLOSED_S = 5.0  # more than this many seconds of fail-closed cover in a stream is worth a look
@@ -21,8 +22,9 @@ WARN_P95_MS = 180.0  # the realtime decision budget (headroom.limit_ms)
 
 
 def default_dir() -> Path:
-    base = os.environ.get("LOCALAPPDATA") or str(Path.home() / ".local" / "share")
-    return Path(base) / "StreamSafe" / "reports"
+    from streamsafe.app import paths
+
+    return paths.reports_dir()
 
 
 def _secs(report: dict, key: str, fps: float) -> float:
@@ -78,7 +80,7 @@ AR_PROBLEMS = {
 def text(r: dict[str, Any]) -> str:
     ar_verdict = "كل شي طبيعي" if r["verdict"] == "ok" else "يحتاج مراجعة"
     lines = [
-        "تقرير جلسة StreamSafe / StreamSafe session report",
+        f"تقرير جلسة {PRODUCT_NAME} / {PRODUCT_NAME} session report",
         f"النسخة / version: {r['app_version']}   التاريخ / date: {r['created']}",
         f"الجهاز / device: {r['device']}   النظام / OS: {r['os']}",
         f"مدة البث / duration: {r['minutes']} min",
@@ -91,8 +93,8 @@ def text(r: dict[str, Any]) -> str:
     ]
     for p in r["problems"]:
         lines.append(f"  - {AR_PROBLEMS.get(p, p)} ({p})")
-    lines.append("أرسل هذا الملف لفريق StreamSafe. ما فيه صور ولا مفتاح البث.")
-    lines.append("Send this file to the StreamSafe team; it has no images or stream key.")
+    lines.append(f"أرسل هذا الملف لفريق {PRODUCT_NAME}. ما فيه صور ولا مفتاح البث.")
+    lines.append(f"Send this file to the {PRODUCT_NAME} team; it has no images or stream key.")
     return "\n".join(lines) + "\n"
 
 

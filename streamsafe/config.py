@@ -11,6 +11,8 @@ import os
 from dataclasses import dataclass, field, fields, is_dataclass
 from typing import Any
 
+from streamsafe.branding import PRODUCT_NAME
+
 
 @dataclass
 class DetectorConfig:
@@ -133,8 +135,8 @@ class BrandConfig:
     slate_image: str = ""  # image centred on the slate (and the scene card unless scene_image is set)
     scene_image: str = ""
     slate_color: str = ""  # "#RRGGBB" background; empty = default (or the image's border colour)
-    slate_text: str = "StreamSafe - back in a moment"  # empty = no text
-    scene_text: str = "StreamSafe - scene hidden"
+    slate_text: str = f"{PRODUCT_NAME} - back in a moment"  # empty = no text
+    scene_text: str = f"{PRODUCT_NAME} - scene hidden"
 
 
 @dataclass
