@@ -10,6 +10,9 @@ import sys
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles default to a code page that cannot print Arabic
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     multiprocessing.freeze_support()  # the analyzer runs in a child process; a frozen exe re-enters here
     cmd, rest = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("", [])
     if cmd == "check":
