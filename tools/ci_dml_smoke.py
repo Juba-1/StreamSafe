@@ -38,7 +38,7 @@ def tiny_model(path: Path) -> None:
         [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1, 4])],
         [w, m, shape],
     )
-    onnx.save(helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], ir_version=8), str(path))  # IR 8: every ORT >=1.20 loads it
+    onnx.save(helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)], ir_version=8), str(path))
 
 
 def main() -> int:
