@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from streamsafe import session_report
 from streamsafe.config import Config
 from streamsafe.io.sinks import MultiSink, open_sink
 from streamsafe.io.sources import open_source
@@ -35,6 +36,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--head-dir", help="folder with the eye's risk heads")
     p.add_argument("--stats", help="write the run summary JSON here")
     p.add_argument("--diag", help="write every decision and every drawn garment here (JSON)")
+    p.add_argument("--report-dir", help="folder for the tester session report (default: %%LOCALAPPDATA%%/StreamSafe/reports)")
+    p.add_argument("--no-report", action="store_true", help="do not write the tester session report")
     return p.parse_args(argv)
 
 
@@ -58,6 +61,11 @@ def main(argv: list[str] | None = None) -> int:
         source.close()
         if sink is not None:
             sink.close()
+    if not args.no_report:
+        try:
+            print("SESSION_REPORT", session_report.write(report, cfg.runtime.fps, args.report_dir), flush=True)
+        except OSError as exc:  # a report must never break a stream that already ended
+            print("SESSION_REPORT_FAILED", exc, flush=True)
     return 1 if report["summary"]["analyzer_errors"] else 0
 
 
