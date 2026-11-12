@@ -46,8 +46,12 @@ jobs:
       - name: ffmpeg (Windows)
         if: runner.os == 'Windows'
         run: choco install ffmpeg -y --no-progress
-      - name: tests
+      - name: tests (Linux, all)
+        if: runner.os == 'Linux'
         run: python -m pytest -q
+      - name: tests (Windows; realtime-speed tests run on Linux only, the shared runner is too slow for them)
+        if: runner.os == 'Windows'
+        run: python -m pytest -q -k "not realtime"
       - name: DirectML smoke
         if: runner.os == 'Windows'
         run: python tools/ci_dml_smoke.py
