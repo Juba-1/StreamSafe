@@ -10,8 +10,8 @@ In the installed program the product settings are filled in where the environmen
 (``product_defaults``): the ONNX backend, the model folder ``<data>/models`` (or ``--models DIR``), the heads,
 the OBS state file, the engine cache, and the NVIDIA runtime with TensorRT when its libraries are installed.
 ``run --output env:NAME`` takes the output address from the environment variable NAME, so a stream key never has
-to be on this program's command line. A beta build past its date refuses ``run`` (exit code 4): it never
-streams, so it can never stream uncovered.
+to be on this program's command line. A beta build past its date refuses ``run`` (exit code 4), and so does a build without usable risk heads (5): it
+never streams, so it can never stream uncovered.
 """
 
 from __future__ import annotations
@@ -26,19 +26,21 @@ from streamsafe.app import paths, runtime_select
 from streamsafe.branding import CLI_EXE, GUI_EXE, PRODUCT_NAME
 
 EXPIRED_EXIT = 4
+NO_HEADS_EXIT = 5
 USAGE_EXIT = 2
 
 
 def product_defaults(env: MutableMapping[str, str], models: str = "") -> None:
     """Fill in the product's runtime settings where the environment (or the app that started us) set none."""
-    from streamsafe.app import nvidia_pack
+    from streamsafe.app import heads, nvidia_pack
 
     if models:
         env["ONNX_DIR"] = models
-        env["HEAD_DIR"] = str(Path(models) / "heads")
     env.setdefault("BACKEND", "onnx")
     env.setdefault("ONNX_DIR", str(paths.models_dir(env)))
-    env.setdefault("HEAD_DIR", str(Path(env["ONNX_DIR"]) / "heads"))
+    if "HEAD_DIR" not in env:  # the newer of the installed heads and the updated ones; none usable: the engine fails closed
+        chosen = heads.best(env)
+        env["HEAD_DIR"] = str(chosen or paths.bundled_heads_dir())
     env.setdefault("OBS_STATE", str(paths.obs_state_file(env)))
     env.setdefault("TRT_CACHE", str(paths.trt_cache_dir(env)))
     if runtime_select.RUNTIME_ENV not in env and nvidia_pack.ready(paths.nvidia_dir(env)):
@@ -120,11 +122,16 @@ def main(argv: list[str] | None = None) -> int:
     elif cmd == "gpu-probe":
         from streamsafe.app.gpu_probe import main as m
     elif cmd == "run":
-        from streamsafe.app import engine, updates
+        from streamsafe.app import encoders, engine, heads, updates
 
         if updates.expired():
             print(f"BETA_EXPIRED this beta build of {PRODUCT_NAME} ended; install the new version. Nothing was streamed.", flush=True)
             return EXPIRED_EXIT
+        if product and (why := heads.why_not(os.environ)):
+            print(f"HEADS_{why.split()[0].upper()} no usable risk heads ({why}). Nothing was streamed.", flush=True)
+            return NO_HEADS_EXIT
+        if product:
+            encoders.choose_into(os.environ, rest)
         rest = resolve_env_outputs(rest, os.environ)
         if os.environ.get(engine.STOP_ENV) == "1":
             engine.stop_on_stdin_close()

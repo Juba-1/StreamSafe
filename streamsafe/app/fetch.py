@@ -20,7 +20,12 @@ Progress = Callable[[int, int], None]  # (bytes so far, total bytes or 0 when un
 
 
 class DownloadError(Exception):
-    """The file could not be downloaded (network, server, disk)."""
+    """The file could not be downloaded (network, server, disk). ``status``: the HTTP status when the server
+    answered with one (401 / 403: private or no access, 404: not there), else 0."""
+
+    def __init__(self, message: str, status: int = 0) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 class IntegrityError(DownloadError):
@@ -119,7 +124,7 @@ def download(
         part.unlink(missing_ok=True)
         raise
     except (OSError, ValueError) as exc:  # URLError and HTTPError are OSErrors
-        raise DownloadError(f"download failed: {_reason(exc)}") from exc
+        raise DownloadError(f"download failed: {_reason(exc)}", _status(exc)) from exc
     if (size and have != size) or sha256_file(part) != sha256.lower():
         part.unlink(missing_ok=True)
         raise IntegrityError("the downloaded file does not match its pinned sha256: deleted")
@@ -134,10 +139,14 @@ def fetch_small(url: str, max_bytes: int = 1 << 20, allow_http: bool = False) ->
         with _open(url, 0, allow_http) as resp:
             data = resp.read(max_bytes + 1)
     except (OSError, ValueError) as exc:
-        raise DownloadError(f"download failed: {_reason(exc)}") from exc
+        raise DownloadError(f"download failed: {_reason(exc)}", _status(exc)) from exc
     if len(data) > max_bytes:
         raise DownloadError("the file is larger than expected")
     return data
+
+
+def _status(exc: BaseException) -> int:
+    return exc.code if isinstance(exc, urllib.error.HTTPError) else 0
 
 
 def _reason(exc: BaseException) -> str:

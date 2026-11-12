@@ -26,7 +26,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from streamsafe.app import paths, runtime_select
+from streamsafe.app import heads, paths, runtime_select
 from streamsafe.app.settings import INPUT_SRT, OUTPUT_RTMP, Settings
 from streamsafe.branding import PRODUCT_NAME
 
@@ -68,7 +68,7 @@ def engine_env(base: Mapping[str, str], nvidia: bool, url: str = "", data_env: M
             PRODUCT_ENV: "1",
             "BACKEND": "onnx",
             "ONNX_DIR": str(paths.models_dir(where)),
-            "HEAD_DIR": str(paths.heads_dir(where)),
+            "HEAD_DIR": str(heads.best(where) or paths.bundled_heads_dir()),
             "OBS_STATE": str(paths.obs_state_file(where)),
             "TRT_CACHE": str(paths.trt_cache_dir(where)),
             "PYTHONUTF8": "1",
@@ -186,6 +186,10 @@ class EngineProcess:
         self._proc: subprocess.Popen | None = None
         self._reader: threading.Thread | None = None
         self.stop_requested = False
+
+    def redactor_secrets(self, *secrets: str) -> None:
+        """The secrets (stream key, full output address) to blank out of every line from now on."""
+        self._redactor = Redactor(*secrets)
 
     def start(self, cmd: list[str], env: Mapping[str, str]) -> None:
         if self.running:

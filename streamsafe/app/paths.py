@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 from pathlib import Path
 
 from streamsafe.branding import PRODUCT_NAME
@@ -19,8 +19,10 @@ from streamsafe.branding import PRODUCT_NAME
 DATA_DIR_ENV = "STREAMSAFE_DATA_DIR"
 FFMPEG_EXE = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
 # OBS's Lua cannot open a path with non-ASCII letters on Windows (docs/OBS_SETUP.md). A Windows user name may have
-# them, so the state file then goes to this all-ASCII folder, which every user may create without admin rights
-ASCII_FALLBACK_DIR = rf"C:\ProgramData\{PRODUCT_NAME}"
+# them: the state file then goes to the 8.3 short name of its folder (all ASCII, same per-user folder), and only if
+# the volume has no short names to the all-ASCII "Public" folder (every user may write there; no admin rights, no
+# ProgramData)
+PUBLIC_FALLBACK = r"C:\Users\Public"
 
 
 def is_frozen() -> bool:
@@ -45,7 +47,12 @@ def models_dir(env: MutableMapping[str, str] | None = None) -> Path:
 
 
 def heads_dir(env: MutableMapping[str, str] | None = None) -> Path:
-    return models_dir(env) / "heads"
+    """Heads brought by an update (the ones the installer ships are ``bundled_heads_dir``)."""
+    return data_dir(env) / "heads"
+
+
+def bundled_heads_dir() -> Path:
+    return app_dir() / "heads"
 
 
 def reports_dir(env: MutableMapping[str, str] | None = None) -> Path:
@@ -76,12 +83,32 @@ def key_file(env: MutableMapping[str, str] | None = None) -> Path:
     return data_dir(env) / "stream_key.bin"
 
 
-def obs_state_file(env: MutableMapping[str, str] | None = None, windows: bool | None = None) -> Path:
+def _short_path(folder: str) -> str:
+    import ctypes
+
+    buf = ctypes.create_unicode_buffer(1024)
+    n = ctypes.windll.kernel32.GetShortPathNameW(folder, buf, len(buf))  # type: ignore[attr-defined]
+    return buf.value if 0 < n < len(buf) else ""
+
+
+def obs_state_file(
+    env: MutableMapping[str, str] | None = None, windows: bool | None = None, short_path: Callable[[str], str] | None = None
+) -> Path:
     """The heartbeat file the OBS guard script reads: in the user's own data folder, unless that path has
-    non-ASCII letters (then the all-ASCII fallback, Windows only)."""
+    non-ASCII letters (then its 8.3 short name, or the Public folder; Windows only)."""
+    env = os.environ if env is None else env
     path = data_dir(env) / "obs" / "state.txt"
     windows = sys.platform == "win32" if windows is None else windows
-    return path if str(path).isascii() or not windows else Path(ASCII_FALLBACK_DIR) / "state.txt"
+    if str(path).isascii() or not windows:
+        return path
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        short = (short_path or _short_path)(str(path.parent))
+    except OSError:
+        short = ""
+    if short and short.isascii():
+        return Path(short) / path.name
+    return Path(env.get("PUBLIC") or PUBLIC_FALLBACK) / PRODUCT_NAME / path.name
 
 
 def obs_script() -> Path:

@@ -10,7 +10,8 @@ Updates: when ``release.UPDATE_MANIFEST_URL`` is set, the app fetches one small 
 
     payload = {"format": 1, "product": "streamsafe-app", "serial": 12,
                "app":    {"version": "3.0.1", "url": "https://...", "notes_ar": "...", "notes_en": "..."},
-               "models": {"version": "2026-11-20", "files": {"manifest.json": {"url": ..., "sha256": ..., "bytes": ...}, ...}}}
+               "models": {"version": "2026-11-20", "files": {"manifest.json": {"url": ..., "sha256": ..., "bytes": ...}, ...}},
+               "heads":  {"version": 3, "files": {"fast_h6.txt": {"url": ..., "sha256": ..., "bytes": ...}, ...}}}
 
 It is used only if a signature verifies under a public key built into the app (``release.UPDATE_PUBLIC_KEYS``),
 and only if its serial is not lower than the last one seen (an old, validly signed file cannot be replayed to
@@ -24,11 +25,13 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from streamsafe import __version__
-from streamsafe.app import build_info, ed25519, fetch, release
+from streamsafe.app import build_info, ed25519, fetch, heads, modelpack, release
 
 FORMAT = 1
 PRODUCT = "streamsafe-app"
@@ -67,9 +70,16 @@ class Update:
     notes: dict[str, str] = field(default_factory=dict)  # {"ar": ..., "en": ...}
     models_version: str = ""
     model_files: dict[str, dict] = field(default_factory=dict)  # name -> {"url", "sha256", "bytes"}
+    heads_version: int = 0
+    head_files: dict[str, dict] = field(default_factory=dict)
 
-    def app_is_newer(self, current: str = __version__) -> bool:
-        return bool(self.app_version) and version_key(self.app_version) > version_key(current)
+    def app_is_newer(self, current: str = "") -> bool:
+        return bool(self.app_version) and version_key(self.app_version) > version_key(current or current_version())
+
+
+def current_version() -> str:
+    """The running build's version with its build number (``3.0.0.57``); from source ``streamsafe.__version__``."""
+    return build_info.VERSION or __version__
 
 
 def version_key(version: str) -> tuple[int, ...]:
@@ -97,7 +107,7 @@ def parse_signed(raw: bytes, keys: tuple[str, ...], min_serial: int = 0) -> Upda
         if p["format"] != FORMAT or p["product"] != PRODUCT:
             raise ValueError("another format or product")
         serial = int(p["serial"])
-        app, models = p.get("app") or {}, p.get("models") or {}
+        app, models, heads = p.get("app") or {}, p.get("models") or {}, p.get("heads") or {}
         update = Update(
             serial=serial,
             app_version=str(app.get("version", "")),
@@ -105,8 +115,10 @@ def parse_signed(raw: bytes, keys: tuple[str, ...], min_serial: int = 0) -> Upda
             notes={"ar": str(app.get("notes_ar", "")), "en": str(app.get("notes_en", ""))},
             models_version=str(models.get("version", "")),
             model_files={str(n): dict(m) for n, m in (models.get("files") or {}).items()},
+            heads_version=int(heads.get("version", 0)),
+            head_files={str(n): dict(m) for n, m in (heads.get("files") or {}).items()},
         )
-        for url in [update.app_url, *(str(m.get("url", "")) for m in update.model_files.values())]:
+        for url in [update.app_url, *(str(m.get("url", "")) for m in (*update.model_files.values(), *update.head_files.values()))]:
             if url:
                 fetch.check_url(url)
     except (ValueError, KeyError, TypeError, AttributeError, fetch.DownloadError) as exc:
@@ -126,6 +138,37 @@ def check(min_serial: int = 0, fetcher: Callable[[str], bytes] | None = None) ->
     except fetch.DownloadError as exc:
         raise UpdateError(str(exc)) from exc
     return parse_signed(raw, release.UPDATE_PUBLIC_KEYS, min_serial)
+
+
+def heads_newer(update: Update, installed_version: int) -> bool:
+    return bool(update.head_files) and update.heads_version > installed_version
+
+
+def apply_data(
+    update: Update,
+    *,
+    models: Path,
+    heads_folder: Path,
+    downloads: Path,
+    installed_heads_version: int,
+    progress: modelpack.Progress | None = None,
+    cancel: threading.Event | None = None,
+    allow_http: bool = False,
+) -> list[str]:
+    """Bring the models and the heads to what the (verified) manifest names. Each part is checked and swapped in
+    on its own, the previous one kept (``models.prev`` / ``heads.prev``). Returns what was changed
+    (``"models"`` / ``"heads"``). Raises UpdateError; whatever was not reached stays as it was."""
+    changed = []
+    try:
+        if models_differ(update, modelpack.current_shas(models)):
+            modelpack.install_files(update.model_files, models, downloads, progress, cancel, allow_http)
+            changed.append("models")
+        if heads_newer(update, installed_heads_version):
+            heads.install_files(update.head_files, update.heads_version, heads_folder, downloads, cancel, allow_http)
+            changed.append("heads")
+    except (modelpack.PackError, heads.HeadsError) as exc:
+        raise UpdateError(str(exc)) from exc
+    return changed
 
 
 def models_differ(update: Update, installed: dict[str, str]) -> bool:

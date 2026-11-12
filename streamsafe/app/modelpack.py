@@ -1,10 +1,11 @@
 """The model pack: models are not inside the installer; they are put into ``<data>/models`` on the first run.
 
-Three ways in, one way to trust:
-  * ``install_zip``     a zip made by ``tools/make_model_pack.py`` (downloaded from ``release.MODEL_PACK_URL`` or
-                        picked by the streamer),
+Four ways in, one way to trust:
+  * ``download_from_base`` the files listed in the ``manifest.json`` found at ``release.MODEL_BASE_URL``,
+  * ``install_zip``     a zip of the same files that the streamer picked (we sent it to them),
   * ``install_folder``  the same files, already unpacked in a folder the streamer picked,
   * ``install_files``   single files named by the signed update manifest (``updates.py``).
+The risk heads are not part of a pack: they ship inside the installer and are updated by ``heads.py``.
 Whatever arrives is first assembled in a private folder beside the model folder and checked there exactly as the
 engine checks at every start (``onnx_backend.checked_files``: size and sha256 of every file against
 ``manifest.json``, the pinned model revisions) plus: every file is listed in the manifest, and the risk heads
@@ -16,6 +17,7 @@ starts with models nobody verified (fail closed).
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -28,10 +30,11 @@ from pathlib import Path
 from streamsafe.app import fetch, unpack
 
 MANIFEST = "manifest.json"
-HEADS = "heads"
+HEADS = "heads"  # a pack made by an older tool may hold the heads: they are skipped, ``heads.py`` owns them
 MAX_PACK_BYTES = 16 << 30
 MAX_PACK_FILES = 64
 ALLOWED_SUFFIXES = (".onnx", ".data", ".npy", ".json", ".txt", ".md")
+MANIFEST_MAX_BYTES = 1 << 20
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,80}$")
 NEED_FREE_FACTOR = 1.1
 
@@ -42,11 +45,23 @@ class PackError(Exception):
     """The model files offered are not a complete, undamaged model pack. Nothing was changed."""
 
 
+class SourceError(PackError):
+    """The place the models should come from did not give them. ``kind``: "private" (401 / 403: the repository is
+    not public yet or needs a login), "missing" (404), "network" (no connection, timeout), "other"."""
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
+
+
+def source_error(exc: fetch.DownloadError) -> SourceError:
+    kind = "private" if exc.status in (401, 403) else "missing" if exc.status in (404, 410) else "network" if not exc.status else "other"
+    return SourceError(kind, str(exc))
+
+
 def check_name(name: str) -> str:
-    """A pack file name: a plain file, or one inside ``heads/``. Returns it, or raises PackError."""
-    parts = name.split("/")
-    ok = len(parts) in (1, 2) and all(_NAME.match(p) for p in parts) and name.lower().endswith(ALLOWED_SUFFIXES)
-    if not ok or (len(parts) == 2 and parts[0] != HEADS):
+    """A pack file name: one plain file name with a known suffix (no folders). Returns it, or raises PackError."""
+    if not (_NAME.match(name) and name.lower().endswith(ALLOWED_SUFFIXES)):
         raise PackError(f"not a model pack file: {name!r}")
     return name
 
@@ -69,13 +84,12 @@ def problem(models: Path, quick: bool = True) -> str:
         return "the models are not installed yet"
     except (OSError, ValueError, KeyError, TypeError, PackError) as exc:
         return str(exc)
-    return "" if (models / HEADS).is_dir() else "the risk heads are missing"
+    return ""
 
 
 def verify(folder: Path) -> dict:
     """The full check of an assembled pack (module docstring). Returns the manifest's files, or raises PackError."""
     from streamsafe.config import Config
-    from streamsafe.models.heads import RiskHeads
     from streamsafe.models.onnx_backend import checked_files
 
     try:
@@ -86,7 +100,6 @@ def verify(folder: Path) -> dict:
             raise PackError(f"files that the manifest does not list: {', '.join(unlisted)}")
         for name in files:
             check_name(name)
-        RiskHeads.load(folder / HEADS)
     except PackError:
         raise
     except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
@@ -176,7 +189,8 @@ def install_zip(
         _need_space(stage, need)
 
         def choose(name: str) -> str | None:
-            return check_name(name[len(strip) :])
+            name = name[len(strip) :]
+            return None if name.startswith((HEADS + "/", "trt_cache/")) else check_name(name)
 
         try:
             unpack.extract(archive, stage, choose, MAX_PACK_BYTES, MAX_PACK_FILES, _named(progress, "unpacking"), cancel)
@@ -193,7 +207,11 @@ def install_folder(source: Path, models: Path, progress: Progress | None = None,
     if not (source / MANIFEST).is_file():
         raise PackError(f"this folder has no {MANIFEST}: it is not a model pack")
     try:
-        names = [check_name(p.relative_to(source).as_posix()) for p in sorted(source.rglob("*")) if p.is_file() and "trt_cache" not in p.parts]
+        names = [
+            check_name(p.relative_to(source).as_posix())
+            for p in sorted(source.rglob("*"))
+            if p.is_file() and not {"trt_cache", HEADS} & set(p.relative_to(source).parts[:-1])
+        ]
         total = sum((source / n).stat().st_size for n in names)
     except OSError as exc:
         raise PackError(str(exc)) from exc
@@ -222,21 +240,33 @@ def install_folder(source: Path, models: Path, progress: Progress | None = None,
         shutil.rmtree(stage, ignore_errors=True)
 
 
-def download_and_install(
-    url: str,
-    sha256: str,
+def download_from_base(
+    base_url: str,
     models: Path,
     downloads: Path,
     progress: Progress | None = None,
     cancel: threading.Event | None = None,
     allow_http: bool = False,
-) -> None:
-    """Download the pack zip (pinned sha256 required), install it, delete the zip."""
-    archive = fetch.download(url, downloads / "model_pack.zip", sha256, 0, _named(progress, "downloading"), cancel, allow_http, MAX_PACK_BYTES)
+) -> list[str]:
+    """Download ``manifest.json`` from ``base_url`` and every file it lists, check each against the manifest,
+    install them in one step. Raises SourceError when the place does not give the files (private / missing /
+    no network), PackError when what arrived is not a good pack."""
+    base = base_url.rstrip("/") + "/"
     try:
-        install_zip(archive, models, sha256, progress, cancel)
-    finally:
-        archive.unlink(missing_ok=True)
+        raw = fetch.fetch_small(base + MANIFEST, MANIFEST_MAX_BYTES, allow_http)
+    except fetch.DownloadError as exc:
+        raise source_error(exc) from exc
+    try:
+        files = json.loads(raw.decode("utf-8"))["files"]
+        wanted = {MANIFEST: {"url": base + MANIFEST, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}}
+        for name, meta in files.items():
+            wanted[check_name(str(name))] = {"url": base + str(name), "sha256": str(meta["sha256"]).lower(), "bytes": int(meta["bytes"])}
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise PackError(f"the model list at the download address is not readable ({exc})") from exc
+    try:
+        return install_files(wanted, models, downloads, progress, cancel, allow_http)
+    except OSError as exc:
+        raise PackError(str(exc)) from exc
 
 
 def install_files(
@@ -260,7 +290,7 @@ def install_files(
     total = sum(int(m["bytes"]) for m in wanted.values())
     if len(wanted) > MAX_PACK_FILES or total > MAX_PACK_BYTES:
         raise PackError("the update names more than a model pack")
-    current = _current_shas(models)
+    current = current_shas(models)
     stage = _stage(models)
     fetched, done = [], 0
     try:
@@ -282,7 +312,7 @@ def install_files(
                 except fetch.Cancelled:
                     raise
                 except fetch.DownloadError as exc:
-                    raise PackError(f"{name}: {exc}") from exc
+                    raise SourceError(source_error(exc).kind, f"{name}: {exc}") from exc
                 os.replace(part, out)
                 fetched.append(name)
             done += size
@@ -296,7 +326,7 @@ def install_files(
     return fetched
 
 
-def _current_shas(models: Path) -> dict[str, str]:
+def current_shas(models: Path) -> dict[str, str]:
     """sha256 by name of the pack in use, as its manifest says (trusted only as a hint: all is verified again)."""
     try:
         files = json.loads((models / MANIFEST).read_text(encoding="utf-8"))["files"]

@@ -12,6 +12,7 @@ int16 [n, 2] at 48 kHz or None for silence (muted, or no sound known for this fr
 
 from __future__ import annotations
 
+import os
 import queue
 import shutil
 import subprocess
@@ -63,7 +64,7 @@ class FFmpegSink:
         url: str,
         size: tuple[int, int],
         fps: float = 30.0,
-        encoder: str = "libx264",
+        encoder: str = os.environ.get("ENCODER") or "libx264",  # the installed app picks the one that works (app/encoders.py)
         bitrate: str = "6000k",
         ffmpeg: str = "ffmpeg",
         audio: bool = True,

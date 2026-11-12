@@ -1,7 +1,7 @@
 """Release settings: THE one place for every address the app may contact and every pinned download.
 
 The app makes no network call that is not listed here (docs/SECURITY_POSTURE.md):
-  * the model pack (``MODEL_PACK_URL``) or, when set, the signed update manifest (``UPDATE_MANIFEST_URL``),
+  * the model files (``MODEL_BASE_URL``) and, when set, the signed update manifest (``UPDATE_MANIFEST_URL``),
   * NVIDIA's libraries for the fast NVIDIA mode (``NVIDIA_WHEELS``), only after the streamer says yes,
   * the streamer's own stream output.
 Everything downloaded is data or a vendor library pinned by sha256 here or in the signed manifest; nothing
@@ -13,14 +13,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # --- models ---------------------------------------------------------------------------------------------------
-# One zip made by ``tools/make_model_pack.py`` (it prints both values). Empty URL: the app asks the streamer to
-# pick the zip or a folder that we sent them. A URL without its sha256 is refused.
-MODEL_PACK_URL = ""
-MODEL_PACK_SHA256 = ""
+# A folder of files with a ``manifest.json`` beside them (name -> bytes + sha256 of every file, written by
+# ``tools/export_onnx.py``). The app downloads the manifest, then every file it lists, and checks each file against
+# the manifest. The repository may still be private (then Hugging Face answers 401 / 404: the app says so and
+# offers "choose a folder or zip we sent you"). The risk heads are NOT here: they ship inside the installer.
+MODEL_BASE_URL = "https://huggingface.co/juba-1/streamsafe-models/resolve/main/v1/"
 
 # --- updates --------------------------------------------------------------------------------------------------
-# A small JSON file signed with ed25519 (``tools/sign_manifest.py``): latest app version + model files with
-# sha256. Empty URL or no key: the app never looks for updates. The private key never enters this repository.
+# A small JSON file signed with ed25519 (``tools/sign_manifest.py``): latest app version, model files and head
+# files with sha256. Empty URL or no key: the app never looks for updates and works as it is. The private key
+# never enters this repository.
 UPDATE_MANIFEST_URL = ""
 UPDATE_PUBLIC_KEYS: tuple[str, ...] = ()  # hex, 32 bytes each; more than one allows changing the key
 
@@ -115,5 +117,5 @@ NVIDIA_LICENSE_URLS = (
 def allowed_hosts() -> set[str]:
     from urllib.parse import urlsplit
 
-    urls = [MODEL_PACK_URL, UPDATE_MANIFEST_URL, *(w.url for w in NVIDIA_WHEELS)]
+    urls = [MODEL_BASE_URL, UPDATE_MANIFEST_URL, *(w.url for w in NVIDIA_WHEELS)]
     return {urlsplit(u).hostname or "" for u in urls if u}
