@@ -26,6 +26,8 @@ permissions:
 jobs:
   installer:
     runs-on: windows-latest
+    env:
+      HF_HEADS_TOKEN: ${{ secrets.HF_HEADS_TOKEN }}
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +41,17 @@ jobs:
         id: meta
         shell: pwsh
         run: python tools/build_meta.py --days ${{ inputs.beta_days || 30 }} --build ${{ github.run_number }} --out build
+      - name: "fetch the real risk heads from the private HF store (needs repo secret HF_HEADS_TOKEN, read-only)"
+        if: env.HF_HEADS_TOKEN != ''
+        env:
+          HEADS_PATH: ${{ vars.HEADS_PATH || 'runs/run48_lucia_runner/heads_lucia/ali' }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force installer/heads | Out-Null
+          foreach ($f in "fast_h6.txt","male_h6.txt","thr_h6.txt") {
+            Invoke-WebRequest -Headers @{Authorization="Bearer $env:HF_HEADS_TOKEN"} -OutFile "installer/heads/$f" `
+              -Uri "https://huggingface.co/datasets/juba-1/streamsafe-work/resolve/main/$env:HEADS_PATH/$f"
+          }
       - name: "risk heads (a v* tag needs the real ones; a test build gets marked placeholders)"
         shell: pwsh
         run: |
