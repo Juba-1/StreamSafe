@@ -297,7 +297,7 @@ class App(tk.Tk):
         top = tk.Frame(c, bg="white")
         top.pack(fill="x")
         self.verdict = self.label(top, "", font=(FONT, 11, "bold"), wraplength=380)
-        self.recheck_btn = ttk.Button(top, text=self.tr("recheck"), command=self.refresh_check)
+        self.recheck_btn = ttk.Button(top, text=self.tr("recheck"), command=self.recheck_by_user)
         if self.rtl:
             self.recheck_btn.pack(side="left")
             self.verdict.pack(side="right", fill="x", expand=True)
@@ -358,6 +358,11 @@ class App(tk.Tk):
             self.rollback_btn.pack(anchor=self.side, pady=6)
         else:
             self.rollback_btn.pack_forget()
+
+    def recheck_by_user(self) -> None:
+        """The streamer pressed "check again": a past "not now" to the NVIDIA fast mode is asked again."""
+        self.ctrl.settings.nvidia_declined = False
+        self.refresh_check()
 
     def refresh_check(self) -> None:
         if self._busy.is_set():

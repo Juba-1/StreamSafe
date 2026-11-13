@@ -265,6 +265,14 @@ def check_models(folder: str, quick: bool) -> Check:
     from streamsafe.models.onnx_backend import REQUIRED, verify
 
     path = Path(folder)
+    if not (path / "manifest.json").is_file():
+        return Check(
+            "models",
+            FAIL,
+            "models not installed yet / النماذج غير منزّلة بعد",
+            "نزّل النماذج من الصفحة الرئيسية (مرة وحدة).",
+            "Download the models from the Home tab (once).",
+        )
     fix_ar = "ملفات النماذج ناقصة أو تالفة. افتح نافذة البرنامج ونزّل النماذج من جديد (أو اختر ملف النماذج اللي أرسلناه لك)."
     fix_en = "Model files are missing or damaged. Open the app window and get the models again (or pick the model file we sent you)."
     try:

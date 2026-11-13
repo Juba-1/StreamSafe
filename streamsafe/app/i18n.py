@@ -90,7 +90,7 @@ TEXT: dict[str, tuple[str, str]] = {
     "p_copying": ("نسخ الملفات", "Copying files"),
     "p_verifying": ("التحقق من الملفات", "Verifying files"),
     "install_done": ("تم تثبيت النماذج.", "The models are installed."),
-    "install_cancelled": ("أُلغي التثبيت. ما تغير شي.", "CancelledError. Nothing was changed."),
+    "install_cancelled": ("أُلغي التثبيت. ما تغير شي.", "Install cancelled. Nothing was changed."),
     "nvidia_offer": (
         "عندك كرت إنفيديا: الوضع السريع يحتاج تنزيل مكتبات إنفيديا (حوالي {gb} جيجا) ثم تجهيز الكرت (حوالي 4 دقائق، مرة واحدة). بدونه البرنامج يشتغل لكن أبطأ.",
         "You have an NVIDIA card: the fast mode downloads NVIDIA libraries (about {gb} GB) and then prepares the card (about 4 minutes, once). Without it the program works, only slower.",
