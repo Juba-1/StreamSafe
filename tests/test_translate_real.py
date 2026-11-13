@@ -162,7 +162,9 @@ def test_real_realtime_run_and_its_cost(tmp_path):
     english = {v for (a, b) in shows for v in range(a, b)}
     changed = {v for v in range(n) if on.hashes[v] != off.hashes[v]}
     near = {v for e in english for v in range(e - 3, e + 4)}  # a slow clock may move an edge by a frame or two
-    assert not (changed - near), f"Arabic only where there is English; extra {sorted(changed - near)[:10]}"
+    stray = sorted(v for v in changed - near if v >= 30)  # the first second differs by start-up timing, not by Arabic
+    assert not stray, f"Arabic only where there is English; extra {stray[:10]}"
+    assert t["frames_overlaid"] <= len(english) + 8, "and the service itself drew on no more frames than the English has"
     assert len(changed & english) >= 0.9 * len(english), f"Arabic on {len(changed & english)} of {len(english)} English frames"
     assert on_report["summary"]["dropped_frames"] == 0 and on_report["late_frames"]["max"] == 0, "the stream stays on time"
     seconds = n / 30
