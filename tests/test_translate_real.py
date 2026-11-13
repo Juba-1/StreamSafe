@@ -159,9 +159,16 @@ def test_real_realtime_run_and_its_cost(tmp_path):
     _, off, cpu_off = run(False)
     on_report, on, cpu_on = run(True)
     t = on_report["summary"]["translate"]
-    changed = {v for v in range(n) if on.hashes[v] != off.hashes[v]}
+    import hashlib
+
+    ref = [hashlib.sha1(make(v).tobytes()).hexdigest() for v in range(n)]  # the untouched source frames
     english = {v for (a, b) in shows for v in range(a, b)}
-    assert not (changed - english), "Arabic only where there is English"
+    off_diff = sorted(v for v in range(n) if off.hashes[v] != ref[v])
+    changed = {v for v in range(n) if on.hashes[v] != ref[v]}
+    assert not (changed - english), (
+        f"Arabic only where there is English; extra {sorted(changed - english)[:10]}, "
+        f"run without translation differs from the source on {off_diff[:10]} ({len(off_diff)} frames)"
+    )
     assert len(changed & english) >= 0.9 * len(english), f"Arabic on {len(changed & english)} of {len(english)} English frames"
     assert on_report["summary"]["dropped_frames"] == 0 and on_report["late_frames"]["max"] == 0, "the stream stays on time"
     seconds = n / 30
