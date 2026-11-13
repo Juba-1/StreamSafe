@@ -5,10 +5,10 @@ Arabic version: `TESTER_GUIDE_AR.md`. Thank you for testing. This build is a bet
 ## What StreamSafe does
 
 StreamSafe sits between your game and your stream. It holds the picture back for a short delay (2 seconds by
-default, set with `--delay`) and checks every frame during that time.
+default) and checks every frame during that time.
 
 - A character that must be covered gets an **opaque cover** shaped to their pose. It moves with them.
-- An explicit scene gets a **full-screen cover**, and the game audio is **muted** while it is on.
+- An explicit scene gets a **full-screen cover**, and the **sound is muted** while it is on.
 - If anything goes wrong (an error, a slow PC, StreamSafe crashing), viewers see a full-screen slate. They never see an unchecked frame.
 - There is **no blur and no pixelation**. Covers are solid.
 
@@ -17,59 +17,46 @@ default, set with `--delay`) and checks every frame during that time.
 | | |
 |---|---|
 | System | Windows 10 or 11, 64-bit |
-| Graphics card | NVIDIA RTX 3060 or better: recommended (fastest, uses TensorRT). AMD or Intel (any DirectX 12 card): supported, but slower. No graphics card: it will not start. |
-| Video memory | 6 GB or more is suggested (the check warns below this) |
-| RAM / disk | 8 GB RAM, 2 GB free disk (the check warns below this) |
-| Other | OBS Studio, FFmpeg (comes with StreamSafe), a Twitch / Kick / YouTube account |
-
-Always run the check first (step 3).
+| Graphics card | NVIDIA RTX 3060 or better: recommended (fast mode). AMD or Intel (any DirectX 12 card): supported, but slower. No graphics card: it will not start. |
+| Video memory | 6 GB or more is suggested |
+| RAM / disk | 8 GB RAM. Free disk: about 5 GB for the models, 12 GB if you enable the fast NVIDIA mode |
+| Other | OBS Studio, a Twitch / Kick / YouTube account. FFmpeg comes with StreamSafe. |
+| Rights | No administrator rights needed |
 
 ## 2. Install
 
-The installer is **coming in the installer**: it will install StreamSafe, FFmpeg, the models and the OBS script. Until it
-ships, we send you the `StreamSafe` folder and a model folder; the commands below use `StreamSafe.exe` from
-a Command Prompt opened in that folder. Where a step says "the model folder", use the folder we sent you
-(`<model folder>` below).
+1. Download `StreamSafe-Beta-Setup.exe` from the link we sent you.
+2. Double-click it. A blue box **"Windows protected your PC"** appears.
+   This is expected: the beta is **not code-signed yet** (we have no publisher certificate), so Windows does not know the publisher.
+   Click **More info**, then **Run anyway**.
+   If your antivirus blocks it, tell us instead of turning the antivirus off.
+3. Click through the setup (Next). It asks for no administrator rights and installs to `%LOCALAPPDATA%\Programs\StreamSafe`.
+4. At the end leave "Open StreamSafe" ticked and finish. Later you find it in the Start menu as **StreamSafe**.
+5. Uninstall: Windows Settings > Apps > StreamSafe > Uninstall. It asks whether to also delete the models and reports (several GB).
 
 ## 3. First run
 
-**3.1 Check your PC**
+Open StreamSafe. The window starts in Arabic; press the language button at the top right (**عربي**) to switch. It has three tabs: **Home**, **Settings**, **Check**.
 
-```
-StreamSafe.exe check --models "<model folder>"
-```
+1. **Check.** It runs by itself when the window opens (**Check** tab). Each line is green (fine), orange (remark) or red (must be fixed).
+   With a red line you cannot start. Press **Check again** after fixing. (Fix table: section 10.)
+2. **Models (once, about 3.4 GB).** On **Home** a **Setup** box appears. Press **Download models**.
+   They come from Hugging Face and the app verifies every file. The progress bar shows where it is; **Cancel** changes nothing.
+   - If it says it cannot open the download (not public yet), press **Choose zip file...** or **Choose models folder...** and pick the file we sent you.
+   - When it ends you see "The models are installed" and the check runs again.
+3. **NVIDIA cards only: fast mode (once).** After the models, the **Check** tab shows a box: **Enable fast NVIDIA mode**.
+   - It downloads NVIDIA libraries (about 3.5 GB), then prepares your card (about 4 minutes). All once.
+   - Do it before your first stream. Without it the app still works, only slower.
+   - **Not now** hides the box and it does not ask again. Press it only if you mean it.
+   - AMD and Intel cards skip this step.
+4. When the check is green or orange and **Start protection** is enabled, you are ready.
 
-Add `--lang ar` for Arabic hints, `--engines` on an NVIDIA card to see if the fast engines are ready.
+## 4. Two ways to connect OBS
 
-Each line is `ok`, `warn` or `fail`. The last line is the verdict:
+Use **A** if you can: simpler, and the stream key stays inside StreamSafe. Use **B** if the mic must stay on during a cover, or you want the StreamSafe picture inside an OBS scene.
 
-- `ok`: go on.
-- `warn`: it works but something is weak (low memory, OBS not found, slower mode). Read the hint.
-- `fail`: StreamSafe will refuse to start. Fix it first (see the table at the end).
-
-**3.2 Models.** The model files are checked every time (they must match their fingerprints). Downloading them for you
-is **coming in the installer**; for now they come in the folder we send.
-
-**3.3 NVIDIA only: one-time preparation (about 4 minutes).** TensorRT builds the fast engines for your exact card and
-driver. Do it once, before your first stream. It is redone after a graphics driver update.
-
-```
-StreamSafe.exe prepare --models "<model folder>"
-```
-
-It prints `preparing 1/4 ...` and ends with `PREPARE_OK`. If it ends with `PREPARE_FAILED`, send us the text.
-(If you skip it, StreamSafe still runs on the slower mode. AMD and Intel cards skip this step.)
-
-## 4. Two OBS setups
-
-Use **A** if you can: it is simple and your stream key never leaves the one command you type. Use **B** if you
-need StreamSafe's picture inside an OBS scene.
-
-> **Sound in setup A:** StreamSafe passes on the sound OBS sends (game + mic, as one mix), delayed by the same
-> amount as the picture, so they stay in sync without any OBS sync offsets. While a full-screen cover is on, the
-> whole mix is silent in A, **your mic too** (OBS sends one mixed track; StreamSafe cannot tell the game from your
-> voice). If your mic must stay on during covers, use B. Sound in A is new: please do the clap test on a private
-> stream and tell us in the feedback form.
+> **Sound.** In A, StreamSafe passes on the sound OBS sends (game and mic mixed in one track) and delays it exactly like the picture,
+> so they stay in sync with no Sync Offset. During a full-screen cover the whole track is muted, **mic included**. If the mic must stay on, use B.
 
 ### Setup A: OBS sends to StreamSafe (SRT), StreamSafe sends to the platform
 
@@ -77,119 +64,137 @@ need StreamSafe's picture inside an OBS scene.
 OBS ──SRT──> StreamSafe (delay + cover) ──RTMPS──> Twitch / Kick / YouTube
 ```
 
-1. In OBS, build your scene with the game as usual.
-2. Get your platform's ingest **server URL** and **stream key** (Twitch: Creator Dashboard; Kick: Stream settings; YouTube: Studio, Go live). Join them as `server/key`.
-   Example shape: `rtmps://<ingest-server>/app/<your-key>`. Use the `rtmps://` address your platform gives.
-3. Open Command Prompt in the StreamSafe folder and start StreamSafe first. It waits for OBS:
-   ```
-   StreamSafe.exe run --input "srt://127.0.0.1:9000?mode=listener" --output "rtmps://<ingest-server>/app/<your-key>" --delay 2
-   ```
-4. In OBS: **Settings -> Stream**, Service **Custom**, Server `srt://127.0.0.1:9000`, leave the Stream Key empty. Use H.264 as the encoder, as usual. Click OK.
-5. Click **Start Streaming** in OBS. Now OBS is sending to StreamSafe, **not** to the platform.
-6. Open your stream page on the platform. After the delay you should see your picture. OBS's own preview has **no** delay: you play on the live picture, viewers see the protected one.
-7. To stop: click Stop Streaming in OBS and let StreamSafe end by itself (see "Ending a session" below).
+1. Build your scene in OBS as usual.
+2. From your platform take the **server URL** and the **stream key** (Twitch: Creator Dashboard. Kick: stream settings. YouTube: Studio, then Go live). Keep them separate; do not join them.
+3. In StreamSafe open **Settings**:
+   - **Input:** choose **OBS sends over SRT**. Port `9000` (keep it unless it is taken).
+   - **Output:** choose **Stream to the platform (RTMP/RTMPS)**.
+   - **Stream address (without the key):** paste the server URL. It must start with `rtmps://` or `rtmp://`.
+   - **Stream key:** paste the key (shown as dots). To keep it, tick **Remember the key on this PC**: it is stored protected by your Windows account. Otherwise paste it each time.
+   - **Delay:** `2`.
+4. Go to Home and press **Start protection**. The status reads "Starting... screen is covered" while it waits for OBS. **Start StreamSafe before OBS.**
+5. In OBS: **Settings > Stream**, Service **Custom**, Server `srt://127.0.0.1:9000`, leave Stream Key **empty**. Encoder H.264 as usual. Press OK.
+   (The same line is shown under the Port field in StreamSafe's Settings and follows the port number.)
+6. Press **Start Streaming** in OBS. OBS now sends to StreamSafe, **not** to the platform.
+7. The status turns **Protected** (green). Open your stream page on the platform: after the delay you see your picture **and sound**.
+   Your OBS preview has no delay; viewers see the protected picture.
+8. To end: press Stop Streaming in OBS, then **Stop** in StreamSafe (section 8).
 
-Why A is safe: OBS never holds your stream key, and if StreamSafe stops, nothing goes to the platform. The raw game never goes out.
-Note: the key is typed in the command, so do not film or share your Command Prompt, and do not paste that command to anyone.
+Why A is safer: OBS never holds the stream key, and if StreamSafe stops nothing reaches the platform. The raw game never goes out.
+The key is never on a command line, never in the report, and is blanked out of every line the window shows.
 
-### Setup B: StreamSafe shows its picture in a window, OBS captures it
+### Setup B: StreamSafe shows the picture in a window, OBS captures it
 
-This setup needs more OBS work, but it carries your sound and lets OBS keep the stream key.
+More OBS work, but the mic stays on during a cover, and OBS keeps the stream key.
 
 ```
-Game capture (hidden "Game Raw")  ->  OBS Virtual Camera  ->  StreamSafe  ->  window "StreamSafe Output"
-                                   ->  OBS stream scene captures that window  ->  platform
+game capture (hidden scene "Game Raw") -> OBS Virtual Camera -> StreamSafe -> window "StreamSafe Output"
+                                       -> OBS stream scene captures the window -> platform
 ```
 
-1. **Hidden scene.** Create a scene called `Game Raw` with your game capture, named `Game Raw`. Never add this video to your stream scene.
+1. **Hidden scene.** Make a scene `Game Raw` with your game capture, and name the source `Game Raw`. Never add this video to the stream scene.
 2. **Game sound as its own source.** Add an **Audio Input Capture** (or Audio Output Capture) named `Game Audio`.
-3. **Virtual camera.** Click **Start Virtual Camera** (in Controls, the gear next to it): Output Type **Source**, Source **Game Raw**. Not "Program".
-4. **Start StreamSafe** (set the state file first; the path must use English letters only):
-   ```
-   mkdir C:\ProgramData\StreamSafe
-   set OBS_STATE=C:\ProgramData\StreamSafe\state.txt
-   StreamSafe.exe run --input "device:OBS Virtual Camera" --output window --delay 2
-   ```
-   A window named `StreamSafe Output` opens. Do not close or minimise it (if you minimise it, StreamSafe restores it).
-5. **Stream scene** called `StreamSafe Stream`:
-   - **Window Capture** of `StreamSafe Output`, full canvas.
-   - An image source named `StreamSafe Slate`, on top, eye **off** (the script turns it on when needed).
-   - `Game Audio`: **Advanced Audio Properties -> Sync Offset** = 2000 ms (same as the delay).
-   - Your mic: Sync Offset = 2000 ms too. Camera: filter **Video Delay (Async)** = 2000 ms.
-   - These numbers are a start. Do the clap test (clap on camera, play a beep in the game, record, check the three line up) and adjust.
-6. **Guard script.** OBS -> **Tools -> Scripts -> +** -> choose `streamsafe_guard.lua` (location of the file: **coming in the installer**; for now we send it). Fill in: state file `C:\ProgramData\StreamSafe\state.txt`; game audio `Game Audio`; slate `StreamSafe Slate`; output `StreamSafe Output`; raw video `Game Raw`; protected scene `StreamSafe Stream`; stale time `500`.
-   The script mutes the game and shows the slate within 0.5 s if StreamSafe stops, freezes, or the window goes empty.
-7. **Panic key.** OBS -> Settings -> Hotkeys -> "StreamSafe: PANIC (cover everything)": set a key. One press = slate and mute; press again to end.
-8. Stream from OBS to the platform as you normally do, with the `StreamSafe Stream` scene. **Test with a private or unlisted stream first.**
-9. Quick test before going live: kill StreamSafe in Task Manager. The slate must appear and the game must be muted within a second.
+3. **Virtual camera.** Press **Start Virtual Camera** (gear beside it): Output Type **Source**, source **Game Raw**. Not "Program".
+4. **StreamSafe settings.** In **Settings:** Input **OBS Virtual Camera** (name `OBS Virtual Camera`), Output **A window that OBS captures**, Delay `2`.
+5. Press **Start protection**. A window named `StreamSafe Output` opens. Do not close or minimise it (if you minimise it, StreamSafe restores it).
+6. **Stream scene** named `StreamSafe Stream`:
+   - **Window Capture** of the `StreamSafe Output` window, full canvas.
+   - An image source named `StreamSafe Slate` on top of everything, eye **off** (the script turns it on when needed).
+   - `Game Audio`: **Advanced Audio Properties > Sync Offset** = 2000 ms (the same as the delay).
+   - Mic: Sync Offset = 2000 ms too. Camera: filter **Video Delay (Async)** = 2000 ms.
+   - These numbers are a start. Do the clap test (clap in front of the camera, play a beep in the game, record, check all three line up) and adjust.
+7. **Guard script.** In StreamSafe, **Settings**, section **OBS setup**, there are two paths, each with a **Copy** button:
+   - **Guard script** (`...\Programs\StreamSafe\obs\streamsafe_guard.lua`): copy it, then in OBS **Tools > Scripts > +** and paste it into the file name box.
+   - **State file for the OBS script** (`...\StreamSafe\obs\state.txt`): copy it and paste it into the script's state file field.
+   - Other fields: game audio `Game Audio`; slate `StreamSafe Slate`; output `StreamSafe Output`; raw video `Game Raw`; protected scene `StreamSafe Stream`; stale time `500`.
+   The script mutes the game and shows the slate within half a second if StreamSafe stops, freezes, or the window empties.
+8. **Panic key.** OBS > Settings > Hotkeys > "StreamSafe: PANIC (cover everything)": assign a key. One press = cover and mute; press again to release.
+9. Stream from OBS to the platform as usual with the `StreamSafe Stream` scene. **Try a private or unlisted stream first.**
+10. Quick test before a real stream: kill `StreamSafe` in Task Manager. The slate must appear and the game must mute within a second.
 
-## 5. The delay
+## 5. Delay
 
-- Viewers see you about 2 seconds later than real time (plus your platform's own delay). That is how StreamSafe has time to check each frame.
-- **Chat will feel late.** You see chat's reply to what the viewer saw 2+ seconds ago. Warn your viewers, or react to "late" chat.
-- In setup B, your mic and camera must be delayed by the same amount (step 5), or your voice will be ahead of the game.
-- You can change it with `--delay <seconds>`. A shorter delay gives the PC less time and can cause more full covers (slow PC). Please test the default first.
+- Viewers see you about 2 seconds behind real time (on top of the platform's own delay). That is how StreamSafe has time to check every frame.
+- **Chat will feel late.** Tell your viewers.
+- In B the mic and camera must be delayed by the same amount (step 6), or your voice will run ahead of the game.
+- You can change it in **Settings > Delay** (0.5 to 10 seconds). A shorter delay gives the PC less time and can cause more full covers. Try the default first.
 
-## 6. Full-screen cover and muted sound are normal
+## 6. Full-screen cover and mute are normal
 
-When StreamSafe sees an explicit scene, it covers the **whole screen** with a card and **mutes the game**. That is the
-intended behaviour, not a bug. It also shows the full-screen slate for a moment when it starts, and when something is wrong or slow.
-In setup B your mic stays on; in setup A the mic is silent too while the cover is on (see the note in section 4).
-When the scene is over, picture and sound come back by themselves.
+When StreamSafe sees an explicit scene it covers the **whole screen** and **mutes the sound**. That is the intended behaviour, not a fault.
+The slate also shows for a moment at start, and whenever something is wrong or slow. The window status then reads **Fully covered**. When the scene ends, picture and sound come back by themselves.
+In A the mic is muted with the game; in B the mic stays on.
 
-## 7. If it covers too much or too little
+## 7. Too much cover, or too little
 
-There is no setting for you to change in the beta. Do not try to tune it. Instead:
+There is no setting to change in the beta. Instead:
 
-1. **Too much** (covers a character or screen that was fine) or **too little / late** (something showed that should have been covered): note the **time** (stream clock or your clock) and what was on screen. **If a real revealing frame reached viewers, tell us right away, do not wait for the form.**
-2. If you recorded the stream locally, keep that recording; we may ask for the short clip around that time.
-3. Mention it in the feedback form with the time. It is the most useful thing you can send.
+1. **Too much cover** (a normal character or screen covered) or **too little / late** (something that should have been covered showed): note the **time** and what was on screen. **If a really explicit frame reached viewers, tell us right away; do not wait for the form.**
+2. If you record your stream locally, keep the recording; we may ask for a short clip around that time.
+3. Write it in the feedback form with the time. This is the most useful thing you can send.
 
 ## 8. Ending a session and sending the report
 
-At a normal end, StreamSafe writes a short report in:
+1. Press **Stop** on **Home** (in A stop OBS first). You see "Stopping and writing the report..."; wait until it clears.
+   If you close the window while protection is running, it asks and stops the same way.
+2. Press **Open last session report**: it opens the `.txt` (Arabic and English). Read it.
+3. The files are in `%LOCALAPPDATA%\StreamSafe\reports` (paste that into the Explorer address bar): `session_YYYYMMDD_HHMMSS.txt` and `.json`.
+4. Send both files for every session with the feedback form (`FEEDBACK_FORM.md`). The result line says `ok` or `check`; send it either way.
 
-```
-%LOCALAPPDATA%\StreamSafe\reports
-```
+If the program crashed or you killed it in Task Manager, there may be no report. Tell us in the form.
 
-(Type that in the File Explorer address bar.) It prints `SESSION_REPORT <path>` when it is done. You get two files with the same name: `session_YYYYMMDD_HHMMSS.txt` (read it, Arabic and English) and `.json`.
+**Privacy.** The report has numbers and times only: graphics card name, Windows version, stream length, seconds of cover and mute, error counts.
+**No images, no stream URL or key, no file paths.**
 
-**Important:** if you stop StreamSafe with **Ctrl+C**, no report is written in this beta. Let it end on its own: end the stream or the input
-(in setup A, click Stop Streaming in OBS; StreamSafe should end when OBS stops sending. If it does not end after a minute, tell us, then use Ctrl+C and say that no report was written).
+## 9. Beta expiry
 
-To send: attach the `.txt` and `.json` of each session to the message you send us with the feedback form (`FEEDBACK_FORM.md`).
-The verdict line says `ok` or `check`; send it either way.
+- At the top of **Home** an orange line reads "Beta version: ends in N days (date)".
+- After that date **Start protection** is disabled and the status reads **Not ready**. A stream that is already running is not cut, but you cannot start a new one.
+- Then download the new version from us and install it over the old one (close StreamSafe first). Your models and settings stay.
 
-**Privacy.** The report holds only counts and times: your GPU name, Windows version, duration, how many seconds of cover and mute, and error counts.
-It has **no pictures, no stream URL or key, and no file paths**. The command you typed is not in it.
-Open the `.txt` and read it before you send it.
+## 10. Troubleshooting
 
-## 9. Troubleshooting (from `StreamSafe.exe check`)
+Lines in the **Check** tab:
 
-| Line in the check | Meaning | What to do |
+| Line | Meaning | What to do |
 |---|---|---|
-| `gpu` FAIL | No graphics card found | Install the latest driver (NVIDIA / AMD / Intel), run check again |
-| `gpu` WARN | Under 6 GB video memory | Close other programs while streaming; tell us your card |
-| `runtime` FAIL | StreamSafe cannot use your GPU, or files are missing | Update your graphics driver and Windows; if it stays, reinstall |
-| `runtime` WARN (DirectML on NVIDIA) | Works, but slower than the NVIDIA mode | Use the NVIDIA edition and run `prepare` |
-| `ffmpeg` FAIL | FFmpeg is missing | Reinstall StreamSafe |
-| `models` FAIL | Model files are missing or damaged | Re-copy / reinstall the model folder |
-| `python` FAIL | Internal runtime too old | Reinstall StreamSafe with the official build |
-| `os` WARN | Not Windows | Live streaming is supported on Windows only |
-| `obs` WARN | OBS not found in its usual folder | Install OBS or ignore if it is installed elsewhere |
-| `ram` / `disk` WARN | Low memory or free space | Close other programs / free some space |
-| `engines` WARN | NVIDIA fast engines not ready | Run `StreamSafe.exe prepare --models "<model folder>"` |
+| Graphics card (red) | No graphics card found | Install the latest driver (NVIDIA / AMD / Intel), press **Check again** |
+| Graphics card (orange) | Under 6 GB video memory | Close other programs while streaming, and tell us your card |
+| GPU runtime (red) | The app cannot use the card | Update the driver and Windows; if it stays, reinstall |
+| GPU runtime (orange, DirectML on NVIDIA) | Works but slower | Enable the fast NVIDIA mode (section 3) |
+| FFmpeg or Decision files (red) | A program file is missing | Reinstall |
+| Model files (red) | Not installed or damaged | On **Home** press **Download models** (or choose the file we sent) |
+| NVIDIA preparation (orange) | Fast mode not ready | Enable it from the same tab |
+| OBS (orange) | OBS not in its usual place | Install OBS, or ignore if it is installed elsewhere |
+| Memory / Disk space (orange) | Low RAM or space | Close programs / free space |
 
 Other problems:
 
 | Problem | What to do |
 |---|---|
-| Stream shows the slate all the time | Look at the Command Prompt for errors. A slow PC causes this: close other programs and tell us your card |
-| Nothing arrives in setup A | Start StreamSafe **before** OBS. Check `srt://127.0.0.1:9000` in OBS (no key) and that the command has `?mode=listener` |
-| Nothing arrives on the platform | Check the server/key, and that your platform accepts `rtmps://` |
-| No sound in setup A | Check that OBS itself has sound (the mixer bars move) and that you run the current StreamSafe build. Silence during a full-screen cover, and for about half a second after it, is intended |
-| Window `StreamSafe Output` not found in OBS | StreamSafe must be running first; use "Window Capture" and pick it from the list |
-| Slate stuck after restarting StreamSafe (B) | Check the state file path is `C:\ProgramData\StreamSafe\state.txt` and English letters only |
+| **Start protection** refuses and says "Cannot start now" | Read the reason it shows (models, red check, missing key, bad stream address, beta ended) |
+| The whole stream is the slate | Look at the **Check** tab. A slow PC causes this: close other programs and tell us your card |
+| Status "Engine not answering: screen covered" or "Stopped by an error" | Stop and start again. If it repeats, send us the report |
+| Nothing arrives in A | Start StreamSafe **before** OBS. Check `srt://127.0.0.1:<port>` in OBS (no key) and that the port matches Settings |
+| Nothing reaches the platform in A | Check the stream address and key, and that the address is `rtmps://` or `rtmp://` |
+| No sound in A | Check that OBS's own mixer bars move. Silence during a full cover and about half a second after is intended |
+| `StreamSafe Output` window not in OBS (B) | StreamSafe must be running first (status not Stopped); use Window Capture and pick it from the list |
+| Slate stuck in B after starting StreamSafe | Make sure the **State file** path in the OBS script settings is exactly what the **Copy** button gave you |
+| Cannot find StreamSafe after install | Start menu, type StreamSafe |
 
-Exit codes of `check`: 0 = ok, 1 = warnings, 2 = a failure.
+## 11. Advanced appendix: command line (optional)
+
+Not needed for normal testing. The installed program also has the console version `StreamSafe.exe` next to `StreamSafeApp.exe` in `%LOCALAPPDATA%\Programs\StreamSafe`.
+Open a Command Prompt there:
+
+```
+StreamSafe.exe check               the check (add --lang ar for Arabic)
+StreamSafe.exe prepare             NVIDIA preparation (after enabling fast mode in the window)
+StreamSafe.exe about               version, beta end date, folders
+StreamSafe.exe run --input "srt://127.0.0.1:9000?mode=listener" --output window --delay 2
+```
+
+- Models and reports live in `%LOCALAPPDATA%\StreamSafe` (no `--models` needed).
+- For a live stream from the command line do not type the key in the command: put the full address in an environment variable and use `--output env:NAME`.
+- **Ctrl+C** ends the session and still writes the report.
+- The window and the command line cannot use the same port at the same time.

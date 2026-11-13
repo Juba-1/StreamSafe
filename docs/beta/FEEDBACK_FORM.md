@@ -5,12 +5,12 @@ Fill one per session. Send it with the report files from `%LOCALAPPDATA%\StreamS
 
 ## A. Setup / الإعداد
 
-1. Date, and how long you streamed (minutes). / التاريخ ومدة البث بالدقايق.
+1. Date, and how long you streamed (minutes). StreamSafe version (top of the window, e.g. v3.0.0.4). / التاريخ ومدة البث بالدقايق، ونسخة البرنامج (فوق في النافذة).
 2. Platform: Twitch / Kick / YouTube. Private test or public? / المنصة، وهل البث تجربة خاصة أو عام؟
-3. Setup used: A (OBS -> SRT -> StreamSafe -> platform) or B (window capture). / الطريقة: A أو B.
+3. Setup used: A (OBS -> SRT -> StreamSafe -> platform) or B (virtual camera + window capture). / الطريقة: A أو B.
 4. Your graphics card and driver (from the report). / كرت الشاشة (يظهر في التقرير).
 5. Game and what you did (story mission, free roam, strip club, beach...). / اللعبة وش سويت فيها.
-6. Did `check` give ok / warn / fail? Which lines were not ok? / نتيجة `check` وأي أسطر ما كانت ok.
+6. Check tab: green / orange / red? Which lines were not green? / تبويب الفحص: أخضر أو برتقالي أو أحمر؟ وأي أسطر ما كانت خضراء؟
 
 ## B. Safety / الحماية (most important / الأهم)
 
@@ -31,7 +31,7 @@ Fill one per session. Send it with the report files from `%LOCALAPPDATA%\StreamS
 
 ## D. Use and trust / الاستخدام والثقة
 
-18. How long did install, first run, and OBS setup take? Which step was confusing? / كم أخذ التثبيت وأول تشغيل وإعداد OBS؟ أي خطوة كانت مو واضحة؟
+18. How long did install, model download, NVIDIA preparation (if any) and OBS setup take? Did Windows or your antivirus warn or block? Which step was confusing? / كم أخذ التثبيت وتنزيل النماذج وتجهيز إنفيديا (إن وجد) وإعداد OBS؟ هل حذّر ويندوز أو برنامج الحماية أو حجب؟ أي خطوة كانت مو واضحة؟
 19. Would you trust it on a public stream today? Why or why not? / هل تثق فيه في بث عام اليوم؟ ليش؟
 20. What would you need to see before you trust it (e.g., a longer test, a panic key, a preview of what viewers see)? / وش تحتاج تشوف عشان تثق فيه؟
 21. Did the viewers or moderators notice anything? / هل لاحظ المشاهدين أو المشرفين شي؟
@@ -39,6 +39,6 @@ Fill one per session. Send it with the report files from `%LOCALAPPDATA%\StreamS
 
 ## E. Attach / المرفقات
 
-- [ ] `session_...txt` and `session_...json` (no images, no stream key; read the `.txt` first) / ملفا التقرير
+- [ ] `session_...txt` and `session_...json` (no images, no stream key; read the `.txt` first; "Open last session report" on Home shows it). If there is no report, say why (crash, killed). / ملفا التقرير (زر "افتح آخر تقرير جلسة" في الرئيسية). لو ما فيه تقرير، قل ليش.
 - [ ] Time list for questions 7-9 / قائمة أوقات الأسئلة 7 إلى 9
 - [ ] Optional: a short local clip around a problem time, only if you are comfortable sending it / اختياري: مقطع قصير حول وقت المشكلة لو ترتاح تشاركه
