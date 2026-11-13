@@ -112,6 +112,20 @@ class SceneConfig:
 
 
 @dataclass
+class TranslateConfig:
+    """Live English -> Arabic text translation (docs/TRANSLATE.md). Off by default; never touches the cover logic."""
+
+    translate_ar: bool = False  # the switch (env TRANSLATE_AR=1, or the app's Settings tab)
+    translate_dir: str = ""  # folder of the translation pack (OCR models, translator, fonts); the app sets it
+    translate_regions: str = "subtitles"  # comma list of: subtitles (bottom band), help (top-left prompt box)
+    translate_min_gap_s: float = 0.25  # least time between two reads of the screen (a change of text reads sooner than the refresh)
+    translate_refresh_s: float = 2.0  # text that stays unchanged is read again this often
+    translate_min_conf: float = 0.55  # OCR lines below this confidence are ignored
+    translate_queue: int = 2  # reads waiting for the worker at most; more are dropped, never queued up
+    translate_threads: int = 2  # CPU threads of the worker (they sleep when idle)
+
+
+@dataclass
 class GarmentConfig:
     small_h: int = 64  # shorter people get a plain full cover (no pose); hysteresis x0.8 / x1.25
     pose_repo: str = "usyd-community/vitpose-base-simple"  # Apache-2.0
@@ -193,6 +207,7 @@ class Config:
     risk: RiskConfig = field(default_factory=RiskConfig)
     scene: SceneConfig = field(default_factory=SceneConfig)
     brand: BrandConfig = field(default_factory=BrandConfig)
+    translate: TranslateConfig = field(default_factory=TranslateConfig)
     garment: GarmentConfig = field(default_factory=GarmentConfig)
     render: RenderConfig = field(default_factory=RenderConfig)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)

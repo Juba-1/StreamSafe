@@ -25,6 +25,7 @@ class Settings:
     remember_key: bool = False
     delay: float = 2.0
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
+    translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
 
     def problems(self) -> list[str]:

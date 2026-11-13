@@ -46,6 +46,11 @@ def models_dir(env: MutableMapping[str, str] | None = None) -> Path:
     return data_dir(env) / "models"
 
 
+def translate_dir(env: MutableMapping[str, str] | None = None) -> Path:
+    """The translation pack (OCR models, translator, fonts): downloaded when the streamer switches Arabic translation on."""
+    return data_dir(env) / "translate"
+
+
 def heads_dir(env: MutableMapping[str, str] | None = None) -> Path:
     """Heads brought by an update (the ones the installer ships are ``bundled_heads_dir``)."""
     return data_dir(env) / "heads"

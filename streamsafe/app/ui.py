@@ -226,6 +226,7 @@ class App(tk.Tk):
         v("key", tk.StringVar, self.ctrl.stored_key() if "key" not in self._vars else self._vars["key"].get())
         v("remember", tk.BooleanVar, st.remember_key)
         v("delay", tk.StringVar, f"{st.delay:g}")
+        v("translate", tk.BooleanVar, st.translate_ar)
 
         def field(parent: tk.Misc, caption: str, var: tk.Variable, width: int = 34, show: str = "") -> None:
             fr = tk.Frame(parent, bg="white")
@@ -257,6 +258,13 @@ class App(tk.Tk):
             self.pack_row(self.label(s, self.tr("key_no_store"), fg="#6b7785", font=(FONT, 9)), fill="x")
         field(s, self.tr("delay"), v("delay", tk.StringVar, ""), 8)
         ttk.Separator(s).pack(fill="x", pady=10)
+        self.pack_row(
+            ttk.Checkbutton(
+                s, text=self.tr("translate_ar"), variable=v("translate", tk.BooleanVar, False), command=self.on_translate_toggle
+            )
+        )
+        self.pack_row(self.label(s, self.tr("translate_hint", mb=release.TRANSLATE_DOWNLOAD_MB), fg="#6b7785", font=(FONT, 9)), fill="x")
+        ttk.Separator(s).pack(fill="x", pady=10)
         self.label(s, self.tr("open_obs"), font=(FONT, 11, "bold")).pack(fill="x")
         for key, path in (("obs_state", paths.obs_state_file(self.ctrl.env)), ("obs_script", paths.obs_script())):
             fr = tk.Frame(s, bg="white")
@@ -282,6 +290,7 @@ class App(tk.Tk):
         st.input, st.output = str(v["input"].get()), str(v["output"].get())
         st.camera, st.rtmp_url = str(v["camera"].get()).strip(), str(v["rtmp_url"].get()).strip()
         st.remember_key = bool(v["remember"].get())
+        st.translate_ar = bool(v["translate"].get())
         try:
             st.srt_port = int(str(v["srt_port"].get()).strip())
         except ValueError:
@@ -538,6 +547,29 @@ class App(tk.Tk):
         self.job(
             "models", work, lambda err: self.message.configure(text=err or self.tr("install_done"), fg="#b3261e" if err else "#1b7f3b")
         )
+
+    def on_translate_toggle(self) -> None:
+        """Switched on for the first time: download the translation files (the stream never waits for them)."""
+        var = self._vars["translate"]
+        if not var.get() or self.ctrl.translate_problem() == "":
+            return  # switched off, or the files are already here
+        if self._busy.is_set():
+            var.set(False)  # busy with another download: ask again later
+            return
+
+        def work() -> str:
+            why = self.ctrl.install_translate(lambda w, d, t: self.on_progress("downloading", d, t), self._cancel)
+            return self.tr("translate_failed", why=why) if why else ""
+
+        def done(err: str) -> None:
+            if err:
+                var.set(False)  # no files: translation stays off
+            else:
+                self.message.configure(text=self.tr("translate_ready"), fg="#1b7f3b")
+            self.collect()
+            self.ctrl.save_settings()
+
+        self.job("translate", work, done)
 
     def enable_nvidia(self) -> None:
         def work() -> str:

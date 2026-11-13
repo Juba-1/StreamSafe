@@ -38,6 +38,29 @@ KEEP_DECISIONS = 60  # frames of decision history kept behind the output positio
 AnalyzerFactory = Callable[[Config, float], Analyzer]
 
 
+def start_translation(cfg: Config, size: tuple[int, int], factory: Any = None) -> Any:
+    """The English -> Arabic overlay service (streamsafe/translate), or None: off (the default), models not
+    installed, or any failure while starting. Nothing here can stop the stream: whatever goes wrong, the run is
+    exactly the run without translation."""
+    if not cfg.translate.translate_ar:
+        return None
+    try:
+        from streamsafe.translate import pack
+        from streamsafe.translate.service import TranslationService, default_factory
+
+        if factory is None:
+            why = pack.problem(cfg.translate.translate_dir, full=True)
+            if why:
+                print(f"TRANSLATE_OFF {why}", flush=True)
+                return None
+        service = TranslationService(cfg, size, factory or default_factory)
+        service.start()
+        return service
+    except Exception as exc:
+        print(f"TRANSLATE_OFF {exc!r:.200}", flush=True)
+        return None
+
+
 class LiveLog:
     """Prints ``LIVE {...}`` every ``every_s`` seconds (0 = off): output position, worst lateness and
     the frames waiting in memory since the last line, frames dropped so far."""
@@ -61,11 +84,17 @@ def default_analyzer(cfg: Config, output_scale: float) -> Analyzer:
     return Analyzer(cfg, build_models(cfg), output_scale)
 
 
-def run(cfg: Config, source: FrameSource, sink: FrameSink | None, factory: AnalyzerFactory = default_analyzer) -> dict[str, Any]:
+def run(
+    cfg: Config,
+    source: FrameSource,
+    sink: FrameSink | None,
+    factory: AnalyzerFactory = default_analyzer,
+    translate_factory: Any = None,
+) -> dict[str, Any]:
     limit_threads()
     mode = cfg.runtime.mode
     if mode == "realtime":
-        return _run_realtime(cfg, source, sink, factory)
+        return _run_realtime(cfg, source, sink, factory, translate_factory)
     if mode == "offline":
         return _run_offline(cfg, source, sink, factory)
     raise ValueError(f"unknown mode: {mode!r} (realtime | offline)")
@@ -128,11 +157,14 @@ RESTART_AFTER_FAILS = 30  # consecutive failed decisions (3 s at 10/s) -> a new 
 RESTART_BACKOFF_S = 10.0
 
 
-def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, factory: AnalyzerFactory) -> dict[str, Any]:
+def _run_realtime(
+    cfg: Config, source: FrameSource, sink: FrameSink | None, factory: AnalyzerFactory, translate_factory: Any = None
+) -> dict[str, Any]:
     rt = cfg.runtime
     full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
     worker = _Workers(lambda: AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE))
     gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps, brand=cfg.brand)
+    tr = start_translation(cfg, source.size, translate_factory)  # None unless the Arabic text translation is on and ready to load
     frames: dict[int, tuple[float, Any, int]] = {}  # frame id -> (capture time, frame, its number in the source)
     # sound travels with its frame: taken from the source by the frame's own number when the frame is shown
     sound_of = getattr(source, "audio_chunk", None) if takes_audio(sink) else None
@@ -160,6 +192,8 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                 cut = cuts(frame)
                 gate.mark_cut(fid, cut)
                 worker.submit(fid, frame if full_res else _to_analysis(frame), cut)
+                if tr is not None:
+                    tr.observe(fid, frame)  # reads the raw frame now; never blocks, never raises
                 number = source.frame_index if sound_of is not None else fid  # type: ignore[attr-defined]
                 with lock:
                     frames[fid] = (captured, frame, number)
@@ -221,6 +255,9 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                 while time.perf_counter() < due:
                     time.sleep(0.0005)
                 out = gate.render(v, frame)
+                # Arabic text, AFTER the gate: only on the frame the gate composed normally (``out is frame``: not the
+                # slate, not the scene card, not a held frame), on a copy, so nothing the gate keeps ever carries it
+                visible = tr.overlay(v, out) if tr is not None and out is frame else out
                 if sink is not None and takes_audio(sink):
                     # fail closed: sound only for a frame that is shown, not muted and not full-screen, and only
                     # that frame's own samples; anything else (also "not arrived") is silence
@@ -229,15 +266,17 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
                         sound = sound_of(number)
                         n_sound += sound is not None
                         n_no_sound += sound is None
-                    sink.write(out, sound)  # type: ignore[call-arg]
+                    sink.write(visible, sound)  # type: ignore[call-arg]
                 elif sink is not None:
-                    sink.write(out)
+                    sink.write(visible)
                 if obs is not None:
                     obs.update(v, gate.muted, out is gate.slate or out is gate.card)
                 late = 1000 * (time.perf_counter() - due)
                 stats["emit_lateness_ms"].append(late)
                 stats["late_frames"].append(int(late > LATE_MS))
                 gate.forget_before(v - KEEP_DECISIONS)
+                if tr is not None:
+                    tr.forget_before(v)
                 live.tick(v, late, waiting, len(stats["dropped_frames"]))
                 v += 1
                 shown += 1
@@ -248,6 +287,8 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
             obs.close()
             stats["obs_write_errors"].append(obs.errors)
         worker.shutdown(receiver)
+        if tr is not None:
+            tr.stop()
     gate.finish()
 
     stats.update(gate.stats)
@@ -267,6 +308,8 @@ def _run_realtime(cfg: Config, source: FrameSource, sink: FrameSink | None, fact
         audio_frames=n_sound,
         audio_missing_frames=n_no_sound if getattr(source, "has_audio", False) else 0,
     )
+    if tr is not None:
+        extra["translate"] = tr.report()
     report = summarize(stats, last.stats, shown, n_dec, rt.fps, extra)
     write_outputs(report, cfg.output.stats_out, cfg.output.diag_out, last.diag, gate.log)
     return report

@@ -57,7 +57,9 @@ def run_args(settings: Settings, reports: Path) -> list[str]:
     return ["run", "--input", source, "--output", sink, "--delay", f"{settings.delay:g}", "--report-dir", str(reports)]
 
 
-def engine_env(base: Mapping[str, str], nvidia: bool, url: str = "", data_env: Mapping[str, str] | None = None) -> dict[str, str]:
+def engine_env(
+    base: Mapping[str, str], nvidia: bool, url: str = "", data_env: Mapping[str, str] | None = None, translate: bool = False
+) -> dict[str, str]:
     """The environment of an engine / prepare / probe process. ``nvidia``: the NVIDIA runtime with TensorRT
     (engines are never built at "go live": ``TRT_BUILD=0``; a model without a ready engine runs on CUDA and the
     report says so). Otherwise the bundled DirectML runtime."""
@@ -79,6 +81,10 @@ def engine_env(base: Mapping[str, str], nvidia: bool, url: str = "", data_env: M
     else:
         env.update({runtime_select.RUNTIME_ENV: runtime_select.DIRECTML, "TRT": "0"})
     env.pop(OUTPUT_ENV, None)
+    env.pop("TRANSLATE_AR", None)
+    env.pop("TRANSLATE_DIR", None)
+    if translate:  # the engine itself checks the pack and carries on without translation when it is not usable
+        env.update({"TRANSLATE_AR": "1", "TRANSLATE_DIR": str(paths.translate_dir(where))})
     if url:
         env[OUTPUT_ENV] = url
     return env

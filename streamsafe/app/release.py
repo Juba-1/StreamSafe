@@ -19,6 +19,29 @@ from dataclasses import dataclass
 # offers "choose a folder or zip we sent you"). The risk heads are NOT here: they ship inside the installer.
 MODEL_BASE_URL = "https://huggingface.co/juba-1/streamsafe-models/resolve/main/v1/"
 
+# --- live Arabic translation of on-screen text (docs/TRANSLATE.md) ------------------------------------------------
+# Downloaded the first time the streamer switches it on (not part of the installer, not part of the model pack):
+# OCR models, the opus-mt-en-ar translator and two fonts, with their licence texts. Every file is pinned by size and
+# sha256 (``tools/build_translate_pack.py`` prints this table); nothing that does not match is kept.
+TRANSLATE_BASE_URL = MODEL_BASE_URL + "translate/"
+TRANSLATE_DOWNLOAD_MB = 96  # shown to the streamer before the download
+TRANSLATE_FILES: dict[str, tuple[str, int]] = {
+    "LICENSE-Apache-2.0.txt": ("cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", 11358),
+    "LICENSE-CC-BY-4.0.txt": ("9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411", 18657),
+    "LICENSE-OFL-NotoSans.txt": ("cee9892f9f0cc8fe882c9e9537ee6a89621d86ee7ceaf70b02e2b2b1c25c061a", 4396),
+    "LICENSE-OFL-NotoSansArabic.txt": ("a7a5a25eb188bf1cd96982030d53e23c33485c69b1044a562254226857ee13af", 4382),
+    "NOTICE-translate.txt": ("13840d1654e6c954e62c5412447d1999a80c7e813c33fc3619b3fb1662d5800b", 1690),
+    "NotoSans-Regular.ttf": ("478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823", 621572),
+    "NotoSansArabic-Regular.ttf": ("bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48", 234892),
+    "config.json": ("8f6496adfc930cbfecbe8281112197705c488fab47d34b4829b06d7f478909af", 223),
+    "det.onnx": ("d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9", 4745517),
+    "model.bin": ("990411b123076f5706de0b55a5ba1609322a18306c0e525043a86ab87634ae36", 78424155),
+    "rec.onnx": ("ef7abd8bd3629ae57ea2c28b425c1bd258a871b93fd2fe7c433946ade9b5d9ea", 8967018),
+    "shared_vocabulary.json": ("1f3c24e6f4e03183b20b95b757f3b7df30512bdf9980a6818c5393b4f8b9aaf6", 1815066),
+    "source.spm": ("81ac8f4d4ee271f4109eac67560a31f9c2d555463ba5eb95c32c6deee8ae819d", 801074),
+    "target.spm": ("67d0f6afb87768c078ee46c0756b8cc94b1ec23c5526b49ecf6c3b2f9197ec39", 916890),
+}
+
 # --- updates --------------------------------------------------------------------------------------------------
 # A small JSON file signed with ed25519 (``tools/sign_manifest.py``): latest app version, model files and head
 # files with sha256. Empty URL or no key: the app never looks for updates and works as it is. The private key
@@ -118,5 +141,5 @@ NVIDIA_LICENSE_URLS = (
 def allowed_hosts() -> set[str]:
     from urllib.parse import urlsplit
 
-    urls = [MODEL_BASE_URL, UPDATE_MANIFEST_URL, *(w.url for w in NVIDIA_WHEELS)]
+    urls = [MODEL_BASE_URL, TRANSLATE_BASE_URL, UPDATE_MANIFEST_URL, *(w.url for w in NVIDIA_WHEELS)]
     return {urlsplit(u).hostname or "" for u in urls if u}

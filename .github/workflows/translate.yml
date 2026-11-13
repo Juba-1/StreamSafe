@@ -1,0 +1,71 @@
+name: translate
+
+# The Arabic translation feature with its REAL models (docs/TRANSLATE.md). The normal ci.yml runs the stub tests on every push;
+# this builds the translation pack (OCR models + opus-mt-en-ar converted to CTranslate2), runs tests/test_translate_real.py
+# on Linux and on Windows, measures what the feature costs, and keeps the sample picture and the numbers as artifacts.
+on:
+  push:
+    branches: [translate]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[translate]" onnxruntime
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install "transformers>=4.57" sacremoses
+      - name: build the pack (downloads the pinned sources, converts the translator, prints the table for release.py)
+        run: python tools/build_translate_pack.py translate-pack | tee pack-table.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: translate-pack
+          path: |
+            translate-pack
+            pack-table.txt
+          retention-days: 30
+
+  real:
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: "install (Linux, CPU onnxruntime)"
+        if: runner.os == 'Linux'
+        run: pip install -e ".[dev,translate]" onnxruntime onnx
+      - name: "install (Windows, DirectML runtime)"
+        if: runner.os == 'Windows'
+        run: pip install -e ".[dev,translate]" onnxruntime-directml onnx
+      - uses: actions/download-artifact@v4
+        with:
+          name: translate-pack
+          path: artifact
+      - name: real-model tests, cost numbers, sample picture
+        shell: bash
+        env:
+          STREAMSAFE_TRANSLATE_PACK: ${{ github.workspace }}/artifact/translate-pack
+          STREAMSAFE_TRANSLATE_REPORT: ${{ github.workspace }}/translate-report
+        run: python -m pytest -q tests/test_translate_real.py -s
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: translate-report-${{ runner.os }}
+          path: translate-report

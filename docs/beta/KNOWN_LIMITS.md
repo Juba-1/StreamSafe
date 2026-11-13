@@ -21,6 +21,7 @@ This is what we know does not work or is not proven yet. If you hit something no
 15. **Slate at start and on trouble.** For a moment at start, and whenever the PC is too slow or something errors, viewers see the full-screen slate. This is intended.
 16. **On-screen game prompts (HUD reading) are off by default** and not part of this beta test.
 17. **The name and look may change.**
+18. **Arabic translation of on-screen text is experimental and off by default** (Settings tab). It reads the subtitles at the bottom of the picture (and nothing else) and draws a dark Arabic box over them on the stream only, never in your own game. It runs beside the protection and can never delay or uncover a frame; if it is slow or fails you simply get no Arabic. The translation model is small and makes mistakes (it can drop or garble words, names and slang); it only reads white game-style subtitles; it is not drawn on a full-screen cover. Switching it on for the first time downloads about 96 MB. See `docs/TRANSLATE.md`.
 
 ## العربي
 1. **الدقة تجريبية.** ممكن يفوّت شخصية (تغطية ناقصة) أو يغطي شي عادي (تغطية زايدة). ما عندنا أرقام نهائية. لا تعتمد عليه لحاله في بث عام؛ جرّب على بث خاص، وخلّ عندك مشرفين وزر الطوارئ.
@@ -40,3 +41,4 @@ This is what we know does not work or is not proven yet. If you hit something no
 15. **شاشة التغطية عند البداية وعند المشاكل.** لحظة عند البداية، ومتى ما كان الجهاز بطيء أو صار خطأ، المشاهدين يشوفون شاشة التغطية الكاملة. هذا مقصود.
 16. **قراءة رسائل اللعبة على الشاشة (HUD) مطفية افتراضيًا** وليست جزءًا من هذا الاختبار.
 17. **الاسم والشكل ممكن يتغيّرون.**
+18. **ترجمة النصوص على الشاشة للعربي تجريبية ومطفية افتراضيًا** (تبويب الإعدادات). تقرأ الترجمات (السبتايتل) اللي تحت الصورة فقط وترسم فوقها صندوق عربي غامق في البث فقط، مو في لعبتك. تشتغل جنب الحماية وما تقدر تأخّر فريم ولا تكشفه؛ لو بطيئة أو صار فيها خطأ ما يطلع عربي وبس. نموذج الترجمة صغير ويغلط (ممكن يطيّح كلمات أو يخربط الأسماء والعامية)، ويقرأ فقط السبتايتل الأبيض بشكل ألعاب، وما تُرسم فوق شاشة التغطية الكاملة. أول تفعيل ينزّل حوالي 96 ميجا. التفاصيل في `docs/TRANSLATE.md`.

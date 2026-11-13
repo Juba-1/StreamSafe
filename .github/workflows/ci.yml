@@ -36,10 +36,10 @@ jobs:
           cache: pip
       - name: "install (Linux, CPU onnxruntime)"
         if: runner.os == 'Linux'
-        run: pip install -e ".[dev]" onnxruntime onnx
+        run: pip install -e ".[dev,translate]" onnxruntime onnx
       - name: "install (Windows, DirectML runtime)"
         if: runner.os == 'Windows'
-        run: pip install -e ".[dev]" onnxruntime-directml onnx
+        run: pip install -e ".[dev,translate]" onnxruntime-directml onnx
       - name: ffmpeg (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg

@@ -125,6 +125,17 @@ TEXT: dict[str, tuple[str, str]] = {
         "This PC has no protected store: the key stays only while the window is open.",
     ),
     "delay": ("التأخير (ثانية)", "Delay (seconds)"),
+    "translate_ar": ("ترجمة النصوص للعربي (تجريبي)", "Translate on-screen text to Arabic (experimental)"),
+    "translate_hint": (
+        "تُرسم الترجمة على البث فقط (لا تظهر في لعبتك). أول تفعيل ينزّل ملفات (حوالي {mb} ميجا). لو تعذّر شي يكمل البث بدونها.",
+        "The translation is drawn on the stream only (not in your own game). Switching it on the first time downloads files (about {mb} MB). If anything fails, the stream carries on without it.",
+    ),
+    "translate_downloading": ("تنزيل ملفات الترجمة", "Downloading translation files"),
+    "translate_ready": ("ملفات الترجمة جاهزة.", "The translation files are ready."),
+    "translate_failed": (
+        "تعذّر تجهيز الترجمة ({why}). البث يكمل بدونها.",
+        "Translation could not be set up ({why}). The stream carries on without it.",
+    ),
     "bad_port": ("المنفذ لازم يكون بين 1024 و 65535.", "The port must be between 1024 and 65535."),
     "bad_camera": ("اكتب اسم الكاميرا.", "Enter the camera name."),
     "bad_rtmp": ("عنوان البث لازم يبدأ بـ rtmp:// أو rtmps://", "The stream address must start with rtmp:// or rtmps://"),

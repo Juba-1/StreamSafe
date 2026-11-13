@@ -26,6 +26,16 @@ PROGRAM LIBRARIES (inside the program folder)
   OpenCV (Apache-2.0; its own FFmpeg libraries are LGPL)  Apache-2.0.txt
   Python (PSF licence), NumPy (BSD), Pillow (HPND), Tcl/Tk (BSD-style)   Python-PSF.txt
 
+OPTIONAL, DOWNLOADED ONLY IF YOU SWITCH ON "TRANSLATE ON-SCREEN TEXT TO ARABIC" (about 96 MB, once)
+
+  The files come with their own notice and licence texts (NOTICE-translate.txt, LICENSE-*.txt) in the same folder.
+  Helsinki-NLP opus-mt-en-ar (OPUS-MT) - English to Arabic translation  - CC-BY 4.0 / Apache-2.0 (converted to CTranslate2 int8)
+      Attribution: "Translation by OPUS-MT (Helsinki-NLP), https://github.com/Helsinki-NLP/Opus-MT, CC-BY 4.0."
+  PaddleOCR PP-OCRv4 detector + PP-OCRv3 English recogniser (ONNX by RapidOCR) - reads the text  - Apache-2.0
+  Noto Sans Arabic, Noto Sans (Noto Project Authors)                      - fonts for the Arabic box  - SIL OFL 1.1
+  Program libraries: CTranslate2 (MIT, CTranslate2-MIT.txt), SentencePiece (Apache-2.0), arabic-reshaper (MIT,
+  arabic-reshaper-MIT.txt).
+
 OPTIONAL, DOWNLOADED ONLY IF YOU SAY YES (fast mode for NVIDIA cards)
 
   NVIDIA CUDA, cuDNN and TensorRT libraries are downloaded from NVIDIA's own package servers to your PC when you

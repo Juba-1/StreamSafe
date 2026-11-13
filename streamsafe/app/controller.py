@@ -14,9 +14,10 @@ from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from streamsafe.app import engine, heads, keystore, modelpack, nvidia_pack, paths, release, updates
+from streamsafe.app import engine, fetch, heads, keystore, modelpack, nvidia_pack, paths, release, updates
 from streamsafe.app import settings as settings_mod
 from streamsafe.app.settings import OUTPUT_RTMP, Settings
+from streamsafe.translate import pack as translate_pack
 
 Log = Callable[[str], None]
 Progress = Callable[[str, int, int], None]  # (what, done, of); of 0 = unknown
@@ -152,6 +153,27 @@ class Controller:
         else:
             raise ValueError(source)
 
+    # --- Arabic translation of on-screen text ---------------------------------------------------------------
+    def translate_problem(self) -> str:
+        """ "" when the translation files are installed and are the pinned ones (sizes; the engine checks every hash)."""
+        return translate_pack.problem(paths.translate_dir(self.env))
+
+    def install_translate(self, progress: Progress | None = None, cancel: threading.Event | None = None) -> str:
+        """Download the translation pack (``release.TRANSLATE_FILES``). Returns "" on success, otherwise why not.
+        The stream never depends on it: a failure only leaves translation off."""
+        try:
+            translate_pack.install_download(
+                release.TRANSLATE_BASE_URL,
+                paths.translate_dir(self.env),
+                paths.downloads_dir(self.env),
+                progress=progress,
+                cancel=cancel,
+                allow_http=self.allow_http,
+            )
+        except (fetch.DownloadError, translate_pack.PackError, OSError) as exc:
+            return str(exc)
+        return ""
+
     # --- NVIDIA fast mode ---------------------------------------------------------------------------------
     def enable_nvidia(self, progress: Progress | None = None, cancel: threading.Event | None = None) -> str:
         """Download NVIDIA's libraries, check that ONNX Runtime reaches the card with them, build the engines.
@@ -233,7 +255,7 @@ class Controller:
             raise RuntimeError(why[0])
         s = self.settings
         url = engine.output_url(s.rtmp_url, key) if s.output == OUTPUT_RTMP else ""
-        env = engine.engine_env(os.environ, self.use_nvidia, url, self.env)
+        env = engine.engine_env(os.environ, self.use_nvidia, url, self.env, translate=s.translate_ar and not self.translate_problem())
         state = paths.obs_state_file(self.env)
         state.unlink(missing_ok=True)  # a line left by an earlier run must not look like this run's
         state.parent.mkdir(parents=True, exist_ok=True)

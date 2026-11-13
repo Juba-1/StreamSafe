@@ -36,7 +36,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: install build tools
-        run: pip install -e . onnxruntime-directml "pyinstaller>=6.10,<7"
+        run: pip install -e ".[translate]" onnxruntime-directml "pyinstaller>=6.10,<7"
       - name: "build facts: version, expiry date (default +30 days), exe version resources"
         id: meta
         shell: pwsh

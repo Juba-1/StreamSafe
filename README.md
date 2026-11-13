@@ -120,6 +120,7 @@ Set any of them from the environment by its upper-case name. CLI flags override 
 | `SLATE_IMAGE` / `SLATE_COLOR` / `SLATE_TEXT` | `SLATE_IMAGE=logo.png` | the fail-closed slate |
 | `SCENE_IMAGE` / `SCENE_TEXT` | | the explicit-scene card |
 | `HUD_OCR` | `HUD_OCR=1` | read the game's on-screen prompts (needs `rapidocr_onnxruntime==1.2.3`) |
+| `TRANSLATE_AR` / `TRANSLATE_DIR` | `TRANSLATE_AR=1 TRANSLATE_DIR=C:\StreamSafe\translate` | live English -> Arabic translation of on-screen text (off by default, experimental; `docs/TRANSLATE.md`) |
 | `SMOOTH`, `MOTION_MARGIN` | `SMOOTH=0` | steady placement and fast-mover margin (both on by default) |
 | `BACKEND` / `ONNX_DIR` | `BACKEND=onnx ONNX_DIR=C:\StreamSafe\models` | model backend and the exported model folder |
 | `AUDIO` | `AUDIO=0` | SRT in / RTMP out without the sound track (default: sound on) |
