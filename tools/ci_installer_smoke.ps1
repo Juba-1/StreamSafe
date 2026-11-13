@@ -84,7 +84,7 @@ Check ($rt.status -ne "fail") "check --json: GPU runtime loads ($($rt.detail))"
 $ffmpeg = Join-Path $installDir "ffmpeg\bin\ffmpeg.exe"
 $ver = (& $ffmpeg -version | Out-String)
 $ver | Out-File "$OutDir\ffmpeg-version.txt" -Encoding utf8
-Check ($ver -notmatch "--enable-gpl" -and $ver -notmatch "--enable-nonfree" -and $ver -notmatch "libx264") "bundled FFmpeg is LGPL (no --enable-gpl, --enable-nonfree, libx264)"
+Check ($ver -notmatch "--enable-(gpl|nonfree|libx264|libx265)") "bundled FFmpeg is LGPL (no --enable-gpl/nonfree/libx264)"
 $prot = (& $ffmpeg -hide_banner -protocols | Out-String)
 Check ($prot -match "(?m)^\s*srt\s*$") "FFmpeg has the srt protocol (OBS to the app)"
 Check ($prot -match "(?m)^\s*rtmps?\s*$") "FFmpeg has rtmp"

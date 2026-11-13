@@ -12,8 +12,9 @@ What it does, 10 times per second:
   * the raw game capture must never be on air: if it is visible in the current scene, OBS is switched back
     to the protected scene (and the slate shown).
 It never touches the stream key, the microphone or any other source.
-The state file path should be plain ASCII (the installer uses C:\ProgramData\StreamSafe\state.txt): Lua's
-io.open cannot open non-ASCII paths on Windows - it would read as "not running" (fails closed, but stuck).
+The state file path should be plain ASCII: Lua's io.open cannot open non-ASCII paths on Windows - it would read as
+"not running" (fails closed, but stuck). The installed app shows the right path in its Settings tab (normally
+%LOCALAPPDATA%\StreamSafe\obs\state.txt; for a user name with non-ASCII letters its 8.3 short form).
 ]]
 
 obs = obslua

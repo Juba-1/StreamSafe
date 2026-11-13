@@ -11,6 +11,10 @@ from streamsafe.app import controller, engine, heads, i18n, modelpack, updates  
 from tests.appfix import FakeProtector  # noqa: E402
 
 
+def clean(s):
+    return str(s).replace("\u202b", "").replace("\u202c", "")
+
+
 def have_display() -> bool:
     if sys.platform == "win32":
         return True
@@ -44,9 +48,9 @@ def texts(widget):
     out = []
     for w in widget.winfo_children():
         try:
-            t = w.cget("text")
+            t = clean(w.cget("text"))
             if t:
-                out.append(str(t))
+                out.append(clean(str(t)))
         except tk.TclError:
             pass
         out += texts(w)
@@ -54,12 +58,12 @@ def texts(widget):
 
 
 def test_arabic_is_the_default_and_laid_out_right_to_left(app):
-    assert app.lang == "ar" and app.badge.cget("text") == "متوقف"
+    assert app.lang == "ar" and clean(app.badge.cget("text")) == "متوقف"
     assert app.hint.cget("anchor") == "e" and app.hint.cget("justify") == "right"
-    assert [app.nb.tab(i, "text") for i in range(3)] == ["الفحص", "الإعدادات", "الرئيسية"]  # first tab at the right
-    assert app.nb.tab(app.nb.select(), "text") == "الرئيسية"
+    assert [clean(app.nb.tab(i, "text")) for i in range(3)] == ["الفحص", "الإعدادات", "الرئيسية"]  # first tab at the right
+    assert clean(app.nb.tab(app.nb.select(), "text")) == "الرئيسية"
     assert i18n.t("ar", "start") in texts(app.home)
-    assert app.banner.cget("text").startswith("نسخة تجريبية")
+    assert clean(app.banner.cget("text")).startswith("نسخة تجريبية")
 
 
 def test_english_toggle_keeps_what_was_typed(app):
@@ -68,13 +72,13 @@ def test_english_toggle_keeps_what_was_typed(app):
     app._vars["srt_port"].set("9123")
     app.toggle_lang()
     app.update()
-    assert app.lang == "en" and app.badge.cget("text") == "Stopped" and app.hint.cget("anchor") == "w"
+    assert app.lang == "en" and clean(app.badge.cget("text")) == "Stopped" and app.hint.cget("anchor") == "w"
     assert (
         app.ctrl.settings.lang == "en" and app.ctrl.settings.rtmp_url == "rtmps://live.example/app" and app.ctrl.settings.srt_port == 9123
     )
     assert app._vars["key"].get() == "secret_key_value"
     app.toggle_lang()
-    assert app.lang == "ar" and app.badge.cget("text") == "متوقف"
+    assert app.lang == "ar" and clean(app.badge.cget("text")) == "متوقف"
 
 
 def test_key_is_masked_and_never_saved_to_settings(app):
@@ -96,7 +100,7 @@ def test_models_missing_shows_setup_and_start_is_refused_with_a_reason(app):
     assert app.setup_box.winfo_ismapped()
     assert any("النماذج غير مثبتة" in t for t in texts(app.setup_box))
     app.on_start()
-    assert not app.ctrl.engine.running and "ما يمديك تبدأ" in app.message.cget("text")
+    assert not app.ctrl.engine.running and "ما يمديك تبدأ" in clean(app.message.cget("text"))
 
 
 def test_check_list_shows_each_item_with_a_plain_word(app):
@@ -111,7 +115,7 @@ def test_check_list_shows_each_item_with_a_plain_word(app):
     app.show_check()
     t = texts(app.check_list)
     assert any("كرت الشاشة" in x and "NVIDIA RTX" in x for x in t) and "الذاكرة قليلة" in t and "ملف FFmpeg ناقص" in t
-    assert "جهازك يشتغل" in app.verdict.cget("text")
+    assert "جهازك يشتغل" in clean(app.verdict.cget("text"))
 
 
 def test_expired_beta_disables_start_and_says_why(app, monkeypatch):
@@ -120,7 +124,7 @@ def test_expired_beta_disables_start_and_says_why(app, monkeypatch):
     app.show_status(force=True)
     app.update()
     assert "disabled" in app.start_btn.state()
-    assert app.badge.cget("text") == "غير جاهز" and "انتهت" in app.banner.cget("text")
+    assert clean(app.badge.cget("text")) == "غير جاهز" and "انتهت" in clean(app.banner.cget("text"))
     app.on_start()
     assert not app.ctrl.engine.running
 
@@ -129,8 +133,8 @@ def test_status_words_follow_the_engine(app, monkeypatch):
     for status, word in ((engine.PROTECTED, "محمي"), (engine.COVERED, "مغطى بالكامل")):
         monkeypatch.setattr(app.ctrl, "status", lambda s=status: s)
         app.show_status(force=True)
-        assert app.badge.cget("text") == word
+        assert clean(app.badge.cget("text")) == word
     app.toggle_lang()
     monkeypatch.setattr(app.ctrl, "status", lambda: engine.PROTECTED)
     app.show_status(force=True)
-    assert app.badge.cget("text") == "Protected"
+    assert clean(app.badge.cget("text")) == "Protected"

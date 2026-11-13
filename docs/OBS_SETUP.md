@@ -33,10 +33,12 @@ Why this shape:
    named `Game Audio` (audio only), so the stream scene never contains the raw video.
 3. **Virtual camera.** OBS -> Start Virtual Camera -> settings: output type **Source**, source **Game Raw**.
    Never "Program": the engine would see its own output (a loop).
-4. **Start StreamSafe:**
-   `streamsafe --input "device:OBS Virtual Camera" --output window --delay 2`
-   with `OBS_STATE=C:\ProgramData\StreamSafe\state.txt` (an ASCII path: OBS's Lua cannot open paths with
-   Arabic or other non-ASCII letters on Windows).
+4. **Start StreamSafe.** The installed app (Start menu) does this from its window; its Settings tab shows the
+   state-file path to put in the guard script (normally `%LOCALAPPDATA%\StreamSafe\obs\state.txt`, per user,
+   no administrator rights) and where the guard script is (`<program folder>\obs\streamsafe_guard.lua`).
+   From source: `streamsafe --input "device:OBS Virtual Camera" --output window --delay 2` with
+   `OBS_STATE=<an ASCII path>` (OBS's Lua cannot open paths with Arabic or other non-ASCII letters on Windows;
+   the app uses the 8.3 short form of its folder for a user name that has such letters).
    (`HUD_OCR=1` turns on reading the game's prompts once GTA 6 positions are set.)
 5. **Stream scene** (name it `StreamSafe Stream`):
    - Window Capture -> window `StreamSafe Output` (full canvas). Its size is fixed; if it is minimised the

@@ -57,6 +57,9 @@ def single_instance() -> bool:
     return ctypes.windll.kernel32.GetLastError() != 183  # type: ignore[attr-defined]  # ERROR_ALREADY_EXISTS
 
 
+RLE, PDF = "\u202b", "\u202c"
+
+
 class App(tk.Tk):
     def __init__(self, ctrl: controller.Controller | None = None) -> None:
         super().__init__()
@@ -94,7 +97,10 @@ class App(tk.Tk):
 
     # --- text ---------------------------------------------------------------------------------------------
     def tr(self, key: str, **values: object) -> str:
-        return i18n.t(self.lang, key, **values)
+        text = i18n.t(self.lang, key, **values)
+        # Tk 8.6 on Windows lays paragraphs out left-to-right, which puts Arabic punctuation on the wrong
+        # side; an explicit right-to-left embedding fixes the base direction.
+        return f"{RLE}{text}{PDF}" if self.rtl else text
 
     @property
     def rtl(self) -> bool:
