@@ -155,3 +155,4 @@ Check (-not (Test-Path $dataDir)) "user data folder is gone (silent uninstall; /
 Write-Host ""
 if ($script:problems.Count) { Write-Host "::error::$($script:problems.Count) check(s) failed: $($script:problems -join ' | ')"; exit 1 }
 Write-Host "installer smoke: all checks passed"
+exit 0  # a native command earlier may leave $LASTEXITCODE non-zero (the check exit code 2 is expected)
