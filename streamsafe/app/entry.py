@@ -29,6 +29,7 @@ from streamsafe.branding import CLI_EXE, GUI_EXE, PRODUCT_NAME
 
 EXPIRED_EXIT = 4
 NO_HEADS_EXIT = 5
+WEAK_GPU_EXIT = 6
 USAGE_EXIT = 2
 
 
@@ -171,6 +172,13 @@ def main(argv: list[str] | None = None) -> int:
         if product and (why := heads.why_not(os.environ)):
             print(f"HEADS_{why.split()[0].upper()} no usable risk heads ({why}). Nothing was streamed.", flush=True)
             return NO_HEADS_EXIT
+        if product and os.environ.get("STREAMSAFE_SKIP_GPU_CHECK") != "1":
+            from streamsafe import syscheck
+
+            gpu_check, _ = syscheck.check_gpu(syscheck.Probes())
+            if gpu_check.status == syscheck.FAIL:  # never load the models on a card that cannot hold them: the PC can freeze
+                print(f"WEAK_GPU {gpu_check.detail}. Nothing was streamed.\n{gpu_check.fix_ar}", flush=True)
+                return WEAK_GPU_EXIT
         if product:
             encoders.choose_into(os.environ, rest)
         rest = resolve_env_outputs(rest, os.environ)

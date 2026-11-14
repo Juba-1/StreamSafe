@@ -51,23 +51,40 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     cfg = config_from_args(args)
     size = tuple(int(v) for v in args.size.lower().split("x")) if args.size else None
-    source = open_source(args.input, cfg.runtime.fps, cfg.runtime.secs, size, cfg.output.audio)  # type: ignore[arg-type]
-    sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio) for spec in args.output]
-    sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
+    source, sink, report = None, None, None
     try:
+        source = open_source(args.input, cfg.runtime.fps, cfg.runtime.secs, size, cfg.output.audio)  # type: ignore[arg-type]
+        sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio) for spec in args.output]
+        sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
         report = run(cfg, source, sink)
-    except KeyboardInterrupt:  # interrupted outside the frame loop (start-up or shutdown): nothing to report
-        return 130
+    except KeyboardInterrupt:  # stopped during start-up or shutdown: still leave a report saying so
+        report = _not_started_report(stopped_by_user=True)
+        code = 130
+    except Exception as exc:  # could not open the input / output, or the run broke: the report says so, then the error
+        print(f"RUN_FAILED {type(exc).__name__}: {exc}", flush=True)
+        _write_report(args, _not_started_report(stopped_by_user=False), cfg.runtime.fps)
+        raise
+    else:
+        code = 1 if report["summary"]["analyzer_errors"] else 0
     finally:
-        source.close()
+        if source is not None:
+            source.close()
         if sink is not None:
             sink.close()
+    _write_report(args, report, cfg.runtime.fps)
+    return code
+
+
+def _not_started_report(stopped_by_user: bool) -> dict:
+    return {"summary": {"frames_out": 0, "seconds": 0, "analyzer_errors": 0, "stopped_by_user": stopped_by_user}}
+
+
+def _write_report(args: argparse.Namespace, report: dict, fps: float) -> None:
     if not args.no_report:
         try:
-            print("SESSION_REPORT", session_report.write(report, cfg.runtime.fps, args.report_dir), flush=True)
+            print("SESSION_REPORT", session_report.write(report, fps, args.report_dir), flush=True)
         except OSError as exc:  # a report must never break a stream that already ended
             print("SESSION_REPORT_FAILED", exc, flush=True)
-    return 1 if report["summary"]["analyzer_errors"] else 0
 
 
 if __name__ == "__main__":

@@ -98,3 +98,30 @@ def test_device_by_name_needs_windows():
         pytest.skip("Windows opens devices by name through FFmpeg dshow")
     with pytest.raises(ValueError, match="Windows"):
         open_source("device:OBS Virtual Camera")
+
+
+def test_window_is_black_at_once_stays_responsive_and_goes_black_when_frames_stop(monkeypatch):
+    """The window lives on its own thread: black from the first moment (models still loading), keeps drawing while
+    the engine is busy (Windows never marks it "Not Responding"), and goes black when frames stop (fail closed)."""
+    import time as _t
+
+    from streamsafe.io import sinks
+
+    shown, waits = [], []
+    monkeypatch.setattr(sinks.cv2, "namedWindow", lambda *a, **k: None)
+    monkeypatch.setattr(sinks.cv2, "imshow", lambda title, f: shown.append(f.copy()))
+    monkeypatch.setattr(sinks.cv2, "waitKey", lambda ms: waits.append(ms) or _t.sleep(ms / 1000) or -1)
+    monkeypatch.setattr(sinks.cv2, "destroyWindow", lambda *a: None)
+    monkeypatch.setattr(sinks.WindowSink, "STALE_S", 0.2)
+    w = sinks.WindowSink("t")
+    assert shown and not shown[0].any()  # black before any frame
+    _t.sleep(0.3)  # the engine is busy: the window keeps pumping events anyway
+    assert len(waits) >= 10
+    frame = np.full((72, 128, 3), 200, np.uint8)
+    w.write(frame)
+    _t.sleep(0.1)
+    assert any(f.shape == frame.shape and f.mean() == 200 for f in shown)
+    _t.sleep(0.4)  # no new frames: black at the same size
+    assert shown[-1].shape == frame.shape and not shown[-1].any()
+    w.close()
+    assert not w._thread.is_alive()

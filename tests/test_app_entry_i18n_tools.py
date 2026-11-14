@@ -43,6 +43,18 @@ def test_run_is_refused_without_usable_heads(product_env, monkeypatch, capsys, t
     assert "HEADS_PLACEHOLDER" in capsys.readouterr().out
 
 
+def test_run_is_refused_on_builtin_graphics(product_env, monkeypatch, capsys, tmp_path):
+    from streamsafe import syscheck
+
+    monkeypatch.setattr(updates, "expired", lambda today=None, expires=None: False)
+    monkeypatch.setattr(heads, "why_not", lambda env: "")
+    monkeypatch.setattr(syscheck, "_gpus", lambda: [syscheck.Gpu("Intel(R) UHD Graphics 630", "intel", 1.0)])
+    monkeypatch.delenv("STREAMSAFE_SKIP_GPU_CHECK", raising=False)
+    assert entry.main(["run", "--input", "x", "--output", "window"]) == entry.WEAK_GPU_EXIT == 6
+    out = capsys.readouterr().out
+    assert "WEAK_GPU" in out and "Nothing was streamed" in out
+
+
 def test_about_says_when_the_beta_ends(product_env, capsys, monkeypatch):
     from streamsafe.app import build_info
 

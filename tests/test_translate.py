@@ -303,7 +303,7 @@ def test_off_by_default_everywhere():
 def test_app_passes_translation_on_only_when_set_and_installed(ctrl, monkeypatch):  # noqa: F811
     seen = []
     real = engine.EngineProcess.start
-    monkeypatch.setattr(engine.EngineProcess, "start", lambda self, cmd, env: (seen.append(dict(env)), real(self, cmd, env))[1])
+    monkeypatch.setattr(engine.EngineProcess, "start", lambda self, cmd, env, log_path=None: (seen.append(dict(env)), real(self, cmd, env, log_path))[1])
     cases = [(False, ""), (True, "files missing"), (True, "")]  # (the setting, translate_problem)
     for want, problem in cases:
         ctrl.settings.translate_ar = want

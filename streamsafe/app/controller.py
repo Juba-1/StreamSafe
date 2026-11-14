@@ -7,9 +7,11 @@ safe side: no start when anything is unclear, and a running engine that stops or
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import threading
+import time
 from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -248,6 +250,17 @@ class Controller:
         self._engine_lines = [*self._engine_lines[-30:], line]
         self.log(line)
 
+    KEEP_LOGS = 10
+
+    def _new_log(self) -> Path:
+        """A fresh engine log in %LOCALAPPDATA%/StreamSafe/logs; only the last ``KEEP_LOGS`` are kept."""
+        folder = paths.logs_dir(self.env)
+        with contextlib.suppress(OSError):
+            old = sorted(folder.glob("engine_*.log"))
+            for f in old[: max(0, len(old) - self.KEEP_LOGS + 1)]:
+                f.unlink()
+        return folder / f"engine_{time.strftime('%Y%m%d_%H%M%S')}.log"
+
     def start(self, key: str) -> None:
         """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start."""
         why = self.blockers(key)
@@ -263,7 +276,7 @@ class Controller:
         self.tracker.reset()
         self.last_exit = None
         self._engine_lines = []
-        self.engine.start(engine.exe_command(engine.run_args(s, paths.reports_dir(self.env))), env)
+        self.engine.start(engine.exe_command(engine.run_args(s, paths.reports_dir(self.env))), env, self._new_log())
 
     def status(self) -> str:
         running = self.engine.running

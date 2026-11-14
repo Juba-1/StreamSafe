@@ -24,6 +24,7 @@ from streamsafe.branding import PRODUCT_NAME
 
 OK, WARN, FAIL = "ok", "warn", "fail"
 MIN_PYTHON = (3, 11)
+FAIL_VRAM_GB = 4.0  # below this the models do not fit: on shared memory the whole PC can freeze (seen on an Intel UHD 630, 1 GB)
 MIN_VRAM_GB = 6.0  # estimate: fp32 eye 2.6 GB + detector/pose/scene + frames; fp16 eye roughly halves the eye
 MIN_RAM_GB = 8.0  # estimate: the delay buffer + models on the host side
 MIN_DISK_GB = 2.0  # reports, logs and the ONNX Runtime engine cache
@@ -70,6 +71,18 @@ def vendor_of(name: str) -> str:
     if "intel" in n or " arc" in f" {n}":
         return "intel"
     return "other"
+
+
+_IGPU_HINTS = ("uhd graphics", "hd graphics", "iris", "radeon(tm) graphics", "radeon graphics", "radeon vega", "vega 8", "vega 11",
+               "radeon 610m", "radeon 660m", "radeon 680m", "radeon 740m", "radeon 760m", "radeon 780m", "radeon 880m", "radeon 890m")
+
+
+def is_integrated(gpu: Gpu) -> bool:
+    """A graphics chip built into the processor (shares system memory, far too slow for the models)."""
+    n = gpu.name.lower()
+    if gpu.vendor == "nvidia" or " arc" in f" {n}":
+        return False
+    return any(h in n for h in _IGPU_HINTS)
 
 
 def _ort_providers() -> list[str] | None:
@@ -171,6 +184,20 @@ def check_gpu(p: Probes) -> tuple[Check, Gpu | None]:
     rank = {"nvidia": 0, "amd": 1, "intel": 2, "other": 3}
     best = min(gpus, key=lambda g: (rank[g.vendor], -(g.vram_gb or 0)))
     names = ", ".join(g.name for g in gpus)
+    if is_integrated(best) or (best.vram_gb is not None and best.vram_gb < FAIL_VRAM_GB):
+        what = "built-in graphics" if is_integrated(best) else f"{best.vram_gb:.1f} GB video memory"
+        return (
+            Check(
+                "gpu",
+                FAIL,
+                f"{best.name}: {what}; {PRODUCT_NAME} needs a gaming graphics card (NVIDIA RTX 3060 class, 6 GB+)",
+                "كرت الشاشة في جهازك ضعيف (كرت مدمج أو ذاكرته قليلة)، والبرنامج يحتاج كرت ألعاب مثل NVIDIA RTX 3060 أو أعلى. "
+                "التشغيل ممنوع عشان ما يتعلق جهازك.",
+                f"This graphics card is too weak (built-in or low memory). {PRODUCT_NAME} needs a gaming card such as an "
+                "NVIDIA RTX 3060 or better. Starting is blocked so your PC does not freeze.",
+            ),
+            best,
+        )
     if best.vram_gb is not None and best.vram_gb < MIN_VRAM_GB:
         return (
             Check(

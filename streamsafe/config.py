@@ -87,6 +87,12 @@ class RiskConfig:
     # last garment, following the picture's motion, for this many decisions (~0.5 s); never across a cut.
     # Run 50: the club dancer at trailer 0:29.6 lost her cover when detection dropped her for 0.4 s
     coast_decisions: int = 5
+    # fixed rules for women the eye reads as modest (analysis/body_rule.py): a big back view, a hips close-up,
+    # a bare belly -> covered with a garment (Ali, 14 Nov 2026). Pose runs for at most body_max people a decision
+    body_rule: bool = True
+    body_min_h: int = 150  # analysis px (of 540)
+    body_max: int = 4
+    body_male_max: float = 0.5  # the male head above this: not a woman, no rule
 
 
 @dataclass
@@ -172,7 +178,7 @@ class RenderConfig:
     # (plain alpha). Run 49: 0.08 kept most of the shaking (trailer p90 0.187 vs 0.101 off) with no better cover;
     # fast movers are handled by the garment's motion margin instead
     smooth_fast: float = 0.0
-    lookahead: bool = False  # a person turning risky is also covered in the earlier frames still waiting
+    lookahead: bool = True  # a person turning risky is also covered in the earlier frames still waiting
     lookahead_frames: int = 60  # how far back (same shot, not yet shown)
 
 

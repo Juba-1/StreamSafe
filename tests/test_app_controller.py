@@ -51,9 +51,9 @@ def test_start_streams_with_the_key_only_in_the_environment(ctrl, monkeypatch):
     seen = {}
     real = engine.EngineProcess.start
 
-    def spy(self, cmd, env):
-        seen["cmd"], seen["env"] = list(cmd), dict(env)
-        return real(self, cmd, env)
+    def spy(self, cmd, env, log_path=None):
+        seen["cmd"], seen["env"], seen["log"] = list(cmd), dict(env), log_path
+        return real(self, cmd, env, log_path)
 
     monkeypatch.setattr(engine.EngineProcess, "start", spy)
     rtmp(ctrl)
@@ -68,6 +68,8 @@ def test_start_streams_with_the_key_only_in_the_environment(ctrl, monkeypatch):
     assert any("***" in line for line in lines)
     ctrl.stop()
     assert ctrl.status() == engine.STOPPED and ctrl.engine.exit_code == 0
+    log = seen["log"].read_text(encoding="utf-8")  # the run is kept in a log file, also without the key
+    assert seen["log"].parent.name == "logs" and "engine ended" in log and KEY not in log and "***" in log
 
 
 def test_the_whole_picture_covered_is_shown_as_covered(ctrl, monkeypatch):

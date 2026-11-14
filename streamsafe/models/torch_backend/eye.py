@@ -42,3 +42,6 @@ class RadioEye:
 
     def prisk(self, emb: np.ndarray) -> np.ndarray:
         return self.heads.prisk(emb)
+
+    def pmale(self, emb: np.ndarray) -> np.ndarray:
+        return self.heads.male(emb)

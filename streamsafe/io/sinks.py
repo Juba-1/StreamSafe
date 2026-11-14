@@ -116,27 +116,79 @@ class WindowSink:
     """The window OBS captures (Window Capture "StreamSafe Output"). Needs an OpenCV build with GUI support
     (``opencv-python``, not ``-headless``).
 
-    Fixed size (the output frame, never scaled by dragging). Windows stops drawing a minimised window and OBS
-    then captures nothing, so on Windows a minimised window is restored at once without taking the focus
+    The window lives on its own thread, which draws it about every 15 ms whatever the engine is doing: it is black
+    (fail closed) from the moment it opens, while the models load or the input has not started, and whenever no new
+    frame came for ``STALE_S``. So Windows never marks it "Not Responding" and OBS never captures a grey or frozen
+    picture. Fixed size (the output frame, never scaled by dragging). Windows stops drawing a minimised window and
+    OBS then captures nothing, so on Windows a minimised window is restored at once without taking the focus
     (``restored`` counts it); the OBS guard also shows the slate whenever the captured window is empty."""
 
     CHECK_S = 0.25
+    STALE_S = 0.5  # no new frame for this long: the window goes black instead of freezing on the last picture
+    TICK_MS = 15
+    IDLE_SIZE = (1280, 720)
 
     def __init__(self, title: str = WINDOW_TITLE) -> None:
         self.title = title
         self.restored = 0
-        self._next_check = 0.0
-        cv2.namedWindow(title, cv2.WINDOW_AUTOSIZE)
+        self.shown = 0  # frames from the engine that were drawn
+        self._lock = threading.Lock()
+        self._frame: np.ndarray | None = None
+        self._at = 0.0
+        self._stop = threading.Event()
+        self._ready = threading.Event()
+        self._error: BaseException | None = None
+        self._thread = threading.Thread(target=self._loop, name="window", daemon=True)
+        self._thread.start()
+        self._ready.wait(10)
+        if self._error is not None:
+            raise self._error
+
+    def _black(self, like: np.ndarray | None) -> np.ndarray:
+        if like is not None:
+            return np.zeros_like(like)
+        return np.zeros((self.IDLE_SIZE[1], self.IDLE_SIZE[0], 3), np.uint8)
+
+    def _loop(self) -> None:
+        try:
+            cv2.namedWindow(self.title, cv2.WINDOW_AUTOSIZE)
+            cv2.imshow(self.title, self._black(None))
+            cv2.waitKey(1)
+        except BaseException as exc:  # no GUI support: the caller gets the error
+            self._error = exc
+            self._ready.set()
+            return
+        self._ready.set()
+        next_check, last = 0.0, None
+        while not self._stop.is_set():
+            with self._lock:
+                frame, at = self._frame, self._at
+                self._frame = None
+            now = time.monotonic()
+            if frame is not None:
+                last = frame
+                cv2.imshow(self.title, frame)
+                self.shown += 1
+            elif last is not None and now - at > self.STALE_S:
+                cv2.imshow(self.title, self._black(last))  # stale: fail closed, black at the same size
+                last = None
+            cv2.waitKey(self.TICK_MS)
+            if sys.platform == "win32" and now >= next_check:
+                next_check = now + self.CHECK_S
+                self.restored += _restore_if_minimised(self.title)
+        cv2.destroyWindow(self.title)
+        cv2.waitKey(1)
 
     def write(self, frame: np.ndarray) -> None:
-        cv2.imshow(self.title, frame)
-        cv2.waitKey(1)
-        if sys.platform == "win32" and time.monotonic() >= self._next_check:
-            self._next_check = time.monotonic() + self.CHECK_S
-            self.restored += _restore_if_minimised(self.title)
+        if self._error is not None:
+            raise self._error
+        with self._lock:
+            self._frame = frame
+            self._at = time.monotonic()
 
     def close(self) -> None:
-        cv2.destroyWindow(self.title)
+        self._stop.set()
+        self._thread.join(2)
 
 
 def takes_audio(sink: FrameSink | None) -> bool:

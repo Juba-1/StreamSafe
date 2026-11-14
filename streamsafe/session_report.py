@@ -46,6 +46,8 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
         problems.append("slow_decisions")
     if s.get("dropped_frames"):
         problems.append("dropped_frames")
+    if s.get("frames_out", -1) == 0:
+        problems.append("never_started")
     return dict(
         app_version=__version__,
         created=time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -74,6 +76,7 @@ AR_PROBLEMS = {
     "long_failclosed": "الشاشة تغطت بالكامل لفترة طويلة بسبب بطء أو خطأ",
     "slow_decisions": "الجهاز أبطأ من المطلوب في بعض اللحظات",
     "dropped_frames": "فيه فريمات ما وصلت للبث",
+    "never_started": "البث ما بدأ: البرنامج وقف قبل ما توصله صورة (تأكد من OBS ومن تبويب الفحص)",
 }
 
 

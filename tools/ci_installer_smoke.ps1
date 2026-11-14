@@ -101,6 +101,10 @@ if (-not $RealHeads) {
   $out = (& $cli run --input "device:none" --output window | Out-String)
   Check ($LASTEXITCODE -eq 5 -and $out -match "HEADS_PLACEHOLDER") "run exits 5 with HEADS_PLACEHOLDER (got $LASTEXITCODE)"
 }
+if ($RealHeads) {
+  $out = (& $cli run --input "device:none" --output window | Out-String)
+  Check ($LASTEXITCODE -eq 6 -and $out -match "WEAK_GPU") "no gaming graphics card on the runner: run exits 6 with WEAK_GPU (got $LASTEXITCODE)"
+}
 
 Step "the window"
 Add-Type -AssemblyName System.Drawing, System.Windows.Forms

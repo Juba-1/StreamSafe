@@ -191,16 +191,24 @@ class EngineProcess:
         self._redactor = redactor or Redactor()
         self._proc: subprocess.Popen | None = None
         self._reader: threading.Thread | None = None
+        self._log = None
         self.stop_requested = False
 
     def redactor_secrets(self, *secrets: str) -> None:
         """The secrets (stream key, full output address) to blank out of every line from now on."""
         self._redactor = Redactor(*secrets)
 
-    def start(self, cmd: list[str], env: Mapping[str, str]) -> None:
+    def start(self, cmd: list[str], env: Mapping[str, str], log_path: Path | None = None) -> None:
+        """``log_path``: every (redacted) output line is also kept there, so a tester can send it when something
+        goes wrong (the window keeps only the last lines)."""
         if self.running:
             raise RuntimeError("already running")
         self.stop_requested = False
+        self._log = None
+        if log_path is not None:
+            with contextlib.suppress(OSError):
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                self._log = open(log_path, "a", encoding="utf-8")  # noqa: SIM115 - closed when the output ends
         self._proc = subprocess.Popen(
             cmd,
             env=dict(env),
@@ -218,9 +226,21 @@ class EngineProcess:
 
     def _read(self, proc: subprocess.Popen) -> None:
         assert proc.stdout is not None
-        with contextlib.suppress(OSError, ValueError):
-            for line in proc.stdout:
-                self._on_line(self._redactor.clean(line.rstrip("\r\n")))
+        log = self._log
+        try:
+            with contextlib.suppress(OSError, ValueError):
+                for line in proc.stdout:
+                    clean = self._redactor.clean(line.rstrip("\r\n"))
+                    if log is not None:
+                        with contextlib.suppress(OSError, ValueError):
+                            log.write(f"{time.strftime('%H:%M:%S')} {clean}\n")
+                            log.flush()
+                    self._on_line(clean)
+        finally:
+            if log is not None:
+                with contextlib.suppress(OSError, ValueError):
+                    log.write(f"{time.strftime('%H:%M:%S')} [engine ended, exit {proc.poll()}]\n")
+                    log.close()
 
     @property
     def running(self) -> bool:

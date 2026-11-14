@@ -30,3 +30,15 @@ def test_clean_session_is_ok_and_has_no_secrets(tmp_path):
 def test_problems_are_flagged():
     r = session_report.build(_report(failclosed_frames=300, worker_restarts=1, analyzer_errors=2), 30.0)
     assert r["verdict"] == "check" and {"long_failclosed", "worker_restarts", "analyzer_errors"} <= set(r["problems"])
+
+
+def test_a_run_stopped_before_any_frame_still_leaves_a_report(tmp_path, monkeypatch):
+    from streamsafe import cli
+
+    def slow_open(*a, **k):
+        raise KeyboardInterrupt  # the user pressed Stop while the input was still opening
+
+    monkeypatch.setattr(cli, "open_source", slow_open)
+    assert cli.main(["--input", "x.mp4", "--report-dir", str(tmp_path)]) == 130
+    txt = next(tmp_path.glob("session_*.txt")).read_text(encoding="utf-8")
+    assert "never_started" in txt and "البث ما بدأ" in txt

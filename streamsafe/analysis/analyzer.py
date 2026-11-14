@@ -17,10 +17,10 @@ from collections.abc import Callable
 import cv2
 import numpy as np
 
-from streamsafe.analysis import headroom
+from streamsafe.analysis import body_rule, headroom
 from streamsafe.analysis.eye_schedule import EyeScheduler
 from streamsafe.analysis.hud_thread import HudThread
-from streamsafe.analysis.risk import RiskPolicy
+from streamsafe.analysis.risk import S_COVER, RiskPolicy
 from streamsafe.analysis.scene import SceneLatch
 from streamsafe.analysis.tracks import GarmentMemory, Tracker, box_iou
 from streamsafe.config import Config
@@ -146,6 +146,8 @@ class Analyzer:
         self.policy.update(people, self.tracker, thr, now)
         self.tracker.forget_old()
         timings["track"], clock = _lap(clock)
+        st["body_rule"].append(self._body_rule(im, rgb, people))
+        timings["body"], clock = _lap(clock)
 
         risky = [p for p in people if p.risky]
         risky_px = sum(int(p.mask.sum()) for p in risky)
@@ -199,6 +201,36 @@ class Analyzer:
             people=[(p.tid, p.box) for p in people],
             refs=refs,
         )
+
+    def _body_rule(self, im: np.ndarray, rgb: np.ndarray, people: list[Person]) -> int:
+        """Women the eye left uncovered: a big back view, a hips close-up or a bare belly is covered anyway
+        (analysis/body_rule.py). Only adds covers. Returns how many people it covered."""
+        rc = self.cfg.risk
+        pmale = getattr(self.models.eye, "pmale", None)
+        if not rc.body_rule or pmale is None:
+            return 0
+        cands = []
+        for p in people:
+            if p.risky or p.height < rc.body_min_h or p.tid < 0:
+                continue
+            track = self.tracker.tracks[p.tid]
+            emb = track.unit_emb if getattr(track, "unit_emb", None) is not None else p.emb
+            if emb is None or float(pmale(np.asarray(emb)[None])[0]) > rc.body_male_max:
+                continue
+            cands.append(p)
+        cands = sorted(cands, key=lambda p: -p.height)[: rc.body_max]
+        if not cands:
+            return 0
+        hits = 0
+        for p, (kp, sc) in zip(cands, self.models.pose(rgb, [p.box for p in cands]), strict=True):
+            why = body_rule.hit(im, p.mask, p.box, kp, sc)
+            if why:
+                hits += 1
+                p.risky = True
+                r = self.tracker.tracks[p.tid].risk
+                r.risky, r.safe_run, r.evidence = True, 0, max(r.evidence, S_COVER)
+                self.stats["body_" + why].append(1)
+        return hits
 
     def _mode(self, person: Person) -> str:
         """Garment look for a covered person. Someone covered only while their look is put off gets the plain
