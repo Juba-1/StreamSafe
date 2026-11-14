@@ -65,12 +65,30 @@ class Pipeline:
     ms: dict[str, list[float]] = field(default_factory=lambda: {"ocr": [], "translate": [], "render": []})
 
     def warmup(self) -> None:
-        self.translator.translate(["Hello."])
+        """Run every stage once on a made-up line, so the first real subtitle does not pay for the models' first call
+        (lazy allocations, font loading): on a slow CPU that was seconds, longer than the stream's delay."""
+        self.translator.translate(["Press X to end the dance."])
+        img = np.zeros((96, 640, 3), np.uint8)
+        cv2.putText(img, "Press X to end the dance", (8, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 255, 255), 3, cv2.LINE_AA)
+        try:  # best effort: a stage that cannot run on this picture is not a reason to refuse to start
+            self.reader.read(cv2.copyMakeBorder(img, EDGE, EDGE, EDGE, EDGE, cv2.BORDER_CONSTANT, value=(0, 0, 0)))
+            self.renderer.render("اضغط X لإنهاء الرقص", (100, 400, 500, 450), (1280, 720), 1)
+        except Exception:
+            pass
+        for v in self.ms.values():
+            v.clear()
 
-    def __call__(self, crops: dict[str, Crop], frame_size: tuple[int, int]) -> dict[str, Any]:
-        """Per region name: a list of ``Patch`` (possibly empty = no English text there), or ``SAME``."""
+    def __call__(self, crops: dict[str, Crop | None], frame_size: tuple[int, int]) -> dict[str, Any]:
+        """Per region name: a list of ``Patch`` (possibly empty = no English text there), or ``SAME``. A region whose
+        crop is ``None`` is not read: its text has not changed (``SAME``). A region that is not given has no text."""
         out: dict[str, Any] = {}
-        for name, (bgr, rect) in crops.items():
+        for gone in [n for n in self._last if n not in crops]:
+            del self._last[gone]  # no text there any more: when text comes back it is read and drawn again
+        for name, item in crops.items():
+            if item is None:
+                out[name] = SAME
+                continue
+            bgr, rect = item
             h, w = bgr.shape[:2]
             scale = min(1.0, READ_W / w)
             small = cv2.resize(bgr, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA) if scale < 1 else bgr
