@@ -1,0 +1,172 @@
+category	en	ar
+prompt	Press E to enter the vehicle.	اضغط E لركوب السيارة.
+prompt	Hold ~INPUT~ to aim.	اضغط مع الاستمرار على ~INPUT~ للتصويب.
+prompt	Press SPACE to jump.	اضغط SPACE للقفز.
+prompt	Press F to exit the vehicle.	اضغط F للنزول من السيارة.
+prompt	Hold SHIFT to sprint.	اضغط مع الاستمرار على SHIFT للركض.
+prompt	Press Q to take cover.	اضغط Q للاحتماء.
+prompt	Press R to reload.	اضغط R لإعادة التعبئة.
+prompt	Press TAB to open the weapon wheel.	اضغط TAB لفتح عجلة الأسلحة.
+prompt	Press ~INPUT~ to pick up the weapon.	اضغط ~INPUT~ لالتقاط السلاح.
+prompt	Press E to talk.	اضغط E للتحدث.
+prompt	Press G to call your contact.	اضغط G للاتصال بجهة اتصالك.
+prompt	Hold E to open the door.	اضغط مع الاستمرار على E لفتح الباب.
+prompt	Press E to buy.	اضغط E للشراء.
+prompt	Press E to use the ATM.	اضغط E لاستخدام الصراف الآلي.
+prompt	Press E to refuel.	اضغط E لتعبئة الوقود.
+prompt	Press E to climb.	اضغط E للتسلق.
+prompt	Press F to steal this vehicle.	اضغط F لسرقة هذه السيارة.
+prompt	Press X to skip the cutscene.	اضغط X لتخطي المشهد.
+prompt	Hold ~INPUT~ to swim faster.	اضغط مع الاستمرار على ~INPUT~ للسباحة بسرعة أكبر.
+prompt	Press E to hide.	اضغط E للاختباء.
+prompt	Press 1 to accept or 2 to decline.	اضغط 1 للقبول أو 2 للرفض.
+prompt	Press ENTER to continue.	اضغط ENTER للمتابعة.
+prompt	Press ESC to pause the game.	اضغط ESC لإيقاف اللعبة مؤقتًا.
+prompt	Use the mouse to look around.	استخدم الماوس للنظر حولك.
+prompt	Press W, A, S, D to move.	اضغط W وA وS وD للتحرك.
+prompt	Hold the left mouse button to fire.	اضغط مع الاستمرار على زر الماوس الأيسر لإطلاق النار.
+prompt	Press E to enter the shop.	اضغط E لدخول المتجر.
+prompt	Press E to sleep.	اضغط E للنوم.
+prompt	Press H to honk the horn.	اضغط H لإطلاق البوق.
+prompt	Press E to take the photo.	اضغط E لالتقاط الصورة.
+status	You are wanted by the police.	أنت مطلوب من الشرطة.
+status	Wanted level.	مستوى الملاحقة.
+status	Mission failed.	فشلت المهمة.
+status	Mission passed!	نجحت المهمة!
+status	You have been busted.	تم القبض عليك.
+status	Wasted.	قُتلت.
+status	The police are looking for you.	الشرطة تبحث عنك.
+status	You lost the cops.	لقد هربت من الشرطة.
+status	Wanted level cleared.	تمت إزالة مستوى الملاحقة.
+status	Your wanted level has increased.	ارتفع مستوى الملاحقة لديك.
+status	Checkpoint reached.	تم الوصول إلى نقطة التحقق.
+status	Game saved.	تم حفظ اللعبة.
+status	Objective updated.	تم تحديث الهدف.
+status	New waypoint set.	تم تحديد نقطة وجهة جديدة.
+status	Waypoint set.	تم تحديد نقطة الوجهة.
+mission	Go to the bank.	اذهب إلى البنك.
+mission	Lose the cops.	اهرب من الشرطة.
+mission	Follow Jason.	اتبع جيسون.
+mission	Get in the car.	اركب السيارة.
+mission	Steal the armored truck.	اسرق الشاحنة المدرعة.
+mission	Rob the store.	اسرق المتجر.
+mission	Meet Lucia at the beach.	قابل لوسيا على الشاطئ.
+mission	Drive to the marina.	قُد السيارة إلى المرسى.
+mission	Wait for the signal.	انتظر الإشارة.
+mission	Escape the police helicopter.	اهرب من مروحية الشرطة.
+mission	Kill the target.	اقتل الهدف.
+mission	Eliminate all enemies.	اقضِ على جميع الأعداء.
+mission	Collect the money.	اجمع المال.
+mission	Return to the safehouse.	عُد إلى المخبأ.
+mission	Pick up the package.	التقط الطرد.
+mission	Deliver the car to the garage.	سلّم السيارة إلى الكراج.
+mission	Hide from the police.	اختبئ من الشرطة.
+mission	Get to the airport before time runs out.	اذهب إلى المطار قبل انتهاء الوقت.
+mission	Don't let him get away!	لا تدعه يهرب!
+mission	Take cover and wait for backup.	احتمِ وانتظر التعزيزات.
+mission	Hack the security panel.	اخترق لوحة الأمان.
+mission	Break into the warehouse.	اقتحم المستودع.
+mission	Wait for Jason outside.	انتظر جيسون في الخارج.
+mission	Follow the truck without being seen.	تتبّع الشاحنة دون أن يراك أحد.
+mission	Destroy the vehicles.	دمّر المركبات.
+mission	Defeat the gang.	اهزم العصابة.
+mission	Get out of the area.	اخرج من المنطقة.
+subtitle	You good?	هل أنت بخير؟
+subtitle	Let's roll.	هيا بنا.
+subtitle	Bro, we gotta go. Now!	يا صاح، يجب أن نذهب. الآن!
+subtitle	What's up, homie?	كيف حالك يا صاحبي؟
+subtitle	Hey, watch where you're going!	هيه، انتبه إلى طريقك!
+subtitle	I'm not doing this again.	لن أفعل هذا مجددًا.
+subtitle	We're running out of time.	الوقت ينفد منا.
+subtitle	Trust me, I got this.	ثق بي، أنا أتولى الأمر.
+subtitle	Who the hell are you?	من تكون بحق الجحيم؟
+subtitle	Get down!	انبطح!
+subtitle	Cops! Go go go!	الشرطة! هيا هيا هيا!
+subtitle	That was close.	كان ذلك قريبًا جدًا.
+subtitle	I got your back.	أنا معك وأحمي ظهرك.
+subtitle	Nice shot!	تصويبة رائعة!
+subtitle	We did it!	لقد نجحنا!
+subtitle	Where's the money?	أين المال؟
+subtitle	Keep your head down.	أبقِ رأسك منخفضًا.
+subtitle	I'm done with this city.	لقد سئمت من هذه المدينة.
+subtitle	You owe me big time.	أنت مدين لي بالكثير.
+subtitle	Don't do anything stupid.	لا تفعل أي شيء غبي.
+subtitle	Easy money, right?	مال سهل، أليس كذلك؟
+subtitle	Take the wheel.	تولَّ القيادة.
+subtitle	I'll call you later.	سأتصل بك لاحقًا.
+subtitle	Hurry up, they're coming!	أسرع، إنهم قادمون!
+subtitle	Nobody move!	لا أحد يتحرك!
+subtitle	This is a robbery!	هذه عملية سطو!
+subtitle	Give me the keys.	أعطني المفاتيح.
+subtitle	Are you crazy?	هل جننت؟
+subtitle	What are you looking at?	إلى ماذا تنظر؟
+subtitle	I don't trust him.	أنا لا أثق به.
+subtitle	She's been lying to us the whole time.	لقد كانت تكذب علينا طوال الوقت.
+subtitle	We need to talk.	نحن بحاجة إلى التحدث.
+subtitle	Thanks, man. I owe you one.	شكرًا يا رجل. أنا مدين لك بمعروف.
+subtitle	Let's get out of here.	لنخرج من هنا.
+name	Welcome to Leonida.	مرحبًا بك في ليونيدا.
+name	Welcome to Vice City.	مرحبًا بك في فايس سيتي.
+name	Lucia and Jason are on the run.	لوسيا وجيسون هاربان.
+name	Rockstar Games presents.	روكستار جيمز تقدّم.
+name	Jason's car is parked outside.	سيارة جيسون متوقفة في الخارج.
+name	Meet me at Port Gellhorn.	قابلني في بورت جيلهورن.
+name	Lucia is waiting at Vice Beach.	لوسيا تنتظر عند شاطئ فايس.
+name	The Grassrivers are dangerous at night.	منطقة غراسريفرز خطيرة ليلًا.
+name	Welcome to the Leonida Keys.	مرحبًا بك في ليونيدا كيز.
+name	Drive to Ambrosia.	قُد السيارة إلى أمبروزيا.
+name	Jason and Lucia hide in Kalaga National Park.	يختبئ جيسون ولوسيا في منتزه كالاغا الوطني.
+name	Call Lucia.	اتصل بلوسيا.
+name	Ask Jason about the plan.	اسأل جيسون عن الخطة.
+name	Vice City Police Department.	شرطة فايس سيتي.
+name	Lucia, we need to leave Vice City tonight.	لوسيا، يجب أن نغادر فايس سيتي الليلة.
+name	Leonida Police are searching the Keys.	شرطة ليونيدا تفتش الجزر.
+money	You earned $2,500.	لقد كسبت 2,500 دولار.
+money	Cash: $15,000	المال: 15,000 دولار
+money	The reward is $50,000.	المكافأة هي 50,000 دولار.
+money	Pay $300 to repair the car.	ادفع 300 دولار لإصلاح السيارة.
+money	Not enough money.	لا يوجد مال كافٍ.
+money	Bank balance: $1,250,000	رصيد البنك: 1,250,000 دولار
+money	Wanted level: 5 stars	مستوى الملاحقة: 5 نجوم
+money	Time left: 02:30	الوقت المتبقي: 02:30
+money	Distance: 450 m	المسافة: 450 م
+money	Health 100%	الصحة 100%
+money	Mission 12 of 30	المهمة 12 من 30
+money	Price: $4,999.99	السعر: 4,999.99 دولار
+money	Ammo: 120/240	الذخيرة: 120/240
+money	The heist is worth $2.5 million.	قيمة السطو 2.5 مليون دولار.
+money	Speed: 120 km/h	السرعة: 120 كم/س
+money	Complete 5 races for a bonus of $10,000.	أكمل 5 سباقات لتحصل على مكافأة قدرها 10,000 دولار.
+ui	Resume	استئناف
+ui	Settings	الإعدادات
+ui	Map	الخريطة
+ui	Inventory	الحقيبة
+ui	Weapons	الأسلحة
+ui	Save Game	حفظ اللعبة
+ui	Quit to Menu	الخروج إلى القائمة
+ui	Back	رجوع
+ui	Options	الخيارات
+ui	Phone	الهاتف
+ui	Stats	الإحصائيات
+ui	Loading...	جارٍ التحميل...
+ui	Continue	متابعة
+ui	Yes	نعم
+ui	No	لا
+case	MISSION FAILED	فشلت المهمة
+case	MISSION PASSED	نجحت المهمة
+case	WASTED	قُتلت
+case	BUSTED	تم القبض عليك
+case	PRESS ENTER TO CONTINUE	اضغط ENTER للمتابعة
+case	GO TO THE BANK	اذهب إلى البنك
+case	LOSE THE COPS	اهرب من الشرطة
+case	YOU ARE WANTED BY THE POLICE	أنت مطلوب من الشرطة
+case	Go To The Airport	اذهب إلى المطار
+case	Press E To Enter The Vehicle	اضغط E لركوب السيارة
+case	Follow Lucia To The Marina	اتبع لوسيا إلى المرسى
+case	HOLD SHIFT TO SPRINT	اضغط مع الاستمرار على SHIFT للركض
+long	Jason, listen to me. We have to leave the city tonight, or they will find us. Lucia is waiting at the marina.	جيسون، اسمعني. يجب أن نغادر المدينة الليلة وإلا سيجدوننا. لوسيا تنتظر في المرسى.
+long	The police are everywhere. Stay off the main roads and find a place to hide until your wanted level drops.	الشرطة في كل مكان. ابتعد عن الطرق الرئيسية وابحث عن مكان للاختباء حتى ينخفض مستوى الملاحقة لديك.
+long	This job pays $20,000, but if anything goes wrong, you are on your own.	هذه المهمة تدفع 20,000 دولار، لكن إن حدث أي خطأ فستكون وحدك.
+long	You have been busted. Pay $500 to get out of jail.	تم القبض عليك. ادفع 500 دولار للخروج من السجن.
+long	Press E to enter the vehicle. Hold ~INPUT~ to aim.	اضغط E لركوب السيارة. اضغط مع الاستمرار على ~INPUT~ للتصويب.
+long	Take the car to the garage, wait for Lucia, and do not let anyone follow you.	خذ السيارة إلى الكراج، وانتظر لوسيا، ولا تدع أحدًا يتبعك.

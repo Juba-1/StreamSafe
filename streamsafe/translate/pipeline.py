@@ -132,6 +132,8 @@ def load_pipeline(folder: Path, threads: int | None = None, min_conf: float = 0.
     if threads is None:  # leave the cores to the game and the stream: 1 thread on a small CPU, 2 from 8 cores up
         threads = 2 if (os.cpu_count() or 2) >= 8 else 1
     from streamsafe.translate.ocr import TextReader
-    from streamsafe.translate.translator import CachedTranslator, Ct2Translator
+    from streamsafe.translate.translator import CachedTranslator, Ct2Translator, GameTranslator
 
-    return Pipeline(TextReader(folder, threads), CachedTranslator(Ct2Translator(folder, threads)), ArabicRenderer(folder), min_conf)
+    return Pipeline(
+        TextReader(folder, threads), CachedTranslator(GameTranslator(Ct2Translator(folder, threads))), ArabicRenderer(folder), min_conf
+    )

@@ -7,6 +7,7 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -191,3 +192,37 @@ def test_real_realtime_run_and_its_cost(tmp_path):
     print("TRANSLATE_COST " + json.dumps(cost))
     save_report("cost.json", cost)
     assert cost["added_cpu_ms_per_s"] < 700, "well under one core"
+
+
+def test_real_stand_in_cities_keep_their_arabic_spelling(pipe):
+    """gamefix swaps place names for cities and looks for these spellings in the model's answer: a model change that
+    spells one differently must fail here, not on a streamer's screen."""
+    from streamsafe.translate import gamefix
+
+    model = pipe.translator.inner.inner
+    frames = ["Welcome to {}.", "Meet me at {}.", "{} is dangerous at night.", "Drive to {}.", "{}'s police are searching."]
+    for city, arabic in gamefix._STANDINS.items():
+        for out in model.translate([f.format(city) for f in frames]):
+            assert arabic in out, (city, out)
+
+
+def test_real_game_text_quality_does_not_regress(pipe):
+    """chrF on the GTA-style sets (tests/data, written by hand): the bare model scores ~53 / ~61, with the game rules ~85 / ~84."""
+    pytest.importorskip("sacrebleu")
+    from bench import translate_quality as q
+
+    got = {}
+    for name, path, floor in (("tuned", q.DATA, 80.0), ("heldout", q.HELDOUT, 78.0)):
+        rows = q.load(path)
+        hyps = pipe.translator.inner.translate([r["en"] for r in rows])
+        got[name] = q.score(rows, hyps)
+        assert got[name]["all"] >= floor, (name, got[name])
+        assert all(h.strip() for h in hyps), "no line comes back empty"
+        for r, h in zip(rows, hyps, strict=True):  # the facts a viewer can check at a glance
+            if r["category"] == "prompt":
+                m = re.match(r"(?:Press|Hold)\s+(.+?)\s+to\b", r["en"])
+                keys = [t for t in re.split(r"[ ,]+", m.group(1)) if t.isupper() or t.startswith("~")] if m else []
+                assert all(k in h for k in keys), (r["en"], h)
+            for num in re.findall(r"\d[\d,.:]*\d|\d", r["en"]):
+                assert num in h or num.replace(",", "") in h, (r["en"], h)
+    save_report("game_text_quality.json", got)

@@ -1,0 +1,61 @@
+category	en	ar
+prompt	Press E to open the trunk.	اضغط E لفتح صندوق السيارة.
+prompt	Hold F to repair the engine.	اضغط مع الاستمرار على F لإصلاح المحرك.
+prompt	Press C to crouch.	اضغط C للانحناء.
+prompt	Press ~INPUT~ to throw the grenade.	اضغط ~INPUT~ لرمي القنبلة.
+prompt	Press V to switch the camera.	اضغط V لتبديل الكاميرا.
+prompt	Hold CTRL to walk slowly.	اضغط مع الاستمرار على CTRL للمشي ببطء.
+prompt	Press E to order food.	اضغط E لطلب الطعام.
+prompt	Press M to open the map.	اضغط M لفتح الخريطة.
+prompt	Press E to board the boat.	اضغط E لركوب القارب.
+prompt	Hold E to pick the lock.	اضغط مع الاستمرار على E لفتح القفل.
+status	You are being chased by the police.	الشرطة تطاردك.
+status	Mission complete.	اكتملت المهمة.
+status	Your car has been destroyed.	تم تدمير سيارتك.
+status	You have been arrested.	تم اعتقالك.
+status	The cops lost track of you.	فقدت الشرطة أثرك.
+status	Autosave in progress. Do not turn off the console.	الحفظ التلقائي جارٍ. لا تطفئ الجهاز.
+status	Low health. Find a place to rest.	الصحة منخفضة. ابحث عن مكان للراحة.
+status	You are in a restricted area.	أنت في منطقة محظورة.
+mission	Take the boat to the island.	خذ القارب إلى الجزيرة.
+mission	Park the car behind the building.	أوقف السيارة خلف المبنى.
+mission	Talk to the guard.	تحدث إلى الحارس.
+mission	Sneak past the cameras.	تسلل من أمام الكاميرات.
+mission	Shoot the lock.	أطلق النار على القفل.
+mission	Climb the fence.	تسلق السياج.
+mission	Find the hidden key.	ابحث عن المفتاح المخفي.
+mission	Drive the truck to the docks.	قُد الشاحنة إلى الرصيف.
+mission	Stay in the car and keep the engine running.	ابقَ في السيارة وأبقِ المحرك يعمل.
+mission	Lose the helicopter.	اهرب من المروحية.
+subtitle	Stop right there!	قف مكانك!
+subtitle	I told you not to come here.	قلت لك ألا تأتي إلى هنا.
+subtitle	You're a real piece of work, you know that?	أنت شخص عجيب فعلًا، هل تعرف ذلك؟
+subtitle	Come on, it's just a little cash.	هيا، إنه مجرد مبلغ صغير.
+subtitle	We're gonna be rich, babe.	سنصبح أغنياء يا عزيزتي.
+subtitle	Don't look back.	لا تنظر إلى الخلف.
+subtitle	I can't believe you did that.	لا أصدق أنك فعلت ذلك.
+subtitle	Yo, that car is sick!	يا للروعة، هذه السيارة رائعة!
+subtitle	Where did you learn to drive like that?	أين تعلمت القيادة هكذا؟
+subtitle	Everybody get on the floor!	الجميع على الأرض!
+name	Lucia, wait for me at the dock.	لوسيا، انتظريني عند الرصيف.
+name	Jason knows a guy in Vice City.	جيسون يعرف شخصًا في فايس سيتي.
+name	Leonida is hot this time of year.	ليونيدا حارة في هذا الوقت من السنة.
+name	Rockstar Games is a registered trademark.	روكستار جيمز علامة تجارية مسجلة.
+name	Meet Jason and Lucia in Ambrosia.	قابل جيسون ولوسيا في أمبروزيا.
+money	You received $750.	لقد استلمت 750 دولارًا.
+money	A new car costs $85,000.	تكلفة السيارة الجديدة 85,000 دولار.
+money	Wanted level: 3 stars	مستوى الملاحقة: 3 نجوم
+money	You have $12,300 in your pocket.	لديك 12,300 دولار في جيبك.
+money	Time remaining: 01:45	الوقت المتبقي: 01:45
+money	Distance: 1.2 km	المسافة: 1.2 كم
+ui	Pause	إيقاف مؤقت
+ui	Controls	عناصر التحكم
+ui	Audio	الصوت
+ui	Display	العرض
+ui	Quit Game	الخروج من اللعبة
+ui	Press any key	اضغط أي مفتاح
+case	ARE YOU SURE?	هل أنت متأكد؟
+case	THE POLICE ARE COMING	الشرطة قادمة
+case	Park The Car Behind The Building	أوقف السيارة خلف المبنى
+case	PRESS C TO CROUCH	اضغط C للانحناء
+long	Welcome to Leonida. Stay out of trouble, and do not trust anyone.	مرحبًا بك في ليونيدا. ابتعد عن المشاكل ولا تثق بأحد.
