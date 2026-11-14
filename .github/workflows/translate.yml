@@ -7,6 +7,11 @@ on:
   push:
     branches: [translate]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "upload the pack to the model store (only if it matches the app's sha256 pins)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -69,3 +74,41 @@ jobs:
         with:
           name: translate-report-${{ runner.os }}
           path: translate-report
+
+  publish:
+    # By hand only (Actions → translate → Run workflow, publish = true): puts the pack built above on the model store,
+    # only if every file matches the sha256 the app pins (release.TRANSLATE_FILES) — a mismatch fails and uploads nothing.
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          name: translate-pack
+          path: artifact
+      - run: pip install -e . huggingface_hub
+      - name: verify against the app's pins
+        run: |
+          python - <<'PY'
+          import hashlib, pathlib, sys
+          from streamsafe.app import release
+          root = pathlib.Path("artifact/translate-pack")
+          bad = []
+          for name, (sha, _size) in release.TRANSLATE_FILES.items():
+              p = root / name
+              got = hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "missing"
+              if got != sha:
+                  bad.append(f"{name}: {got}")
+          print("\n".join(bad) or "all files match the pins")
+          sys.exit(1 if bad else 0)
+          PY
+      - name: upload to the model store
+        env:
+          HF_TOKEN: ${{ secrets.HF_HEADS_TOKEN }}
+        run: |
+          python -c "from huggingface_hub import HfApi; HfApi().upload_folder(repo_id='juba-1/streamsafe-models', folder_path='artifact/translate-pack', path_in_repo='v1/translate', commit_message='translate pack')"
