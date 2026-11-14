@@ -276,6 +276,8 @@ def _run_realtime(
                 stats["late_frames"].append(int(late > LATE_MS))
                 gate.forget_before(v - KEEP_DECISIONS)
                 if tr is not None:
+                    if late > LATE_MS:
+                        tr.stream_late()
                     tr.forget_before(v)
                 live.tick(v, late, waiting, len(stats["dropped_frames"]))
                 v += 1

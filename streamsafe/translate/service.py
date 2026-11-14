@@ -40,6 +40,7 @@ REGIONS = {  # (y0, y1, x0, x1) as fractions of the frame; GTA's subtitle band a
 }
 SIG_SHAPE = (32, 256)  # signature: bright pixels of the region at this size
 BRIGHT = 170  # subtitle letters are light on dark outline
+BACKOFF_S = 1.5  # pause reads this long after the stream emits a late frame
 SIG_SAME = 0.35  # share of differing bright pixels up to which two pictures show "the same text"
 SIG_MIN_PIXELS = 12  # fewer bright pixels than this: nothing is written there
 KEEP_FRAMES = 600  # frames of signatures kept (older ones can no longer be shown)
@@ -173,6 +174,7 @@ class TranslationService:
         self._last_sub: dict[str, tuple[float, np.ndarray | None]] = dict.fromkeys(self.names, (-1000000000.0, None))
         self._last_any = -1e9
         self._ctx = mp.get_context("spawn")
+        self._backoff_until = 0.0
         self._jobs = self._ctx.Queue(maxsize=max(1, cfg.translate.translate_queue))
         self._results = self._ctx.Queue()
         self._stop = self._ctx.Event()
@@ -253,7 +255,7 @@ class TranslationService:
                 self._sigs[fid] = sigs
                 while len(self._sigs) > KEEP_FRAMES:
                     self._sigs.popitem(last=False)
-            if not self.ready or now - self._last_any < self.cfg.translate.translate_min_gap_s:
+            if not self.ready or now - self._last_any < self.cfg.translate.translate_min_gap_s or now < self._backoff_until:
                 return
             due = False
             for n, sig in sigs.items():
@@ -327,6 +329,10 @@ class TranslationService:
             return out
         finally:
             self.overlay_ms.append(1000 * (time.perf_counter() - t0))
+
+    def stream_late(self) -> None:
+        """The output just emitted a late frame: the stream comes first, so no new reads for a while."""
+        self._backoff_until = self._clock() + BACKOFF_S
 
     def forget_before(self, v: int) -> None:
         with self._lock:
