@@ -8,6 +8,7 @@ translated or drawn again (``SAME``).
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -108,8 +109,10 @@ class Pipeline:
         return out
 
 
-def load_pipeline(folder: Path, threads: int = 2, min_conf: float = 0.55) -> Pipeline:
+def load_pipeline(folder: Path, threads: int | None = None, min_conf: float = 0.55) -> Pipeline:
     """The real models from an installed pack."""
+    if threads is None:  # leave the cores to the game and the stream: 1 thread on a small CPU, 2 from 8 cores up
+        threads = 2 if (os.cpu_count() or 2) >= 8 else 1
     from streamsafe.translate.ocr import TextReader
     from streamsafe.translate.translator import CachedTranslator, Ct2Translator
 
