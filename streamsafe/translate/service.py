@@ -40,7 +40,14 @@ REGIONS = {  # (y0, y1, x0, x1) as fractions of the frame; GTA's subtitle band a
 }
 SIG_SHAPE = (32, 256)  # signature: bright pixels of the region at this size
 BRIGHT = 170  # subtitle letters are light on dark outline
-BACKOFF_S = 1.5  # pause reads this long after the stream emits a late frame
+BACKOFF_S = 1.5  # pause optional re-reads this long after the stream emits a late frame
+BACKOFF_NEW_S = 0.4  # ... but a read of NEW text (the Arabic the viewers are waiting for) only this long: it is one cheap job on a
+# below-normal-priority process with a one-deep queue, and holding it back for 1.5 s cost the first frames of every subtitle
+FINE_SHAPE = (96, 768)  # the closer look at a region whose text looks unchanged (taken once per refresh time, not per frame)
+FINE_SAME = 0.025  # share of differing bright pixels (at that size) up to which the text counts as the very same text
+QUIET_MAX_S = 8.0  # unchanged-looking text is read again after this long at the latest, whatever the closer look says
+BAND_MARGIN_ROWS = 2  # signature rows added above and below the text when only its band of the region is read
+BAND_MAX = 0.7  # the band is read instead of the whole region only if it is at most this share of the region's height
 SIG_SAME = 0.35  # share of differing bright pixels up to which two pictures show "the same text"
 SIG_MIN_PIXELS = 12  # fewer bright pixels than this: nothing is written there
 KEEP_FRAMES = 600  # frames of signatures kept (older ones can no longer be shown)
@@ -78,6 +85,29 @@ def sig_distance(a: np.ndarray, b: np.ndarray) -> float:
 
 def has_text_like(sig: np.ndarray) -> bool:
     return int(np.count_nonzero(sig)) >= SIG_MIN_PIXELS
+
+
+def fine_signature(frame: np.ndarray, rect: tuple[int, int, int, int]) -> np.ndarray:
+    """Like ``signature`` at 3 times the size: sees one changed word or letter of a line that looks the same."""
+    x0, y0, x1, y1 = rect
+    small = cv2.resize(frame[y0:y1, x0:x1], (FINE_SHAPE[1], FINE_SHAPE[0]), interpolation=cv2.INTER_AREA)
+    return cv2.cvtColor(small, cv2.COLOR_BGR2GRAY) > BRIGHT
+
+
+def text_band(sig: np.ndarray, rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    """The part of ``rect`` that holds the bright pixels of ``sig`` (full width, the rows with text plus a margin):
+    the text reader costs by pixels, and a subtitle fills a third of its region. ``rect`` itself when the text is
+    spread over most of it (or there is none)."""
+    x0, y0, x1, y1 = rect
+    rows = np.nonzero(sig.sum(axis=1) >= 3)[0]  # a row with a few bright pixels: text, not a speck
+    if len(rows) == 0:
+        return rect
+    n = sig.shape[0]
+    r0, r1 = max(0, int(rows[0]) - BAND_MARGIN_ROWS), min(n, int(rows[-1]) + 1 + BAND_MARGIN_ROWS)
+    if (r1 - r0) > BAND_MAX * n:
+        return rect
+    h = y1 - y0
+    return x0, y0 + (r0 * h) // n, x1, y0 + -((-r1 * h) // n)
 
 
 # ----------------------------------------------------------------------------------------------- worker side
@@ -172,9 +202,11 @@ class TranslationService:
         self._read_sigs: dict[int, dict[str, np.ndarray]] = {}  # fid -> the signatures of the frame each read was taken from
         self._submitted: dict[int, dict[str, np.ndarray]] = {}  # the same, while the read is with the worker
         self._last_sub: dict[str, tuple[float, np.ndarray | None]] = dict.fromkeys(self.names, (-1000000000.0, None))
+        self._fine: dict[str, np.ndarray | None] = dict.fromkeys(self.names)  # closer picture of each region at its last read
+        self._read_at: dict[str, float] = dict.fromkeys(self.names, -1e9)  # when each region was last handed to the worker
         self._last_any = -1e9
         self._ctx = mp.get_context("spawn")
-        self._backoff_until = 0.0
+        self._late_at = -1e9  # when the stream last emitted a late frame
         self._jobs = self._ctx.Queue(maxsize=max(1, cfg.translate.translate_queue))
         self._results = self._ctx.Queue()
         self._stop = self._ctx.Event()
@@ -255,18 +287,35 @@ class TranslationService:
                 self._sigs[fid] = sigs
                 while len(self._sigs) > KEEP_FRAMES:
                     self._sigs.popitem(last=False)
-            if not self.ready or now - self._last_any < self.cfg.translate.translate_min_gap_s or now < self._backoff_until:
+            if not self.ready or now - self._last_any < self.cfg.translate.translate_min_gap_s:
                 return
-            due = False
+            since_late = now - self._late_at
+            if since_late < BACKOFF_NEW_S:  # the stream just emitted a late frame: not even new text for a moment
+                return
+            due: list[str] = []
             for n, sig in sigs.items():
                 t_last, sig_last = self._last_sub[n]
                 if not has_text_like(sig):  # nothing is written there: nothing to read
                     self._last_sub[n] = (t_last, sig)
-                elif sig_last is None or sig_distance(sig, sig_last) > SIG_SAME or now - t_last >= self.cfg.translate.translate_refresh_s:
-                    due = True  # new or changed text, or unchanged text that is due for another look
+                elif sig_last is None or sig_distance(sig, sig_last) > SIG_SAME:
+                    due.append(n)  # new or changed text
+                elif now - t_last >= self.cfg.translate.translate_refresh_s and since_late >= BACKOFF_S:
+                    # the text looks unchanged for the refresh time: look closer instead of reading it again (a subtitle is
+                    # read once, not every refresh time); read only if the closer look sees a change, or after QUIET_MAX_S
+                    fine, before = fine_signature(frame, self.rects[n]), self._fine[n]
+                    if before is None or now - self._read_at[n] >= QUIET_MAX_S or sig_distance(fine, before) > FINE_SAME:
+                        due.append(n)
+                    else:
+                        self._last_sub[n] = (now, sig_last)
             if not due:
                 return
-            crops: dict[str, Crop] = {n: (frame[r[1] : r[3], r[0] : r[2]].copy(), r) for n, r in self.rects.items()}
+            crops: dict[str, Crop | None] = {}
+            for n, sig in sigs.items():
+                if n in due:  # the band of the region that holds the text
+                    r = text_band(sig, self.rects[n])
+                    crops[n] = (frame[r[1] : r[3], r[0] : r[2]].copy(), r)
+                elif has_text_like(sig):
+                    crops[n] = None  # text that has not changed: the worker repeats the boxes of its last read, no reading
             with self._lock:
                 self._submitted[fid] = sigs
             try:
@@ -278,8 +327,10 @@ class TranslationService:
                 return
             self._last_any = now
             self.stats["reads_submitted"] += 1
-            for n, sig in sigs.items():
-                self._last_sub[n] = (now, sig)
+            for n in due:
+                self._last_sub[n] = (now, sigs[n])
+                self._read_at[n] = now
+                self._fine[n] = fine_signature(frame, self.rects[n])
         except Exception as exc:
             self.stats["observe_errors"] += 1
             if len(self.errors) < 5:
@@ -332,7 +383,7 @@ class TranslationService:
 
     def stream_late(self) -> None:
         """The output just emitted a late frame: the stream comes first, so no new reads for a while."""
-        self._backoff_until = self._clock() + BACKOFF_S
+        self._late_at = self._clock()
 
     def forget_before(self, v: int) -> None:
         with self._lock:

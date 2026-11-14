@@ -19,10 +19,11 @@ from streamsafe.app import settings as app_settings
 from streamsafe.config import Config
 from streamsafe.runtime import runner
 from streamsafe.translate import pack, textproc
+from streamsafe.translate import service as svc_mod
 from streamsafe.translate.arabic import PAD_X_K, PAD_Y_K, ArabicRenderer, Patch, blend, visual_order
 from streamsafe.translate.ocr import Line
 from streamsafe.translate.pipeline import SAME, Pipeline, group
-from streamsafe.translate.service import TranslationService, region_rect, sig_distance, signature
+from streamsafe.translate.service import TranslationService, fine_signature, region_rect, sig_distance, signature, text_band
 from streamsafe.translate.translator import CachedTranslator
 from tests import translate_stubs as ts
 from tests.crashing import process_dies
@@ -230,6 +231,187 @@ def test_queue_is_bounded_and_a_full_queue_drops_the_read():
         time.sleep(0.05)
     assert svc.stats["reads_submitted"] >= 1 and svc.stats["reads_dropped"] >= 1
     svc.stop()
+
+
+# ---------------------------------------------------------------------------------- fewer, cheaper reads (slow CPUs)
+class Clock:
+    def __init__(self) -> None:
+        self.t = 100.0
+
+    def __call__(self) -> float:
+        return self.t
+
+
+def timed_service(regions: str = "subtitles", **kw) -> tuple[TranslationService, Clock]:
+    clock = Clock()
+    cfg = Config.from_env(env={}, translate_ar=True, translate_regions=regions, **kw)
+    svc = TranslationService(cfg, ts.SIZE, ts.stub_factory, clock=clock)
+    svc.ready = True  # pretend the worker is loaded: the jobs just wait in the queue, nobody takes them
+    return svc, clock
+
+
+def drain(svc: TranslationService) -> list:
+    out = []
+    while True:
+        try:
+            out.append(svc._jobs.get(timeout=0.3))
+        except Exception:
+            return out
+
+
+def shown(text: str | None) -> np.ndarray:
+    return ts.subtitle_frames(1, {(0, 1): text} if text else {}, person=False)[0]
+
+
+def test_unchanged_subtitle_is_read_once_not_every_refresh_time():
+    svc, clock = timed_service()
+    line = shown("Press X to end the dance")
+    for i in range(80):  # 8 s of the same subtitle, a frame every 0.1 s: the refresh time (2 s) passes 3 times
+        svc.observe(i, line)
+        clock.t += 0.1
+    assert svc.stats["reads_submitted"] == 1, "a closer look at the unchanged text finds nothing new: no second read"
+    svc.stop()
+
+
+def test_a_changed_word_in_unchanged_looking_text_is_still_read_at_the_refresh():
+    svc, clock = timed_service()
+    a, b = shown("Press X to end the dance"), shown("Press Y to end the dance")
+    r = region_rect("subtitles", ts.SIZE)
+    assert sig_distance(signature(a, r), signature(b, r)) <= svc_mod.SIG_SAME, "the per-frame picture does not see it"
+    assert sig_distance(fine_signature(a, r), fine_signature(b, r)) > svc_mod.FINE_SAME, "the closer look does"
+    for i in range(10):
+        svc.observe(i, a)
+        clock.t += 0.1
+    assert svc.stats["reads_submitted"] == 1
+    for i in range(10, 40):
+        svc.observe(i, b)
+        clock.t += 0.1
+    assert svc.stats["reads_submitted"] == 2
+    svc.stop()
+
+
+def test_unchanged_text_is_read_again_after_the_quiet_limit_whatever_the_closer_look_says():
+    svc, clock = timed_service()
+    line = shown("Press X to end the dance")
+    n = int((svc_mod.QUIET_MAX_S + 3) / 0.1)
+    for i in range(n):
+        svc.observe(i, line)
+        clock.t += 0.1
+    assert svc.stats["reads_submitted"] == 2
+    svc.stop()
+
+
+def test_backoff_holds_new_text_back_only_briefly_and_refreshes_for_longer():
+    svc, clock = timed_service()
+    line = shown("Press X to end the dance")
+    svc.stream_late()
+    svc.observe(0, line)
+    assert svc.stats["reads_submitted"] == 0, "right after a late frame nothing is read"
+    clock.t += svc_mod.BACKOFF_NEW_S + 0.01
+    svc.observe(1, line)
+    assert svc.stats["reads_submitted"] == 1, "new text is read after the short pause, not after the long one"
+    svc.stop()
+    assert svc_mod.BACKOFF_NEW_S < svc_mod.BACKOFF_S
+
+    svc, clock = timed_service(translate_refresh_s=1.0)  # a refresh look waits for the long pause
+    other = shown("Follow me to the private room.")
+    svc.observe(0, line)
+    clock.t += 1.2
+    svc.observe(1, other)  # changed text: due at once
+    assert svc.stats["reads_submitted"] == 2
+    svc.stream_late()
+    clock.t += 1.1
+    svc.observe(2, other)
+    assert svc._read_at["subtitles"] < clock.t - 1.0 and svc.stats["reads_submitted"] == 2, "no refresh inside the long pause"
+    svc.stop()
+
+
+def test_only_the_band_with_the_text_is_handed_to_the_worker():
+    svc, _ = timed_service()
+    svc.observe(0, shown("Press X to end the dance"))
+    ((fid, crops),) = drain(svc)
+    bgr, rect = crops["subtitles"]
+    full = region_rect("subtitles", ts.SIZE)
+    assert fid == 0 and bgr.shape[:2] == (rect[3] - rect[1], rect[2] - rect[0])
+    assert (rect[0], rect[2]) == (full[0], full[2]) and full[1] <= rect[1] < rect[3] <= full[3]
+    assert (rect[3] - rect[1]) <= 0.4 * (full[3] - full[1]), "a one-line subtitle: a third of the region, not all of it"
+    sig = signature(shown("Press X to end the dance"), full)
+    assert text_band(sig, full) == rect
+    assert text_band(np.zeros_like(sig), full) == full, "no text: the region as it is"
+    assert text_band(np.ones_like(sig), full) == full, "text everywhere: the whole region"
+    svc.stop()
+
+
+def test_a_region_without_text_is_not_read_and_one_with_unchanged_text_is_not_read_again():
+    svc, clock = timed_service(regions="subtitles,help")
+    both = shown("Press X to end the dance")
+    help_r = region_rect("help", ts.SIZE)
+    import cv2
+
+    with_help = both.copy()
+    cv2.putText(
+        with_help, "Hold L2 to aim", (help_r[0] + 40, help_r[1] + 80), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (255, 255, 255), 3, cv2.LINE_AA
+    )
+    svc.observe(0, both)  # subtitles only
+    clock.t += 0.5
+    svc.observe(1, with_help)  # the help box gets text, the subtitle is unchanged
+    jobs = drain(svc)
+    assert len(jobs) == 2
+    assert set(jobs[0][1]) == {"subtitles"}, "nothing written in the help box: it is not sent"
+    assert jobs[1][1]["subtitles"] is None and jobs[1][1]["help"] is not None, "unchanged subtitle: only its boxes are repeated"
+    svc.stop()
+
+
+def test_pipeline_repeats_boxes_without_reading_and_forgets_regions_that_lost_their_text():
+    tr = ts.StubTranslator()
+    pipe = Pipeline(ts.StubReader(), CachedTranslator(tr), renderer())
+    line = "Follow me to the private room."
+    assert len(pipe(_crop(line), ts.SIZE)["subtitles"]) == 1
+    assert pipe({"subtitles": None}, ts.SIZE) == {"subtitles": SAME}, "carried over: no reading at all"
+    assert len(pipe.ms["ocr"]) == 1
+    assert pipe({}, ts.SIZE) == {}, "region not given: no text there"
+    again = pipe(_crop(line), ts.SIZE)
+    assert len(again["subtitles"]) == 1, "the text came back after a gap: drawn again, not 'same'"
+
+
+def test_warmup_runs_every_stage_once_and_leaves_no_trace():
+    calls = {"read": 0, "render": 0}
+
+    class Reader(ts.StubReader):
+        def read(self, bgr):
+            calls["read"] += 1
+            return super().read(bgr)
+
+    class Renderer:
+        def render(self, *a, **k):
+            calls["render"] += 1
+
+    tr = ts.StubTranslator()
+    pipe = Pipeline(Reader(), CachedTranslator(tr), Renderer())  # type: ignore[arg-type]
+    pipe.warmup()
+    assert calls == {"read": 1, "render": 1} and len(tr.calls) == 1
+    assert all(v == [] for v in pipe.ms.values()) and pipe._last == {}
+
+    class Broken:
+        def read(self, bgr):
+            raise RuntimeError("no")
+
+    Pipeline(Broken(), CachedTranslator(ts.StubTranslator()), Renderer()).warmup()  # type: ignore[arg-type]  # does not raise
+
+
+def test_a_read_that_arrives_late_reaches_every_frame_of_its_subtitle_still_waiting():
+    """Backfill: the read was taken on frame 40 (held back at first); frames 10..39 of the same subtitle wait in the delay
+    buffer and get the Arabic too, as soon as it is there."""
+    svc = make_service()
+    frames = ts.subtitle_frames(60, {(10, 50): "Press X to end the dance"}, person=False)
+    for i, f in enumerate(frames):
+        svc.observe(i, f)
+    assert all(svc.patches_for(v) == [] for v in range(60)), "nothing finished yet"
+    patch = Patch(5, 5, np.zeros((2, 2, 3), np.uint8), np.full((2, 2), 255, np.uint8))
+    svc._submitted[40] = svc._sigs[40]
+    svc._store(40, {"subtitles": [patch]})
+    assert all(svc.patches_for(v) == [patch] for v in range(10, 50))
+    assert all(svc.patches_for(v) == [] for v in [*range(10), *range(50, 60)])
 
 
 # ------------------------------------------------------------------------------------------ pack and settings
