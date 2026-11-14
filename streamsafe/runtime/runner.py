@@ -255,9 +255,11 @@ def _run_realtime(
                 while time.perf_counter() < due:
                     time.sleep(0.0005)
                 out = gate.render(v, frame)
-                # Arabic text, AFTER the gate: only on the frame the gate composed normally (``out is frame``: not the
-                # slate, not the scene card, not a held frame), on a copy, so nothing the gate keeps ever carries it
-                visible = tr.overlay(v, out) if tr is not None and out is frame else out
+                # Arabic text, AFTER the gate and on top of the cover: on a normally composed frame and on the full-scene
+                # cover (card / slate: the dialogue goes on while the picture is covered), never on a held repeat; always
+                # on a copy, so nothing the gate keeps (its slate, card or last frame) ever carries the text
+                text_ok = out is frame or out is gate.card or out is gate.slate
+                visible = tr.overlay(v, out) if tr is not None and text_ok else out
                 if sink is not None and takes_audio(sink):
                     # fail closed: sound only for a frame that is shown, not muted and not full-screen, and only
                     # that frame's own samples; anything else (also "not arrived") is silence

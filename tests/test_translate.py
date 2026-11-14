@@ -396,23 +396,32 @@ def test_realtime_arabic_is_on_exactly_the_frames_of_the_english_and_hides_it():
     assert (on.frames[10] == off.frames[10]).all() and (on.frames[90] == off.frames[90]).all()
 
 
-def test_realtime_arabic_is_never_drawn_on_a_slate_or_scene_card():
-    # (1) the analyzer dies: after a while every frame is the slate, subtitles keep coming
+def test_realtime_arabic_goes_on_top_of_the_full_scene_cover_and_the_cover_stays_whole():
+    """The owner's rule: when the picture is covered the dialogue still gets its Arabic, drawn ON the cover; the cover
+    itself (everything outside the Arabic box) is untouched, and frames without English stay exactly the cover."""
+    band = slice(int(0.70 * 720), 720)  # the subtitle band of the 1280x720 test frames, where the Arabic box sits
+    # (1) the analyzer dies: after a while every frame is the slate, subtitles keep coming until frame 150
     frames = small_frames({(10, 150): "Follow me to the private room."})
     _, off, _ = run_engine(frames, analyzer=process_dies)
-    report, on, _ = run_engine(frames, ts.stub_factory, analyzer=process_dies)
+    _, on, _ = run_engine(frames, ts.stub_factory, analyzer=process_dies)
     slates = [v for v in range(N) if is_slate(off.frames[v])]
     assert len(slates) > 60
-    assert all(on.hashes[v] == off.hashes[v] for v in slates), "a slate frame is exactly the slate"
-    assert any(on.hashes[v] != off.hashes[v] for v in range(10, 30)) or report["summary"]["translate"]["frames_overlaid"] > 0
-    # (2) a whole-screen scene card
+    for v in slates:
+        assert (on.frames[v][: band.start] == off.frames[v][: band.start]).all(), "the slate above the band is untouched"
+        if v >= 160:
+            assert on.hashes[v] == off.hashes[v], "no English, no Arabic: exactly the slate"
+    assert any(on.hashes[v] != off.hashes[v] for v in slates if v < 150), "the dialogue gets Arabic on the slate"
+    # (2) a whole-screen scene card while a subtitle is on screen
     frames = small_frames({(10, 150): "Press X to end the dance"})
     for v in range(60, 120):
         frames[v][:] = MAGENTA
         ts.draw_subtitle(frames[v], "Press X to end the dance")
-    report, on, _ = run_engine(frames, ts.stub_factory, analyzer=stub_scene_analyzer)
+    _, on, _ = run_engine(frames, ts.stub_factory, analyzer=stub_scene_analyzer)
     cards = list(range(75, 105))
-    assert len({on.hashes[v] for v in cards}) == 1, "all card frames are one identical picture: no Arabic on a card"
+    tops = {on.frames[v][: band.start].tobytes() for v in cards}
+    assert len(tops) == 1, "the card itself is one identical picture above the band"
+    shown = on.frames[cards[0]][: band.start]
+    assert not (shown == np.array(MAGENTA, dtype=shown.dtype)).all(axis=2).any(), "the covered picture never shows through"
 
 
 @pytest.mark.parametrize("factory", ["dying_factory", "failing_factory", "slow_factory", "broken_load_factory"])
