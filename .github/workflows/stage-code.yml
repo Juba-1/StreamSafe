@@ -1,0 +1,25 @@
+name: stage-code
+
+# By hand: puts this commit's source (git archive) on the private HF work store, so a GPU test pod can fetch it
+# without any GitHub credentials. Needs repo secret HF_HEADS_TOKEN with write access to juba-1/streamsafe-work.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: git archive --format=tar.gz -o engine3.tar.gz HEAD && sha256sum engine3.tar.gz
+      - run: pip install -q huggingface_hub
+      - env:
+          HF_TOKEN: ${{ secrets.HF_HEADS_TOKEN }}
+        run: |
+          python -c "
+          from huggingface_hub import HfApi
+          HfApi().upload_file(path_or_fileobj='engine3.tar.gz', path_in_repo='code/engine3_main.tar.gz', repo_id='juba-1/streamsafe-work', repo_type='dataset', commit_message='stage code ${GITHUB_SHA}')
+          print('STAGED', '${GITHUB_SHA}')"
