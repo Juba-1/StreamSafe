@@ -10,3 +10,4 @@ __pycache__/
 
 !installer/ffmpeg.lock.json
 !installer/heads/heads.json
+.claude/
