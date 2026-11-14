@@ -265,6 +265,17 @@ class App(tk.Tk):
         )
         self.pack_row(self.label(s, self.tr("translate_hint", mb=release.TRANSLATE_DOWNLOAD_MB), fg="#6b7785", font=(FONT, 9)), fill="x")
         ttk.Separator(s).pack(fill="x", pady=10)
+        self.label(s, self.tr("sec_brand"), font=(FONT, 11, "bold")).pack(fill="x")
+        self.pack_row(self.label(s, self.tr("brand_hint"), fg="#6b7785", font=(FONT, 9)), fill="x")
+        fr = tk.Frame(s, bg="white")
+        side = "right" if self.rtl else "left"
+        ttk.Button(fr, text=self.tr("brand_pick"), command=self.pick_brand).pack(side=side, padx=4)
+        ttk.Button(fr, text=self.tr("brand_remove"), command=lambda: self.set_brand("")).pack(side=side, padx=4)
+        self.brand_label = self.label(fr, "", fg="#44505e", font=(FONT, 9))
+        self.brand_label.pack(side=side, padx=8)
+        self.pack_row(fr, fill="x")
+        self.show_brand()
+        ttk.Separator(s).pack(fill="x", pady=10)
         self.label(s, self.tr("open_obs"), font=(FONT, 11, "bold")).pack(fill="x")
         for key, path in (("obs_state", paths.obs_state_file(self.ctrl.env)), ("obs_script", paths.obs_script())):
             fr = tk.Frame(s, bg="white")
@@ -278,6 +289,22 @@ class App(tk.Tk):
         v("input", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
         v("srt_port", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
         self.show_srt_hint()
+
+    def show_brand(self) -> None:
+        path = self.ctrl.settings.brand_image
+        text = self.tr("brand_set", name=os.path.basename(path)) if path else self.tr("brand_none")
+        self.brand_label.configure(text=text)
+
+    def pick_brand(self) -> None:
+        source = filedialog.askopenfilename(title=self.tr("brand_pick_title"), filetypes=[("PNG / JPG", "*.png *.jpg *.jpeg *.webp *.bmp")])
+        if source:
+            self.set_brand(source)
+
+    def set_brand(self, source: str) -> None:
+        problem = self.ctrl.set_brand_image(source)
+        if problem:
+            messagebox.showwarning(PRODUCT_NAME, self.tr(problem))
+        self.show_brand()
 
     def show_srt_hint(self) -> None:
         port = self._vars["srt_port"].get().strip() or "9000"

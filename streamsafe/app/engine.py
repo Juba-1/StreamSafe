@@ -58,7 +58,12 @@ def run_args(settings: Settings, reports: Path) -> list[str]:
 
 
 def engine_env(
-    base: Mapping[str, str], nvidia: bool, url: str = "", data_env: Mapping[str, str] | None = None, translate: bool = False
+    base: Mapping[str, str],
+    nvidia: bool,
+    url: str = "",
+    data_env: Mapping[str, str] | None = None,
+    translate: bool = False,
+    brand_image: str = "",
 ) -> dict[str, str]:
     """The environment of an engine / prepare / probe process. ``nvidia``: the NVIDIA runtime with TensorRT
     (engines are never built at "go live": ``TRT_BUILD=0``; a model without a ready engine runs on CUDA and the
@@ -85,6 +90,10 @@ def engine_env(
     env.pop("TRANSLATE_DIR", None)
     if translate:  # the engine itself checks the pack and carries on without translation when it is not usable
         env.update({"TRANSLATE_AR": "1", "TRANSLATE_DIR": str(paths.translate_dir(where))})
+    for name in ("SCENE_IMAGE", "SLATE_IMAGE", "SCENE_TEXT", "SLATE_TEXT"):
+        env.pop(name, None)
+    if brand_image and Path(brand_image).is_file():  # the streamer's logo alone on the full-screen cover
+        env.update({"SCENE_IMAGE": brand_image, "SLATE_IMAGE": brand_image, "SCENE_TEXT": "", "SLATE_TEXT": ""})
     if url:
         env[OUTPUT_ENV] = url
     return env

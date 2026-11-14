@@ -64,6 +64,10 @@ def reports_dir(env: MutableMapping[str, str] | None = None) -> Path:
     return data_dir(env) / "reports"
 
 
+def brand_dir(env: MutableMapping[str, str] | None = None) -> Path:
+    return data_dir(env) / "brand"
+
+
 def logs_dir(env: MutableMapping[str, str] | None = None) -> Path:
     return data_dir(env) / "logs"
 

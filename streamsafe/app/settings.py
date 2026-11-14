@@ -27,6 +27,7 @@ class Settings:
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
     translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
+    brand_image: str = ""  # the streamer's / sponsor's logo shown on the full-screen cover (a copy in the data folder)
 
     def problems(self) -> list[str]:
         """Message ids (``i18n``) of what must be fixed before a stream can start. The key is checked by the caller."""

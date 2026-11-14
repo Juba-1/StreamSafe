@@ -151,6 +151,18 @@ TEXT: dict[str, tuple[str, str]] = {
     "obs_state": ("ملف الحالة لسكربت OBS: {path}", "State file for the OBS script: {path}"),
     "obs_script": ("سكربت الحماية: {path}", "Guard script: {path}"),
     "copy": ("انسخ", "Copy"),
+    "sec_brand": ("شعارك على شاشة التغطية", "Your logo on the full-screen cover"),
+    "brand_hint": (
+        "لما تتغطى الشاشة كاملة يشوف المشاهد شعارك أو شعار الراعي بدل الشاشة السودا. اللبس على الشخصيات يبقى زي ما هو.",
+        "When the whole screen is covered, viewers see your logo or your sponsor's instead of the plain cover. "
+        "The clothing on characters stays as it is.",
+    ),
+    "brand_pick": ("اختر صورة...", "Choose an image..."),
+    "brand_remove": ("إزالة", "Remove"),
+    "brand_none": ("ما فيه شعار (الغطاء العادي)", "No logo (the plain cover)"),
+    "brand_set": ("الشعار: {name}", "Logo: {name}"),
+    "brand_bad": ("ما قدرنا نقرأ الصورة. اختر PNG أو JPG.", "Could not read that image. Choose a PNG or JPG."),
+    "brand_pick_title": ("اختر شعارك", "Choose your logo"),
     "not_ready": ("ما يمديك تبدأ الآن: {why}", "Cannot start now: {why}"),
     "why_models": ("النماذج غير جاهزة", "the models are not ready"),
     "why_heads": ("ملفات القرار غير موجودة أو غير صالحة", "the decision files are missing or invalid"),

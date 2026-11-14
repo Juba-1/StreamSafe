@@ -156,6 +156,41 @@ class Controller:
             raise ValueError(source)
 
     # --- Arabic translation of on-screen text ---------------------------------------------------------------
+    BRAND_MAX = 1280  # px: a bigger logo is shrunk when it is chosen
+
+    def set_brand_image(self, source: str) -> str:
+        """Use ``source`` as the logo on the full-screen cover: checked, shrunk, and kept as a PNG copy in the data
+        folder (the original may move). '' when done, else the i18n key of the problem. An empty ``source`` removes it."""
+        if not source:
+            self.settings.brand_image = ""
+            self.save_settings()
+            return ""
+        import cv2
+        import numpy as np
+
+        try:  # np.fromfile + imdecode: cv2.imread cannot open non-ASCII paths on Windows
+            img = cv2.imdecode(np.fromfile(source, np.uint8), cv2.IMREAD_UNCHANGED)
+        except (OSError, ValueError):
+            img = None
+        if img is None or img.ndim < 2 or min(img.shape[:2]) < 16:
+            return "brand_bad"
+        scale = self.BRAND_MAX / max(img.shape[:2])
+        if scale < 1:
+            img = cv2.resize(img, (round(img.shape[1] * scale), round(img.shape[0] * scale)), interpolation=cv2.INTER_AREA)
+        folder = paths.brand_dir(self.env)
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            ok, data = cv2.imencode(".png", img)
+            if not ok:
+                return "brand_bad"
+            target = folder / "logo.png"
+            target.write_bytes(data.tobytes())
+        except OSError:
+            return "brand_bad"
+        self.settings.brand_image = str(target)
+        self.save_settings()
+        return ""
+
     def translate_problem(self) -> str:
         """ "" when the translation files are installed and are the pinned ones (sizes; the engine checks every hash)."""
         return translate_pack.problem(paths.translate_dir(self.env))
@@ -268,7 +303,9 @@ class Controller:
             raise RuntimeError(why[0])
         s = self.settings
         url = engine.output_url(s.rtmp_url, key) if s.output == OUTPUT_RTMP else ""
-        env = engine.engine_env(os.environ, self.use_nvidia, url, self.env, translate=s.translate_ar and not self.translate_problem())
+        env = engine.engine_env(
+            os.environ, self.use_nvidia, url, self.env, translate=s.translate_ar and not self.translate_problem(), brand_image=s.brand_image
+        )
         state = paths.obs_state_file(self.env)
         state.unlink(missing_ok=True)  # a line left by an earlier run must not look like this run's
         state.parent.mkdir(parents=True, exist_ok=True)

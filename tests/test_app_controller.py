@@ -167,3 +167,25 @@ def test_update_flow_reports_but_never_blocks(ctrl, monkeypatch):
     assert ctrl.check_updates() is None
     ctrl.update = updates.Update(serial=1, app_version="99.0.0")
     assert ctrl.update_wanted() == (True, False)
+
+
+def test_streamer_logo_is_kept_as_a_copy_and_goes_on_the_full_screen_cover(ctrl, tmp_path, monkeypatch):
+    import cv2
+    import numpy as np
+
+    src = tmp_path / "شعار.jpg"  # an Arabic file name, as on a real streamer's PC
+    _, data = cv2.imencode(".jpg", np.full((2000, 3000, 3), 120, np.uint8))
+    src.write_bytes(data.tobytes())
+    assert ctrl.set_brand_image(str(src)) == ""
+    kept = ctrl.settings.brand_image
+    assert kept.endswith("logo.png") and "brand" in kept
+    img = cv2.imdecode(np.fromfile(kept, np.uint8), cv2.IMREAD_UNCHANGED)
+    assert max(img.shape[:2]) == ctrl.BRAND_MAX  # shrunk
+    src.unlink()  # the original may move: the copy is used
+    env = engine.engine_env({}, False, data_env=ctrl.env, brand_image=kept)
+    assert env["SCENE_IMAGE"] == env["SLATE_IMAGE"] == kept and env["SCENE_TEXT"] == env["SLATE_TEXT"] == ""
+    bad = tmp_path / "not_an_image.png"
+    bad.write_text("hello")
+    assert ctrl.set_brand_image(str(bad)) == "brand_bad" and ctrl.settings.brand_image == kept
+    assert ctrl.set_brand_image("") == "" and ctrl.settings.brand_image == ""
+    assert "SCENE_IMAGE" not in engine.engine_env({"SCENE_IMAGE": "old"}, False, data_env=ctrl.env)
