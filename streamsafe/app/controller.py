@@ -253,7 +253,7 @@ class Controller:
     KEEP_LOGS = 10
 
     def _new_log(self) -> Path:
-        """A fresh engine log in %LOCALAPPDATA%/StreamSafe/logs; only the last ``KEEP_LOGS`` are kept."""
+        """A fresh engine log in the logs folder of the data folder; only the last ``KEEP_LOGS`` are kept."""
         folder = paths.logs_dir(self.env)
         with contextlib.suppress(OSError):
             old = sorted(folder.glob("engine_*.log"))

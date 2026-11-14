@@ -73,8 +73,24 @@ def vendor_of(name: str) -> str:
     return "other"
 
 
-_IGPU_HINTS = ("uhd graphics", "hd graphics", "iris", "radeon(tm) graphics", "radeon graphics", "radeon vega", "vega 8", "vega 11",
-               "radeon 610m", "radeon 660m", "radeon 680m", "radeon 740m", "radeon 760m", "radeon 780m", "radeon 880m", "radeon 890m")
+_IGPU_HINTS = (
+    "uhd graphics",
+    "hd graphics",
+    "iris",
+    "radeon(tm) graphics",
+    "radeon graphics",
+    "radeon vega",
+    "vega 8",
+    "vega 11",
+    "radeon 610m",
+    "radeon 660m",
+    "radeon 680m",
+    "radeon 740m",
+    "radeon 760m",
+    "radeon 780m",
+    "radeon 880m",
+    "radeon 890m",
+)
 
 
 def is_integrated(gpu: Gpu) -> bool:

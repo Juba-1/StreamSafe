@@ -1,49 +1,74 @@
-import numpy as np, arabic_reshaper
-from bidi.algorithm import get_display
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
-W,H=1920,1080
-logo=Image.open('/mnt/user-data/attachments/f132bfdd-8a6b-5a7b-ab8f-f40b225d8c5d/42e2e17f-image.png').convert('RGB')
-def font(path,size,w):
-    f=ImageFont.truetype(path,size)
-    try: f.set_variation_by_axes([w] if 'mont' in path else [w,0])
-    except Exception as e: print('var',e)
+"""Draws the promo intro / outro cards and the corner logo from the brand logo (one-off asset script).
+
+    python marketing/cards.py LOGO.png CAIRO.ttf MONTSERRAT.ttf   -> intro.png, outro.png, wm.png here
+Fonts: Cairo and Montserrat (Google Fonts, OFL), variable weight. Arabic needs Pillow with raqm."""
+
+import sys
+
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+W, H = 1920, 1080
+
+
+def font(path: str, size: int, weight: int) -> ImageFont.FreeTypeFont:
+    f = ImageFont.truetype(path, size)
+    axes = [weight] if len(f.get_variation_axes()) == 1 else [weight, 0]
+    f.set_variation_by_axes(axes)
     return f
-def ar(s): return s
-def bg():
-    y,x=np.mgrid[0:H,0:W]
-    r=np.sqrt(((x-W/2)/W)**2+((y-H*0.45)/H)**2)
-    g=np.clip(1-r*1.6,0,1)**2
-    a=np.zeros((H,W,3),np.float32)
-    a[...,0]=40*g; a[...,1]=6*g; a[...,2]=60*g
+
+
+def direction(text: str) -> str:
+    return "rtl" if any("؀" <= c <= "ۿ" for c in text) else "ltr"
+
+
+def background() -> Image.Image:
+    y, x = np.mgrid[0:H, 0:W]
+    r = np.sqrt(((x - W / 2) / W) ** 2 + ((y - H * 0.45) / H) ** 2)
+    g = np.clip(1 - r * 1.6, 0, 1) ** 2
+    a = np.zeros((H, W, 3), np.float32)
+    a[..., 0], a[..., 1], a[..., 2] = 40 * g, 6 * g, 60 * g
     return Image.fromarray(a.astype(np.uint8))
-def glow_text(img,xy,txt,f,fill,glow,anchor='mm'):
-    lay=Image.new('RGBA',img.size,(0,0,0,0)); d=ImageDraw.Draw(lay)
-    d.text(xy,txt,font=f,fill=glow+(255,),anchor=anchor,direction=DIR(txt))
-    lay=lay.filter(ImageFilter.GaussianBlur(14))
-    img.paste(lay,(0,0),lay); img.paste(lay,(0,0),lay)
-    ImageDraw.Draw(img).text(xy,txt,font=f,fill=fill,anchor=anchor,direction=DIR(txt))
-def put_logo(img,h,cy):
-    l=logo.resize((int(logo.width*h/logo.height),h),Image.LANCZOS)
-    m=np.asarray(l).max(axis=2).astype(np.float32)
-    mask=Image.fromarray(np.clip((m-8)*4,0,255).astype(np.uint8))
-    img.paste(l,((W-l.width)//2,cy-h//2),mask)
-DIR=lambda t:'rtl' if any('\u0600'<=c<='\u06ff' for c in t) else 'ltr'
-CA='cairo.ttf'; MO='mont.ttf'
-# intro
-im=bg()
-put_logo(im,430,330)
-glow_text(im,(W//2,690),ar('نفس التريلر… بعد ستريم سيف'),font(CA,96,800),(255,255,255),(255,40,200))
-glow_text(im,(W//2,800),'THE SAME TRAILER — PROTECTED LIVE',font(MO,46,700),(200,235,255),(40,160,255))
-im.save('intro.png')
-# outro
-im=bg()
-put_logo(im,560,360)
-glow_text(im,(W//2,745),ar('يغطي المشاهد غير اللائقة قبل ما توصل لمشاهدينك'),font(CA,64,700),(255,255,255),(255,40,200))
-glow_text(im,(W//2,840),'Live stream protection for GTA 6',font(MO,44,600),(200,235,255),(40,160,255))
-glow_text(im,(W//2,940),ar('النسخة التجريبية للستريمرز — قريباً'),font(CA,50,700),(255,210,90),(255,120,0))
-im.save('outro.png')
-# watermark (small logo, transparent)
-l=logo.resize((int(logo.width*150/logo.height),150),Image.LANCZOS).convert('RGBA')
-a=np.asarray(l).copy(); m=a[...,:3].max(axis=2).astype(np.float32)
-a[...,3]=np.clip((m-8)*4,0,255)*0.85; Image.fromarray(a).save('wm.png')
-im=Image.open('intro.png'); im.resize((960,540)).save('prev_intro.jpg'); Image.open('outro.png').resize((960,540)).save('prev_outro.jpg')
+
+
+def glow_text(img, xy, text, f, fill, glow) -> None:
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    ImageDraw.Draw(layer).text(xy, text, font=f, fill=(*glow, 255), anchor="mm", direction=direction(text))
+    layer = layer.filter(ImageFilter.GaussianBlur(14))
+    img.paste(layer, (0, 0), layer)
+    img.paste(layer, (0, 0), layer)
+    ImageDraw.Draw(img).text(xy, text, font=f, fill=fill, anchor="mm", direction=direction(text))
+
+
+def logo_mask(logo: Image.Image) -> Image.Image:
+    m = np.asarray(logo).max(axis=2).astype(np.float32)
+    return Image.fromarray(np.clip((m - 8) * 4, 0, 255).astype(np.uint8))
+
+
+def put_logo(img, logo, h, cy) -> None:
+    small = logo.resize((int(logo.width * h / logo.height), h), Image.LANCZOS)
+    img.paste(small, ((W - small.width) // 2, cy - h // 2), logo_mask(small))
+
+
+def main(logo_path: str, cairo: str, mont: str) -> None:
+    logo = Image.open(logo_path).convert("RGB")
+    pink, blue, gold = (255, 40, 200), (40, 160, 255), (255, 120, 0)
+    intro = background()
+    put_logo(intro, logo, 430, 330)
+    glow_text(intro, (W // 2, 690), "نفس التريلر… بعد ستريم سيف", font(cairo, 96, 800), (255, 255, 255), pink)
+    glow_text(intro, (W // 2, 800), "THE SAME TRAILER — PROTECTED LIVE", font(mont, 46, 700), (200, 235, 255), blue)
+    intro.save("intro.png")
+    outro = background()
+    put_logo(outro, logo, 560, 360)
+    line1 = "يغطي المشاهد غير اللائقة قبل ما توصل لمشاهدينك"
+    glow_text(outro, (W // 2, 745), line1, font(cairo, 64, 700), (255, 255, 255), pink)
+    glow_text(outro, (W // 2, 840), "Live stream protection for GTA 6", font(mont, 44, 600), (200, 235, 255), blue)
+    glow_text(outro, (W // 2, 940), "النسخة التجريبية للستريمرز — قريباً", font(cairo, 50, 700), (255, 210, 90), gold)
+    outro.save("outro.png")
+    small = logo.resize((int(logo.width * 150 / logo.height), 150), Image.LANCZOS)
+    rgba = np.dstack([np.asarray(small), (np.asarray(logo_mask(small), np.float32) * 0.85).astype(np.uint8)])
+    Image.fromarray(rgba).save("wm.png")
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:4])

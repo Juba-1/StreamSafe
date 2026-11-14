@@ -61,8 +61,12 @@ def test_no_gpu_and_low_vram():
 
 
 def test_weak_or_builtin_graphics_block_start():
-    for g in (Gpu("Intel(R) UHD Graphics 630", "intel", 1.0), Gpu("Intel(R) Iris(R) Xe Graphics", "intel", None),
-              Gpu("AMD Radeon(TM) Graphics", "amd", None), Gpu("NVIDIA GeForce GT 1030", "nvidia", 2.0)):
+    for g in (
+        Gpu("Intel(R) UHD Graphics 630", "intel", 1.0),
+        Gpu("Intel(R) Iris(R) Xe Graphics", "intel", None),
+        Gpu("AMD Radeon(TM) Graphics", "amd", None),
+        Gpu("NVIDIA GeForce GT 1030", "nvidia", 2.0),
+    ):
         c = by_name(sc.run_checks(probes(gpus=lambda g=g: [g])))["gpu"]
         assert c.status == FAIL, g.name
         assert "RTX 3060" in c.fix_en and c.fix_ar
