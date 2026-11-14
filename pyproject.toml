@@ -17,7 +17,7 @@ onnx-tensorrt = ["onnxruntime-gpu==1.22.*", "tensorrt-cu12==10.9.*"]
 # arabic-reshaper (MIT). The OCR runs on onnxruntime, which is already a dependency of the product
 translate = ["ctranslate2>=4.5", "sentencepiece>=0.2", "arabic-reshaper>=3.0"]
 export = ["onnx", "onnxscript"]
-dev = ["pytest>=8", "ruff>=0.6", "cryptography"]
+dev = ["pytest>=8", "ruff>=0.6", "cryptography", "sacrebleu>=2.4"]  # sacrebleu: bench/translate_quality.py, tests/test_translate_real.py
 
 [project.scripts]
 streamsafe = "streamsafe.cli:main"

@@ -11,7 +11,7 @@ import collections
 from pathlib import Path
 from typing import Protocol
 
-from streamsafe.translate import textproc
+from streamsafe.translate import gamefix, textproc
 
 MODEL_FILE = "model.bin"
 TARGET_TOKEN = ">>ara<<"  # opus-mt-en-ar needs a sentence-initial target-language token
@@ -23,7 +23,15 @@ class Translator(Protocol):
 
 
 class Ct2Translator:
-    def __init__(self, folder: Path, threads: int = 2, beam: int = 2) -> None:
+    def __init__(
+        self,
+        folder: Path,
+        threads: int = 2,
+        beam: int = 2,
+        repetition_penalty: float = 1.1,
+        no_repeat_ngram_size: int = 3,
+        length_penalty: float = 1.0,
+    ) -> None:
         import ctranslate2
         import sentencepiece as spm
 
@@ -31,6 +39,11 @@ class Ct2Translator:
         self.source = spm.SentencePieceProcessor(model_file=str(folder / "source.spm"))
         self.target = spm.SentencePieceProcessor(model_file=str(folder / "target.spm"))
         self.beam = beam
+        self.decoding = {
+            "repetition_penalty": repetition_penalty,
+            "no_repeat_ngram_size": no_repeat_ngram_size,
+            "length_penalty": length_penalty,
+        }
 
     def translate(self, texts: list[str]) -> list[str]:
         """One Arabic string per input. Long texts are split into sentences first (the model drops words from long
@@ -44,8 +57,7 @@ class Ct2Translator:
             batch,
             beam_size=self.beam,
             max_decoding_length=max(len(b) for b in batch) * 3 + 8,
-            no_repeat_ngram_size=3,  # without it this model can loop on a word until the length limit
-            repetition_penalty=1.1,
+            **self.decoding,  # no_repeat_ngram_size: without it this model can loop on a word until the length limit
         )
         done = [self.target.decode(r.hypotheses[0]).strip() for r in results]
         out, i = [], 0
@@ -53,6 +65,32 @@ class Ct2Translator:
             out.append(" ".join(d for d in done[i : i + len(ps)] if d))
             i += len(ps)
         return out
+
+
+class GameTranslator:
+    """Game text around the model (``gamefix``): fixed Arabic for stock UI lines, key prompts built from the key and the
+    translated action, numbers and place names kept out of the model's hands, ALL CAPS / Title Case read as sentences,
+    the Arabic cleaned afterwards. One model call per batch, as without it. ``inner`` is any ``Translator``."""
+
+    def __init__(self, inner: Translator, glossary: bool = True, common=None) -> None:
+        self.inner, self.glossary = inner, glossary
+        if common is None and hasattr(inner, "source"):
+            sp, unk = inner.source, inner.source.unk_id()
+            common = lambda w: sp.piece_to_id("\u2581" + w) != unk  # noqa: E731 - is it an everyday word of the model's vocabulary
+        self.common = common
+
+    def translate(self, texts: list[str]) -> list[str]:
+        jobs = [[gamefix.plan(s, self.common, self.glossary) for s in textproc.sentences(t)] for t in texts]
+        flat = [j for js in jobs for j in js]
+        need = [j for j in flat if not j.fixed and j.src]
+        done = dict(zip(map(id, need), self.inner.translate([j.src for j in need]) if need else [], strict=True))
+        result = {id(j): gamefix.finish(j, done.get(id(j), "")) for j in flat}
+        redo = [j for j in flat if result[id(j)] is None]  # a stand-in was lost or the output was no translation
+        if redo:
+            plain = [gamefix.Job(j.text, src=gamefix.sentence_case(j.text, self.common), imperative=j.imperative) for j in redo]
+            for j, p, ar in zip(redo, plain, self.inner.translate([p.src for p in plain]), strict=True):
+                result[id(j)] = gamefix.finish(p, ar) or ""
+        return [" ".join(r for j in js if (r := result[id(j)])) for js in jobs]
 
 
 class CachedTranslator:

@@ -45,12 +45,46 @@ Arabic box. The CI job `translate` produces the same picture on every run (artif
    one paragraph; its English is the cache key (case, spacing and punctuation normalised; 512 entries, so a repeated line is never
    translated twice; a read whose English equals the last read is not translated or drawn again); the paragraph is split into
    sentences (the model drops words from long inputs) and translated by opus-mt-en-ar on CTranslate2 (int8, CPU, beam 2,
-   no-repeat-3-gram); the Arabic box is rendered (`arabic.py`).
+   no-repeat-3-gram) inside the game rules of `gamefix.py` (below); the Arabic box is rendered (`arabic.py`).
 3. **Frame loop, output side.** After `gate.render`: look up the finished boxes whose read looked like this frame, copy the frame,
    blend the opaque boxes, send that copy to the sink. No match = the very same frame object, untouched.
 
 Regions: the subtitle band (bottom 20 %, middle 84 %). `TRANSLATE_REGIONS=subtitles,help` adds the top-left help box of GTA V
 (prompts such as "Press X to ..."). The regions are GTA V's; GTA 6 positions are one table (`service.REGIONS`).
+
+### Game text rules (`translate/gamefix.py`, `GameTranslator`)
+
+The bare model reads game screens badly: key names ("Press E" -> "اضغط على (إي)", ENTER -> "المُدخل"), amounts ("$15,000" -> "000 15"),
+ALL CAPS / Title Case titles, place names ("Vice City" -> "نائب المدينة"), fixed UI words, imperatives in the feminine ("اركبي").
+`GameTranslator` wraps it with deterministic rules (microseconds; still one model call per batch):
+
+* **Key prompts** ("Press / Hold / Tap KEY(S) to ACTION"): the Arabic head and the key are built by rule (key kept as written, ENTER /
+  SPACE / `~INPUT~` / `[E]` / mouse buttons), only the action goes to the model (as "In order to ..." and is turned into "ل..."); a small table gives
+  the actions the model gets wrong ("take cover", "crouch", "reload" ...).
+* **Stand-ins**: numbers with separators, money, times, percentages and distances are replaced by a number the model keeps (77, 88 ...)
+  and restored exactly; known place names (Vice City, Leonida Keys, Port Gellhorn ...) by a city the model always spells the same way
+  (Boston -> بوسطن ...) and restored as the glossary's Arabic. If a stand-in is lost, the sentence is translated again plain.
+* **Case**: ALL CAPS and Title Case become sentence case before translating (names, acronyms and the pronoun keep their capitals).
+* **Imperatives** get a leading "Please" (the model then answers with a verb, not a noun); the Arabic is made masculine singular
+  and the "please" dropped. Slang is made plain first ("gotta" -> "have to", "homie" -> "friend").
+* **After**: harakat, brackets and quotes the model adds are removed (unless in the English), closing punctuation follows the English,
+  a few terms are fixed (wanted level -> مستوى الملاحقة, mission -> المهمة, bank -> البنك, waypoint, safehouse ...), stock UI lines
+  ("Resume", "Mission failed", "WASTED") have fixed Arabic, and an answer that is empty or a loop is not shown.
+
+Measured with `python -m bench.translate_quality PACK --game [--heldout]` on the hand-written GTA-style sets in `tests/data/`
+(chrF; the *heldout* set was written before the rules and never used to tune them; the glossary can only be fair on it for lines
+it does not list: `--no-glossary` switches the fixed lines, prompt templates and action table off):
+
+| | tuned set (171 lines) | held-out (60 lines) |
+|---|---|---|
+| opus-mt-en-ar, bare | 53.3 | 61.5 |
+| + rules, no glossary | 64.7 | 68.5 |
+| + rules, full | 85.3 | 84.4 |
+
+Latency of one line on 2 shared cores (median / p95): 38 / 72 ms with 1 thread, 52 / 116 ms with 2 threads, rules included (they cost < 1 ms).
+`opus-mt-tc-big-en-ar` (CC-BY-4.0, 242 MB int8) scored 59.7 / 65.2 bare but 82.3 / 80.9 with the rules, at 100 ms: not worth 3x the download and 2.5x the latency.
+
+Add a game's own names and stock lines to `gamefix.NAMES` / `FIXED` / `ACTIONS` (plain tables).
 
 ### Arabic rendering
 
