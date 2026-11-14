@@ -190,7 +190,9 @@ def dress_region(mask: np.ndarray, kp: np.ndarray, sc: np.ndarray, oversize: flo
     a = (xx - sh[0]) * down[0] + (yy - sh[1]) * down[1]  # along the body (0 = shoulders, torso = hips)
     q = (xx - sh[0]) * perp[0] + (yy - sh[1]) * perp[1]  # across the body
     centre0 = float(np.dot((ls + rs) / 2 - sh, perp))  # 0
-    top = 0.06 * torso  # neckline just below the shoulder joints
+    # high neckline: from a little above the shoulder joints, so a bikini top / low neckline never shows above
+    # the fabric (trailer 1: the rooftop and the convertible). Narrow at the neck, full width at the bust
+    top = -0.10 * torso
     hip_w = max(float(np.linalg.norm(kp[L_HIP] - kp[R_HIP])) if len(hip_i) == 2 else 0.0, 0.6 * sw if hip_i else 0.75 * sw)
 
     def half_width(t: np.ndarray) -> np.ndarray:
@@ -198,8 +200,8 @@ def dress_region(mask: np.ndarray, kp: np.ndarray, sc: np.ndarray, oversize: flo
         t = np.asarray(t, np.float32)
         bust, waist = 0.50 * sw, 0.46 * sw
         hips = max(0.55 * sw, 0.62 * hip_w)
-        stops = [top, 0.45 * torso, 0.75 * torso, 1.05 * torso, max(hem, 1.06 * torso)]
-        return oversize * np.interp(t, stops, [bust * 0.92, bust, waist, hips, hips * 1.18])
+        stops = [top, 0.08 * torso, 0.45 * torso, 0.75 * torso, 1.05 * torso, max(hem, 1.06 * torso)]
+        return oversize * np.interp(t, stops, [bust * 0.62, bust * 0.92, bust, waist, hips, hips * 1.18])
 
     band = (a >= top) & (a <= hem)
     # the body axis can drift with the pelvis: centre the skirt on the hips below the waist
