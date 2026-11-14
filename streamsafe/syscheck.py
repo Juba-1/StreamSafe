@@ -200,8 +200,9 @@ def check_gpu(p: Probes) -> tuple[Check, Gpu | None]:
     rank = {"nvidia": 0, "amd": 1, "intel": 2, "other": 3}
     best = min(gpus, key=lambda g: (rank[g.vendor], -(g.vram_gb or 0)))
     names = ", ".join(g.name for g in gpus)
-    if is_integrated(best) or (best.vram_gb is not None and best.vram_gb < FAIL_VRAM_GB):
-        what = "built-in graphics" if is_integrated(best) else f"{best.vram_gb:.1f} GB video memory"
+    virtual = best.vendor == "other"  # Hyper-V / VMware / remote-desktop adapters: no real graphics card
+    if virtual or is_integrated(best) or (best.vram_gb is not None and best.vram_gb < FAIL_VRAM_GB):
+        what = "no real graphics card" if virtual else "built-in graphics" if is_integrated(best) else f"{best.vram_gb:.1f} GB video memory"
         return (
             Check(
                 "gpu",
