@@ -122,7 +122,7 @@ class TranslateConfig:
     translate_refresh_s: float = 2.0  # text that stays unchanged is read again this often
     translate_min_conf: float = 0.55  # OCR lines below this confidence are ignored
     translate_queue: int = 2  # reads waiting for the worker at most; more are dropped, never queued up
-    translate_threads: int = 2  # CPU threads of the worker (they sleep when idle)
+    translate_threads: int = 0  # CPU threads of the worker; 0 = auto (1 under 8 cores, else 2)
 
 
 @dataclass

@@ -85,7 +85,7 @@ def default_factory(cfg: Config) -> Pipeline:
 
     from streamsafe.translate.pipeline import load_pipeline
 
-    return load_pipeline(Path(cfg.translate.translate_dir), cfg.translate.translate_threads, cfg.translate.translate_min_conf)
+    return load_pipeline(Path(cfg.translate.translate_dir), cfg.translate.translate_threads or None, cfg.translate.translate_min_conf)
 
 
 def lower_priority() -> None:
