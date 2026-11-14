@@ -20,6 +20,7 @@ import bisect
 import collections
 import contextlib
 import multiprocessing as mp
+import os
 import queue
 import threading
 import time
@@ -87,7 +88,21 @@ def default_factory(cfg: Config) -> Pipeline:
     return load_pipeline(Path(cfg.translate.translate_dir), cfg.translate.translate_threads, cfg.translate.translate_min_conf)
 
 
+def lower_priority() -> None:
+    """The worker yields the CPU to the frame loop: below normal priority (best effort, never raises)."""
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00004000)
+        else:
+            os.nice(10)
+    except Exception:
+        pass
+
+
 def worker_main(cfg: Config, factory: Factory, size: FrameSize, jobs: Any, results: Any, stop: Any) -> None:
+    lower_priority()
     try:
         from streamsafe.runtime.threads import limit_threads
 
