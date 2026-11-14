@@ -149,6 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         return about("--json" in rest)
     if cmd == "encoder-probe":
         return encoder_probe()
+    if cmd == "translate-selftest":  # CI: the packaged program can load the translation libraries and draw Arabic
+        return translate_selftest()
     if cmd == "check":
         from streamsafe.syscheck import main as m
 
@@ -183,3 +185,17 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def translate_selftest() -> int:
+    try:
+        import ctranslate2  # noqa: F401
+        import sentencepiece  # noqa: F401
+
+        from streamsafe.translate.arabic import shape, visual_order
+
+        print("TRANSLATE_LIBS_OK", visual_order(shape("اضغط X لإنهاء الرقص")) != "", flush=True)
+        return 0
+    except Exception as exc:  # report, the caller decides
+        print("TRANSLATE_LIBS_FAILED", type(exc).__name__, exc, flush=True)
+        return 1

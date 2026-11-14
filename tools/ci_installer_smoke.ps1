@@ -68,6 +68,9 @@ $about = $aboutText | ConvertFrom-Json
 Check ($about.frozen -eq $true) "runs as the packaged program"
 Check ($about.expires -eq $Expires -and -not $about.expired -and $about.days_left -gt 0) "beta ends $($about.expires), $($about.days_left) days left"
 Check ($about.ffmpeg -like "$installDir*") "FFmpeg in use is the bundled one: $($about.ffmpeg)"
+$tr = (& $cli translate-selftest | Out-String)
+Write-Host $tr
+Check ($LASTEXITCODE -eq 0 -and $tr -match "TRANSLATE_LIBS_OK") "translation libraries load in the packaged program"
 Check ($about.data_dir -like "$env:LOCALAPPDATA*") "data folder is per user: $($about.data_dir)"
 Check ($about.version -eq $Version) "version $($about.version)"
 
