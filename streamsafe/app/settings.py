@@ -9,19 +9,26 @@ import os
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 
-INPUT_CAMERA, INPUT_SRT = "camera", "srt"
-OUTPUT_WINDOW, OUTPUT_RTMP = "window", "rtmp"
+INPUT_CAMERA, INPUT_SRT, INPUT_FILE = "camera", "srt", "file"
+OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
 @dataclass
 class Settings:
     lang: str = "ar"  # "ar" / "en"
-    input: str = INPUT_CAMERA  # INPUT_CAMERA: OBS Virtual Camera; INPUT_SRT: OBS streams to us over SRT
+    # INPUT_CAMERA: a capture device (OBS Virtual Camera, a capture card); INPUT_SRT: OBS streams to us over SRT;
+    # INPUT_FILE: a video that is already recorded (with OUTPUT_RECORD: "protect a finished video")
+    input: str = INPUT_CAMERA
     camera: str = DEFAULT_CAMERA
+    camera_sound: str = ""  # the sound input that belongs to the device (a capture card); "" = picture only
+    input_file: str = ""
     srt_port: int = 9000
-    output: str = OUTPUT_WINDOW  # OUTPUT_WINDOW: a window OBS captures; OUTPUT_RTMP: we stream to the platform
-    rtmp_url: str = ""  # the ingest address WITHOUT the stream key
+    # OUTPUT_WINDOW: a window OBS captures; OUTPUT_RTMP: we stream to the platform; OUTPUT_RECORD: a video file
+    output: str = OUTPUT_WINDOW
+    platform: str = "custom"  # ingest.PLATFORMS: which preset fills the address
+    rtmp_url: str = ""  # the ingest address WITHOUT the stream key ("" = the platform's preset)
+    record_dir: str = ""  # where recordings go ("" = the user's Videos folder)
     remember_key: bool = False
     delay: float = 2.0
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
@@ -36,8 +43,14 @@ class Settings:
             out.append("bad_port")
         if self.input == INPUT_CAMERA and not self.camera.strip():
             out.append("bad_camera")
-        if self.output == OUTPUT_RTMP and not valid_rtmp_url(self.rtmp_url):
-            out.append("bad_rtmp")
+        if self.input == INPUT_FILE and not os.path.isfile(self.input_file):
+            out.append("bad_input_file")
+        if self.input == INPUT_FILE and self.output != OUTPUT_RECORD:
+            out.append("bad_file_output")
+        if self.output == OUTPUT_RTMP:
+            from streamsafe.app import ingest
+
+            out += [p for p in ingest.resolve(self.rtmp_url, "k" * 8, self.platform).problems if p != "bad_key"]
         if not 0.5 <= self.delay <= 10:
             out.append("bad_delay")
         return out
@@ -70,9 +83,9 @@ def load(path: Path) -> Settings:
                 setattr(s, f.name, value)
     if s.lang not in ("ar", "en"):
         s.lang = "ar"
-    if s.input not in (INPUT_CAMERA, INPUT_SRT):
+    if s.input not in (INPUT_CAMERA, INPUT_SRT, INPUT_FILE):
         s.input = INPUT_CAMERA
-    if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP):
+    if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_WINDOW
     return s
 

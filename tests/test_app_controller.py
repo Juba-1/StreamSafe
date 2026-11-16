@@ -97,7 +97,8 @@ def test_exit_reasons_by_code_and_text(ctrl):
 def test_nothing_starts_when_anything_is_unclear(ctrl, monkeypatch):
     rtmp(ctrl)
     assert ctrl.blockers(KEY) == []
-    assert ctrl.blockers("") == ["bad_key"] and ctrl.blockers("a b") == ["bad_key"]
+    assert ctrl.blockers("") == ["bad_key"] and ctrl.blockers("a<b") == ["bad_key"]
+    assert ctrl.blockers(" " + KEY + " ") == []  # the stray spaces of a paste are taken off
     ctrl.settings.rtmp_url = "http://nope"
     assert "bad_rtmp" in ctrl.blockers(KEY)
     rtmp(ctrl)

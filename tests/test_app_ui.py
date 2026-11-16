@@ -82,7 +82,12 @@ def test_english_toggle_keeps_what_was_typed(app):
 
 
 def test_key_is_masked_and_never_saved_to_settings(app):
-    entries = [w for w in app.sets.winfo_children() for w in w.winfo_children() if isinstance(w, tk.Entry)]
+    def all_widgets(w):
+        for c in w.winfo_children():
+            yield c
+            yield from all_widgets(c)
+
+    entries = [w for w in all_widgets(app.sets) if isinstance(w, tk.Entry)]
     masked = [e for e in entries if str(e.cget("show")) == "•"]
     assert len(masked) == 1
     app._vars["key"].set("never_in_settings_123")
@@ -138,3 +143,43 @@ def test_status_words_follow_the_engine(app, monkeypatch):
     monkeypatch.setattr(app.ctrl, "status", lambda: engine.PROTECTED)
     app.show_status(force=True)
     assert clean(app.badge.cget("text")) == "Protected"
+
+
+def test_settings_offer_every_way_in_and_out(app):
+    t = " ".join(texts(app.sets))
+    for key in ("in_srt", "in_camera", "in_file", "out_rtmp", "out_record", "out_window", "test_link", "obs_guide"):
+        assert clean(i18n.t("ar", key)) in t, key
+
+
+def test_pasting_a_kick_address_with_the_key_fills_both_boxes(app):
+    app._vars["rtmp_url"].set("rtmps://fa723fc1b171.global-contribute.live-video.net/app/sk_us-west-2_abcDEF123")
+    app._vars["key"].set("")
+    app.tidy_target()
+    assert app._vars["rtmp_url"].get() == "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app"
+    assert app._vars["key"].get() == "sk_us-west-2_abcDEF123"
+    assert app.platform_value() == "kick"
+
+
+def test_platform_choice_fills_its_server(app):
+    app._vars["rtmp_url"].set("")
+    app._vars["platform"].set(app.tr("plat_youtube"))
+    app.on_platform()
+    assert app._vars["rtmp_url"].get() == "rtmps://a.rtmps.youtube.com:443/live2"
+    app._vars["platform"].set(app.tr("plat_twitch"))
+    app.on_platform()  # a preset is replaced by the next preset
+    assert app._vars["rtmp_url"].get() == "rtmps://live.twitch.tv:443/app"
+    app._vars["platform"].set(app.tr("plat_tiktok"))
+    app.on_platform()
+    assert app._vars["rtmp_url"].get() == "" and "LIVE Producer" in clean(app.platform_hint.cget("text"))
+
+
+def test_link_panel_says_what_obs_and_the_platform_do(app, monkeypatch):
+    monkeypatch.setattr(type(app.ctrl.engine), "running", property(lambda self: True))
+    app.ctrl.settings.input, app.ctrl.settings.output = "srt", "rtmp"
+    app.ctrl.link.take({"event": "waiting_obs", "port": 9000})
+    app.show_link()
+    assert "srt://127.0.0.1:9000" in clean(app.lk_in.cget("text"))
+    app.ctrl.link.take({"event": "obs_connected"})
+    app.ctrl.link.take({"event": "platform_lost", "reason": "broken", "retry_s": 4})
+    app.show_link()
+    assert "OBS" in clean(app.lk_in.cget("text")) and "4" in clean(app.lk_out.cget("text"))

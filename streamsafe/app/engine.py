@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from streamsafe.app import heads, paths, runtime_select
-from streamsafe.app.settings import INPUT_SRT, OUTPUT_RTMP, Settings
+from streamsafe.app.settings import INPUT_FILE, INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, Settings
 from streamsafe.branding import PRODUCT_NAME
 
 OUTPUT_ENV = "STREAMSAFE_OUTPUT_URL"
@@ -46,15 +46,70 @@ def exe_command(args: list[str]) -> list[str]:
     return [sys.executable, "-m", "streamsafe.app.entry", *args]
 
 
-def output_url(rtmp_url: str, key: str) -> str:
-    return rtmp_url.strip().rstrip("/") + "/" + key
+def output_url(rtmp_url: str, key: str, platform: str = "custom") -> str:
+    """The full output address (it holds the key). Normalised by ``ingest.resolve``: a Kick / IVS server pasted
+    without ``/app`` gets it, spaces are removed; "" when the address or the key cannot be used."""
+    from streamsafe.app import ingest
+
+    target = ingest.resolve(rtmp_url, key, platform)
+    return "" if target.problems else target.url
 
 
-def run_args(settings: Settings, reports: Path) -> list[str]:
+def run_args(settings: Settings, reports: Path, record_file: str = "") -> list[str]:
     """Arguments of ``run`` for these settings. Never holds the stream key."""
-    source = f"srt://127.0.0.1:{settings.srt_port}?mode=listener" if settings.input == INPUT_SRT else f"device:{settings.camera.strip()}"
-    sink = f"env:{OUTPUT_ENV}" if settings.output == OUTPUT_RTMP else "window"
+    if settings.input == INPUT_SRT:
+        source = f"srt://127.0.0.1:{settings.srt_port}?mode=listener"
+    elif settings.input == INPUT_FILE:
+        source = f"file:{settings.input_file}"
+    else:
+        sound = settings.camera_sound.strip()
+        source = f"device:{settings.camera.strip()}" + (f"|{sound}" if sound else "")
+    sink = (
+        f"env:{OUTPUT_ENV}" if settings.output == OUTPUT_RTMP else f"record:{record_file}" if settings.output == OUTPUT_RECORD else "window"
+    )
     return ["run", "--input", source, "--output", sink, "--delay", f"{settings.delay:g}", "--report-dir", str(reports)]
+
+
+@dataclass
+class LinkState:
+    """What the engine last said about its two links (``io/link.py``), for the window."""
+
+    input: str = ""  # "" / waiting / connected / disconnected / failed
+    platform: str = ""  # "" / connecting / connected / lost / failed
+    port: int = 0
+    reason: str = ""  # the last platform / input problem, a word of io/link.py
+    retry_s: float = 0.0
+    record_file: str = ""
+    recorded: bool = False
+    stopped: str = ""  # why the run ended ("" while it runs)
+    detail: str = ""
+
+    def take(self, event: dict) -> None:
+        name = event.get("event", "")
+        if name == "waiting_obs":
+            self.input = "waiting" if self.input in ("", "waiting") else "disconnected"
+            self.port = int(event.get("port") or 0)
+        elif name == "obs_connected":
+            self.input = "connected"
+        elif name == "obs_disconnected":
+            self.input = "disconnected"
+        elif name == "input_failed":
+            self.input, self.reason = "failed", str(event.get("reason", ""))
+        elif name == "platform_connecting":
+            self.platform = "connecting" if self.platform != "lost" else "lost"
+        elif name == "platform_connected":
+            self.platform, self.reason = "connected", ""
+        elif name == "platform_lost":
+            self.platform, self.reason = "lost", str(event.get("reason", ""))
+            self.retry_s = float(event.get("retry_s") or 0)
+        elif name == "platform_failed":
+            self.platform, self.reason = "failed", str(event.get("reason", ""))
+        elif name == "recording":
+            self.record_file, self.recorded = str(event.get("file", "")), False
+        elif name == "recorded":
+            self.record_file, self.recorded = str(event.get("file", "")), True
+        elif name == "stopped":
+            self.stopped, self.detail = str(event.get("reason", "")), str(event.get("detail", ""))
 
 
 def engine_env(

@@ -7,6 +7,9 @@
     <name>.exe about [--json]          version, build date, beta expiry, folders in use
     <name>.exe encoder-probe           which H.264 encoder of the bundled FFmpeg works on this PC
     <name>.exe ui                      the window (what <name>App.exe opens)
+    <name>.exe link-test --output env:NAME   a few seconds of the black slate to the platform: is the key taken?
+    <name>.exe devices                 capture devices of this PC (cameras, capture cards, their sound), one JSON line
+    <name>.exe selftest-stream --input ... --output ...   the live path without models: every frame fully covered
 
 In the installed program the product settings are filled in where the environment does not set them
 (``product_defaults``): the ONNX backend, the model folder ``<data>/models`` (or ``--models DIR``), the heads,
@@ -172,19 +175,56 @@ def main(argv: list[str] | None = None) -> int:
         if product and (why := heads.why_not(os.environ)):
             print(f"HEADS_{why.split()[0].upper()} no usable risk heads ({why}). Nothing was streamed.", flush=True)
             return NO_HEADS_EXIT
-        if product and os.environ.get("STREAMSAFE_SKIP_GPU_CHECK") != "1":
-            from streamsafe import syscheck
-
-            gpu_check, _ = syscheck.check_gpu(syscheck.Probes())
-            if gpu_check.status == syscheck.FAIL:  # never load the models on a card that cannot hold them: the PC can freeze
-                print(f"WEAK_GPU {gpu_check.detail}. Nothing was streamed.\n{gpu_check.fix_ar}", flush=True)
-                return WEAK_GPU_EXIT
-        if product:
-            encoders.choose_into(os.environ, rest)
         rest = resolve_env_outputs(rest, os.environ)
         if os.environ.get(engine.STOP_ENV) == "1":
             engine.stop_on_stdin_close()
-        from streamsafe.cli import main as m
+        from streamsafe import cli
+
+        def start_checks(outputs: list[str]) -> None:
+            """Run once the input is open (OBS can already connect) and before any output: the slower checks."""
+            if product and os.environ.get("STREAMSAFE_SKIP_GPU_CHECK") != "1":
+                from streamsafe import syscheck
+
+                gpu_check, _ = syscheck.check_gpu(syscheck.Probes())
+                if gpu_check.status == syscheck.FAIL:  # never load the models on a card that cannot hold them: the PC can freeze
+                    raise cli.Refused(WEAK_GPU_EXIT, "weak_gpu", f"WEAK_GPU {gpu_check.detail}. Nothing was streamed.\n{gpu_check.fix_ar}")
+            if product:
+                try:
+                    encoders.choose_into(os.environ, ["--output", *outputs[:1]])
+                except SystemExit as exc:
+                    raise cli.Refused(USAGE_EXIT, "no_encoder", str(exc)) from None
+
+        return cli.main(rest, before_outputs=start_checks)
+    elif cmd == "link-test":  # "Test connection": a few seconds of the black slate to the platform
+        from streamsafe.app import linktest
+
+        rest = resolve_env_outputs(rest, os.environ)
+        if product:
+            from streamsafe.app import encoders
+
+            try:
+                encoders.choose_into(os.environ, rest)
+            except SystemExit as exc:
+                print(f"{exc}\nLINK_TEST failed no_encoder", flush=True)
+                return linktest.FAILED_EXIT
+        return linktest.main(rest)
+    elif cmd == "devices":  # the capture devices of this PC, one JSON line
+        import json
+
+        from streamsafe.io.sources import list_devices
+
+        print("DEVICES " + json.dumps(list_devices(paths.find_ffmpeg() or "ffmpeg"), ensure_ascii=False), flush=True)
+        return 0
+    elif cmd == "selftest-stream":  # CI / support: the whole live path without models (every frame fully covered)
+        from streamsafe import cli
+        from streamsafe.runtime.cover_all import cover_all_analyzer
+
+        rest = resolve_env_outputs(rest, os.environ)
+        if product:
+            from streamsafe.app import encoders
+
+            encoders.choose_into(os.environ, rest)
+        return cli.main(rest, factory=cover_all_analyzer)
     else:
         print((__doc__ or "").replace("<name>", CLI_EXE))
         return 0 if cmd in ("", "-h", "--help") else USAGE_EXIT

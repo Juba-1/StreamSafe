@@ -48,11 +48,24 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
         problems.append("dropped_frames")
     if s.get("frames_out", -1) == 0:
         problems.append("never_started")
+    reason = s.get("stop_reason", "")
+    if reason in FAILED_REASONS:
+        problems.append(reason)
+    runtime = runtime_of(str(s.get("gpu") or ""))
+    if runtime in ("cuda", "directml") and s.get("frames_out"):
+        problems.append("slow_runtime")
     return dict(
         app_version=__version__,
         created=time.strftime("%Y-%m-%d %H:%M:%S"),
         os=f"{platform.system()} {platform.release()}",
-        device=s.get("gpu") or s.get("device") or "",
+        device=_device(s),
+        runtime=runtime,
+        slate_episodes=s.get("slate_episodes"),
+        stop_reason=reason,
+        stop_detail=s.get("stop_detail", ""),
+        input_connections=s.get("input_connections"),
+        platform_reconnects=s.get("platform_reconnects", 0),
+        unsent_frames=s.get("unsent_frames", 0),
         mode=s.get("mode", ""),
         minutes=round(s.get("seconds", 0) / 60, 1),
         decisions_per_s=s.get("decisions_per_s", 0),
@@ -70,7 +83,61 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
     )
 
 
+FAILED_REASONS = ("input_failed", "platform_failed", "error", "start_failed")
+
+RUNTIME_TEXT = {
+    "tensorrt": "إنفيديا - الوضع السريع / NVIDIA fast mode (TensorRT)",
+    "cuda": "إنفيديا - الوضع العادي، أبطأ: جهّز الوضع السريع من تبويب الفحص / NVIDIA normal mode (slower: prepare the fast mode)",
+    "directml": "DirectML - أبطأ وضع: على كرت إنفيديا فعّل الوضع السريع / DirectML (slowest: on an NVIDIA card turn on the fast mode)",
+    "cpu": "المعالج / CPU",
+    "": "-",
+}
+
+
+def runtime_of(gpu: str) -> str:
+    """What the models ran on, in one word: tensorrt / cuda / directml / cpu ("" = unknown). A run where only some
+    models were on TensorRT ("onnx-trt+cuda") counts as the slower one."""
+    g = gpu.lower()
+    if "dml" in g or "directml" in g:
+        return "directml"
+    if "cuda" in g:
+        return "cuda"
+    if "trt" in g or "tensorrt" in g:
+        return "tensorrt"
+    return "cpu" if g == "cpu" else ""
+
+
+AR_REASONS = {
+    "user": "أوقفته أنت",
+    "input_ended": "انتهى الدخل (OBS وقف الإرسال أو خلص الملف)",
+    "input_failed": "ما قدرنا نفتح الدخل (المنفذ مشغول أو الجهاز غير موجود)",
+    "platform_failed": "المنصة ما قبلت البث (العنوان أو المفتاح غلط، أو ما فيه إنترنت)",
+    "error": "خطأ داخل البرنامج",
+    "start_failed": "المحرك توقف قبل ما يبدأ",
+}
+
+
+def _device(summary: dict) -> str:
+    """The graphics card of the run; for a run that ended before the models loaded, the card the PC has (so a
+    report of a failed start still says which machine it was)."""
+    named = summary.get("gpu") or summary.get("device") or ""
+    if named and named != "?":
+        return str(named)
+    try:
+        from streamsafe import syscheck
+
+        gpus = syscheck._gpus()
+        return ", ".join(g.name for g in gpus) + " (not loaded)" if gpus else ""
+    except Exception:
+        return ""
+
+
 AR_PROBLEMS = {
+    "input_failed": "الدخل ما انفتح: تأكد إن المنفذ نفسه في OBS وما فيه برنامج ثاني ماسكه",
+    "platform_failed": "المنصة رفضت البث: راجع عنوان البث والمفتاح",
+    "error": "البرنامج توقف بسبب خطأ",
+    "start_failed": "المحرك توقف قبل ما يبدأ البث",
+    "slow_runtime": "البرنامج اشتغل على الوضع الأبطأ: فعّل الوضع السريع لإنفيديا من تبويب الفحص عشان ما تكثر الشاشة الكاملة",
     "analyzer_errors": "حصلت أخطاء في التحليل (البث كان مغطى وقتها)",
     "worker_restarts": "محرك التحليل أعاد التشغيل أثناء البث",
     "long_failclosed": "الشاشة تغطت بالكامل لفترة طويلة بسبب بطء أو خطأ",
@@ -90,10 +157,20 @@ def text(r: dict[str, Any]) -> str:
         f"قرارات بالثانية / decisions per second: {r['decisions_per_s']}   أبطأ 5% / p95: {r['decision_ms_p95']} ms",
         f"لقطات فيها شخصيات تحتاج تغطية / risky decisions: {r['risky_decisions']}",
         f"تغطية كاملة للمشهد / full-scene cover: {r['full_cover_s']} s",
-        f"تغطية احتياطية (خطأ أو بطء) / fail-closed cover: {r['failclosed_s']} s",
+        f"تغطية احتياطية (خطأ أو بطء) / fail-closed cover: {r['failclosed_s']} s"
+        + (f"   مرات / episodes: {r['slate_episodes']}" if r.get("slate_episodes") is not None else ""),
+        f"طريقة التشغيل / runtime: {RUNTIME_TEXT.get(r.get('runtime', ''), r.get('runtime', ''))}",
         f"صوت مكتوم / muted audio: {r['muted_s']} s",
         f"النتيجة / verdict: {ar_verdict} ({r['verdict']})",
     ]
+    if r.get("stop_reason"):
+        why = r["stop_reason"]
+        lines.append(f"سبب التوقف / stopped because: {AR_REASONS.get(why, why)} ({why}) {r.get('stop_detail', '')}".rstrip())
+        lines.append(
+            f"اتصالات OBS / OBS connections: {r.get('input_connections')}   "
+            f"إعادة الاتصال بالمنصة / platform reconnects: {r.get('platform_reconnects', 0)}   "
+            f"فريمات ما انرسلت / unsent frames: {r.get('unsent_frames', 0)}"
+        )
     for p in r["problems"]:
         lines.append(f"  - {AR_PROBLEMS.get(p, p)} ({p})")
     lines.append(f"أرسل هذا الملف لفريق {PRODUCT_NAME}. ما فيه صور ولا مفتاح البث.")
@@ -101,12 +178,39 @@ def text(r: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write(report: dict[str, Any], fps: float, folder: str | os.PathLike | None = None) -> Path:
+def write(report: dict[str, Any], fps: float, folder: str | os.PathLike | None = None, log: list[str] | None = None) -> Path:
+    """``log``: the engine's last lines (already without the key), added under the report (``add_log``)."""
     out = Path(folder) if folder else default_dir()
     out.mkdir(parents=True, exist_ok=True)
     r = build(report, fps)
     stem = "session_" + time.strftime("%Y%m%d_%H%M%S")
+    n = 1
+    while (out / f"{stem}.txt").exists():  # two reports in one second (a start that fails at once, twice)
+        n += 1
+        stem = "session_" + time.strftime("%Y%m%d_%H%M%S") + f"_{n}"
     (out / f"{stem}.json").write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
     path = out / f"{stem}.txt"
     path.write_text(text(r), encoding="utf-8")
+    if log:
+        add_log(path, log)
     return path
+
+
+LOG_HEAD = "--- سجل المحرك (آخر الأسطر) / engine log (last lines) ---"
+
+
+def add_log(path: Path, lines: list[str], keep: int = 40) -> None:
+    """Put the engine's last lines under a report (once): a failed start then explains itself in one file."""
+    try:
+        if LOG_HEAD in path.read_text(encoding="utf-8"):
+            return
+        with open(path, "a", encoding="utf-8") as f:
+            f.write("\n" + LOG_HEAD + "\n" + "\n".join(line[:300] for line in lines[-keep:]) + "\n")
+    except OSError:
+        pass
+
+
+def write_failure(reason: str, detail: str, lines: list[str], folder: str | os.PathLike | None = None) -> Path:
+    """The report of an engine that ended without writing one (it was refused at start, crashed or was killed)."""
+    summary = {"frames_out": 0, "seconds": 0, "analyzer_errors": 0, "stop_reason": reason, "stop_detail": detail[:400]}
+    return write({"summary": summary}, 30.0, folder, lines)

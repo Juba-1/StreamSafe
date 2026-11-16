@@ -11,6 +11,10 @@ state = Path(os.environ["OBS_STATE"])
 state.parent.mkdir(parents=True, exist_ok=True)
 print("args:", " ".join(sys.argv[1:]), flush=True)
 print("output:", os.environ.get("STREAMSAFE_OUTPUT_URL", "-"), flush=True)
+for line in filter(None, os.environ.get("FAKE_STATUS", "").split("|")):  # STATUS lines the real engine would print
+    print("STATUS " + line, flush=True)
+if os.environ.get("FAKE_EXIT"):
+    sys.exit(int(os.environ["FAKE_EXIT"]))
 if os.environ.get("FAKE_CRASH"):
     sys.exit(3)
 seq = 0
