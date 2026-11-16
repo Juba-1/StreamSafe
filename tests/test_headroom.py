@@ -105,14 +105,15 @@ def test_warmup_measures_this_pcs_models():
     assert h is not None and (h.step_ms, h.limit_ms) == (STEP, LIMIT)
     assert h.fixed_ms == pytest.approx(39.0) and h.eye_one_ms == pytest.approx(26.0) and h.eye_full_ms == pytest.approx(304.0)
     assert sizes[-2 * headroom.RUNS :] == [1] * headroom.RUNS + [FULL_BATCH] * headroom.RUNS, "timed after every size was warmed"
-    assert an.stats["headroom"] == [h.as_dict()] and h.budget == 7
+    assert an.stats["headroom"] == [dict(h.as_dict(), budget_applied=7)] and h.budget == 7
 
 
-def test_the_automatic_budget_is_off_unless_asked_realtime_only_and_an_explicit_budget_wins():
+def test_the_automatic_budget_is_on_by_default_realtime_only_and_an_explicit_budget_wins():
     for settings, expect in (
-        ({}, 0),  # the default: measured and reported, nothing changed
-        (dict(eye_budget_auto=True), 7),
-        (dict(eye_budget_auto=True, mode="offline"), 0),  # benchmarks must not depend on the machine
+        ({}, 7),  # the default since the laptop field report: a slow path gets its budget without being asked
+        (dict(eye_budget_auto=False), 0),  # switched off: measured and reported, nothing changed
+        (dict(mode="offline"), 0),  # benchmarks must not depend on the machine
+        (dict(eye_budget_auto=True, mode="offline"), 0),
         (dict(eye_budget_auto=True, eye_budget=4), 4),
     ):
         an, clock, _ = timed_analyzer(**SLOW, **settings)

@@ -31,12 +31,16 @@ def summarize(gate_stats: dict, analyzer_stats: dict, n_frames: int, n_decisions
         else:
             out[key] = values
     seconds = n_frames / fps if fps else 0.0
+    episodes = slate_episodes(merged.get("failclosed_frames", []))
     out["summary"] = dict(
         frames_out=n_frames,
         seconds=round(seconds, 1),
         decisions=n_decisions,
         decisions_per_s=round(n_decisions / max(1e-6, seconds), 2),
         failclosed_frames=len(merged.get("failclosed_frames", [])),
+        # separate times the fail-closed slate came on (a run of slate frames is one episode), and the longest one
+        slate_episodes=len(episodes),
+        slate_longest_frames=max((b - a + 1 for a, b in episodes), default=0),
         held_frames=len(merged.get("held_frames", [])),
         scene_frames=len(merged.get("scene_frames", [])),
         muted_frames=len(merged.get("muted_frames", [])),
@@ -44,6 +48,18 @@ def summarize(gate_stats: dict, analyzer_stats: dict, n_frames: int, n_decisions
         **extra,
     )
     return out
+
+
+def slate_episodes(frames: list[int]) -> list[tuple[int, int]]:
+    """(first, last) frame of every unbroken run of fail-closed slate frames: what a viewer counts as "the cover
+    card came up once"."""
+    runs: list[tuple[int, int]] = []
+    for v in sorted(frames):
+        if runs and v - runs[-1][1] <= 1:
+            runs[-1] = (runs[-1][0], v)
+        else:
+            runs.append((v, v))
+    return runs
 
 
 def write_outputs(report: dict, stats_path: str, diag_path: str, decisions_log: list, draw_log: list | None) -> None:

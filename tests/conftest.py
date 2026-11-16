@@ -23,6 +23,9 @@ class MemorySink:
 
 
 def run_stub(path: str, mode: str, scene_model: bool = False, **settings) -> tuple[dict, MemorySink]:
+    # the governor follows the real clock: on a busy CI runner a slow stand-in decision would add covers and make
+    # these runs depend on the machine. It has its own tests (tests/test_governor.py), also through this runner
+    settings.setdefault("eye_budget_adapt", False)
     cfg = Config.from_env(env={}, mode=mode, delay=1.0, **settings)
     source = VideoFileSource(path, cfg.runtime.fps)
     sink = MemorySink()

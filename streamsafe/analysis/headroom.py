@@ -11,10 +11,14 @@ a failed engine build. So the engine times its own models during warm-up and der
     batch keeps a decision well inside the slate limit, so a fast TensorRT path runs exactly as without a budget.
     Otherwise the largest batch that does, never below ``MIN_BUDGET``.
 
-The rule is a pure function of five numbers (``Headroom``), applied once when the analyzer starts and never
-changed while it runs: no controller, nothing that can flip back and forth in mid-stream. It only ever chooses
-between "no budget" and "a budget", and a budget only adds covers (``analysis/eye_schedule.py``). The offline
-mode never applies it: benchmark results must not depend on the machine.
+The start rule is a pure function of five numbers (``Headroom``), applied once when the analyzer starts. It only
+ever chooses between "no budget" and "a budget", and a budget only adds covers (``analysis/eye_schedule.py``).
+The offline mode never applies it: benchmark results must not depend on the machine.
+
+What the start cannot know is what else will use the GPU once the stream runs (the game, the encoder, a laptop
+that throttles when it gets hot). ``BudgetGovernor`` (``EYE_BUDGET_ADAPT``, realtime only) follows the decisions'
+own measured times: one that ran over the limit lowers the budget at once, a long calm stretch raises it by one,
+never above where it started. Like the budget itself it can only add covers, never remove one.
 """
 
 from __future__ import annotations
@@ -112,3 +116,82 @@ def measure(models: Models, cfg: Config, clock: Callable[[], float] = time.perf_
         step_ms=cfg.runtime.step_every * frame_ms,
         limit_ms=SPAN_SHARE * cfg.render.max_span * frame_ms,
     )
+
+
+GOVERNOR_FLOOR = 1  # the governor may go below MIN_BUDGET: one look per decision still gets everybody seen in turn
+CALM_DECISIONS = 30  # decisions at the full budget, all with room for one more crop, before the budget is raised by one
+RELAX_SHARE = 0.85  # "room for one more crop": the decision scaled to budget + 1 crops stays under this share of the limit
+PLAIN_DECISIONS = 100  # plain covers stay on this long (10 s) after the slow decision that turned them on ...
+PLAIN_MAX = 1200  # ... doubling whenever dresses prove too slow again right after coming back, up to this (2 min)
+
+
+class BudgetGovernor:
+    """What the analyzer may spend per decision while the stream runs (realtime only). Deterministic for a given
+    series of decision times; both of its levers can only make the cover bigger, never smaller.
+
+    The eye budget:
+    * A decision that looked at ``crops`` people and took longer than ``limit_ms`` lowers the budget, in
+      proportion to how far over it was and by at least one, never below ``GOVERNOR_FLOOR``. One slow decision is
+      enough: the next one over the slate limit would be a slate for everybody.
+    * The budget is raised by one only after ``CALM_DECISIONS`` decisions that used the whole budget and still
+      had room for one more crop; a slow decision in between starts the count again. Decisions that did not need
+      the budget prove nothing about a bigger one and are not counted.
+    * It never goes above the start value (``start`` 0 = no limit: back to no limit after ``FULL_BATCH - 1``).
+
+    Plain covers (``plain``): a slow decision whose time went into drawing dresses (pose model + cloth, CPU work
+    the eye budget cannot touch) more than into the eye switches every garment to the plain full-body cover for
+    ``PLAIN_DECISIONS`` decisions. The plain cover hides more than the dress (the whole body, head included) and
+    costs a tenth of it. If dresses are too slow again within ``PLAIN_DECISIONS`` of coming back, the next plain
+    period is twice as long (at most ``PLAIN_MAX``), so a PC that cannot afford dresses does not flip all the time.
+    """
+
+    def __init__(self, start: int, limit_ms: float) -> None:
+        self.start = start
+        self.limit_ms = limit_ms
+        self.budget = start
+        self.plain = False
+        self._calm = 0
+        self._plain_left = 0
+        self._plain_period = PLAIN_DECISIONS
+        self._since_plain = PLAIN_DECISIONS  # decisions since plain covers were last switched off
+        self.lowered = 0  # how often it had to lower the budget (run report)
+        self.lowest = start  # the smallest budget it came down to (0 = it never needed one)
+        self.plain_periods = 0  # how often it switched to plain covers (run report)
+
+    def update(self, total_ms: float, crops: int, eye_ms: float = 0.0, dress_ms: float = 0.0) -> int:
+        """Takes the time of the decision just made, its eye batch, and the time its eye and its dresses (pose +
+        garments) took; returns the eye budget of the next decision and sets ``plain`` for it."""
+        current = self.budget or FULL_BATCH
+        slow = total_ms > self.limit_ms
+        if self.plain:
+            self._plain_left -= 1
+            if slow:  # still slow without dresses: stay plain for a full period from here
+                self._plain_left = self._plain_period
+            elif self._plain_left <= 0:
+                self.plain, self._since_plain = False, 0
+        else:
+            self._since_plain += 1
+            if slow and dress_ms > eye_ms:
+                if self._since_plain <= PLAIN_DECISIONS:
+                    self._plain_period = min(PLAIN_MAX, 2 * self._plain_period)
+                else:
+                    self._plain_period = PLAIN_DECISIONS
+                self.plain, self._plain_left, self.plain_periods = True, self._plain_period, self.plain_periods + 1
+        if slow:
+            self._calm = 0
+            if crops > 0:
+                fits = int(min(current, crops) * self.limit_ms / total_ms)
+                lower = max(GOVERNOR_FLOOR, min(current - 1, fits))
+                if lower != self.budget:
+                    self.budget, self.lowered = lower, self.lowered + 1
+                    self.lowest = lower if self.lowest == 0 else min(self.lowest, lower)
+        elif self.budget != self.start and crops >= current:
+            if total_ms * (current + 1) / current <= RELAX_SHARE * self.limit_ms:
+                self._calm += 1
+                if self._calm >= CALM_DECISIONS:
+                    self._calm = 0
+                    raised = current + 1
+                    self.budget = self.start if raised >= (self.start or FULL_BATCH) else raised
+            else:
+                self._calm = 0
+        return self.budget

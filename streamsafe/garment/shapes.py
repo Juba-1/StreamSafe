@@ -102,7 +102,13 @@ def robe_region(mask: np.ndarray) -> tuple[np.ndarray, dict | None]:
     robe = np.zeros_like(upright)
     cv2.fillPoly(robe, [poly.astype(np.int32)], 1)
     ks = max(3, int(0.10 * height)) | 1
-    robe = cv2.morphologyEx(robe, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks)))
+    # opened inside the robe's own box only (plus a kernel of margin): the same pixels as opening the whole
+    # upright canvas, which is mostly empty, at a fraction of the time (the opening was most of a robe's cost)
+    px1, py1 = max(0, int(poly[:, 0].min()) - ks), max(0, int(top) - ks)
+    px2, py2 = min(big, int(poly[:, 0].max()) + ks + 2), min(big, int(bot) + ks + 2)
+    if px2 > px1 and py2 > py1:
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))
+        robe[py1:py2, px1:px2] = cv2.morphologyEx(robe[py1:py2, px1:px2].copy(), cv2.MORPH_OPEN, kernel)
     inv = cv2.invertAffineTransform(rot)
     region = cv2.warpAffine(robe, inv, (w, h), flags=cv2.INTER_NEAREST).astype(bool) | mask
     return region, {"R": rot, "Ri": inv, "big": big, "top": top, "bot": bot, "ang": angle}

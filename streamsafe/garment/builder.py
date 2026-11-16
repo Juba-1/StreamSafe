@@ -2,6 +2,8 @@
 
 Two looks, chosen per person with hysteresis (``choose_mode``):
   * "small" - far / small person: opaque plain cloth over the whole (slightly dilated) body;
+  * "plain" - the same plain cloth for a person of any size, with the dress's wider margin around the body:
+              what everybody wears while the PC is too slow for dresses (``headroom.BudgetGovernor``);
   * "full"  - pose-shaped dress (robe when the pose is unreliable) with cloth shading.
 Continuity between decisions: the skeleton is smoothed, and a garment never shrinks in a single
 step (it is united with the previous decision's own garment, moved to the new box).
@@ -95,7 +97,7 @@ class GarmentBuilder:
             body = (body & ~safe_px) | (own & ~merged)  # own pixels go only to a safe person merged into the box
         safe_near = cv2.dilate(safe_px.astype(np.uint8), K5).astype(bool) if safe_px.any() else safe_px
 
-        if mode == "small":
+        if mode in ("small", "plain"):
             cover = body & ~(safe_near & ~own)
             if cover.sum() < MIN_PIXELS:
                 return None

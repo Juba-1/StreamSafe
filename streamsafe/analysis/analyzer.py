@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
@@ -27,7 +28,8 @@ from streamsafe.config import Config
 from streamsafe.garment.builder import GarmentBuilder, SafePerson, choose_mode
 from streamsafe.models import Models
 from streamsafe.render.motion import make_motion_ref
-from streamsafe.types import ANALYSIS_SIZE, Decision, Person
+from streamsafe.runtime.threads import usable_cpus
+from streamsafe.types import ANALYSIS_SIZE, Decision, Layer, Person
 
 SWIM_SHIFT = 0.05  # beach / pool scenes lower the threshold by up to this (x score scale)
 SCENE_EVERY_S = 1.0  # scene model period when only the beach prior needs it (and on every cut)
@@ -63,12 +65,17 @@ class Analyzer:
         self.stats: defaultdict[str, list] = defaultdict(list)
         self.diag: list = []
         self.headroom: headroom.Headroom | None = None  # this PC's measured model times, set by ``warmup``
+        self.clock: Callable[[], float] = time.perf_counter  # what decisions are timed with (tests: a clock of their own)
+        self.governor: headroom.BudgetGovernor | None = None  # realtime: follows the measured decision times
+        threads = cfg.garment.garment_threads or min(4, max(1, usable_cpus() // 2))
+        self._pool = ThreadPoolExecutor(threads, thread_name_prefix="garment") if threads > 1 else None
 
     def warmup(self, clock: Callable[[], float] = time.perf_counter) -> None:
         """One pass of every model so the first real frame does not pay for lazy initialisation, then the
         model times of this PC (``analysis/headroom.py``): they go into the run report, and with
         ``eye_budget_auto`` they set the eye budget, once, before the first decision."""
         w, h = ANALYSIS_SIZE
+        self.clock = clock
         blank = np.zeros((h, w, 3), np.uint8)
         self.models.detector(blank)
         for n in range(1, min(WARM_EYE, self.eyes.budget or WARM_EYE) + 1):
@@ -85,12 +92,14 @@ class Analyzer:
         if self.cfg.eye.eye_budget_auto and self.eyes.budget == 0 and self.cfg.runtime.mode == "realtime":
             self.eyes.budget = self.headroom.budget
             report["budget_applied"] = self.eyes.budget
+        if self.cfg.eye.eye_budget_adapt and self.cfg.runtime.mode == "realtime":
+            self.governor = headroom.BudgetGovernor(self.eyes.budget, self.headroom.limit_ms)
         self.stats["headroom"] = [report]
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
         """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
         also supplies the eye crops)."""
-        t0 = time.perf_counter()
+        t0 = self.clock()
         timings: dict[str, float] = {}
         im = frame if frame.shape[1::-1] == ANALYSIS_SIZE else cv2.resize(frame, ANALYSIS_SIZE, interpolation=cv2.INTER_AREA)
         full = frame if self.cfg.eye.full_res_crops and frame.shape[1] > ANALYSIS_SIZE[0] else None
@@ -99,9 +108,21 @@ class Analyzer:
         except Exception as exc:
             decision = Decision(frame_id=frame_id, ok=False)
             self.stats["analyzer_errors"].append(f"{exc!r:.300}")
-        timings["total"] = time.perf_counter() - t0
+        timings["total"] = self.clock() - t0
         for name, seconds in timings.items():
             self.stats["ms_" + name].append(1000 * seconds)
+        if self.governor is not None:  # what the next decision may spend follows what this one cost
+            looked = decision.ok and not decision.scene and "eye" in timings
+            self.eyes.budget = self.governor.update(
+                1000 * timings["total"],
+                self.stats["embedded"][-1] if looked else 0,
+                1000 * timings.get("eye", 0.0),
+                1000 * (timings.get("pose", 0.0) + timings.get("garment", 0.0)),
+            )
+            self.stats["eye_budget"].append(self.eyes.budget)
+            self.stats["plain_covers"].append(int(self.governor.plain))
+            g = self.governor
+            self.stats["governor"] = [dict(budget_lowered=g.lowered, budget_lowest=g.lowest, plain_periods=g.plain_periods)]
         self.stats["people"].append(decision.n_people)
         self.stats["risky"].append(decision.n_risky)
         return decision
@@ -111,17 +132,17 @@ class Analyzer:
     ) -> Decision:
         cfg, st = self.cfg, self.stats
         rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        clock = time.perf_counter()
-        t = clock if now is None else now  # scene clock: the stream time offline, so runs repeat exactly
+        clock = self.clock()
+        t = time.perf_counter() if now is None else now  # scene clock: the stream time offline, so runs repeat exactly
 
         scene_on, scene_from = self._scene_step(frame_id, rgb, im if full is None else full, cut, t)
         st["scene_on"].append(int(scene_on))
-        timings["scene"], clock = _lap(clock)
+        timings["scene"], clock = self._lap(clock)
         if scene_on:  # the whole frame is covered: no person work needed (saves GPU for the stream)
             return Decision(frame_id=frame_id, ok=True, scene=True, scene_from=scene_from)
 
         people, crops = self.detect(rgb, full, full_bgr=True)
-        timings["detect"], clock = _lap(clock)
+        timings["detect"], clock = self._lap(clock)
 
         looks = self.eyes.plan(people, self.tracker, cut)
         st["eye_skipped"].append(looks.skipped)
@@ -139,15 +160,15 @@ class Analyzer:
             st["eye_early"].append(looks.early)
         waiting = [people[j] for j in looks.waiting]  # not seen and not tracked yet: covered, outside the tracker
         people = [p for p in people if p.tid >= -1]  # waiting ids are below -1
-        timings["eye"], clock = _lap(clock)
+        timings["eye"], clock = self._lap(clock)
 
         self.tracker.assign(people, cut)
         thr = self.thr - SWIM_SHIFT * self.scale * (self.p_swim if cfg.eye.scene_prior else 0.0)
         self.policy.update(people, self.tracker, thr, now)
         self.tracker.forget_old()
-        timings["track"], clock = _lap(clock)
+        timings["track"], clock = self._lap(clock)
         st["body_rule"].append(self._body_rule(im, rgb, people))
-        timings["body"], clock = _lap(clock)
+        timings["body"], clock = self._lap(clock)
 
         risky = [p for p in people if p.risky]
         risky_px = sum(int(p.mask.sum()) for p in risky)
@@ -158,18 +179,23 @@ class Analyzer:
         plan = [(p, self._mode(p)) for p in risky]
         dressed = [p for p, mode in plan if mode == "full"]
         poses = dict(zip(map(id, dressed), self.models.pose(rgb, [p.box for p in dressed]), strict=True)) if dressed else {}
-        timings["pose"], clock = _lap(clock)
+        timings["pose"], clock = self._lap(clock)
 
         safe = [SafePerson(p.mask, p.box, int(p.mask.sum())) for p in people if not p.risky and p.p < SAFE_P * self.scale]
         gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY) if cfg.render.motion else None
-        layers, refs = [], {}
-        for person, mode in plan:
+        refs: dict = {}
+
+        def dress(item: tuple[Person, str]) -> Layer | None:
+            person, mode = item
             memory = self.tracker.tracks[person.tid].garment
             layer = self.garments.build(im, person, mode, memory, safe, self.tracker.decision, cut, poses.get(id(person)))
-            if layer is not None:
-                if gray is not None:
-                    layer.motion = make_motion_ref(gray, person.mask, person.box)
-                layers.append(layer)
+            if layer is not None and gray is not None:
+                layer.motion = make_motion_ref(gray, person.mask, person.box)
+            return layer
+
+        # every person has their own garment memory and nothing else is written: side by side gives the same layers
+        built = self._pool.map(dress, plan) if self._pool is not None and len(plan) > 1 else map(dress, plan)
+        layers = [layer for layer in built if layer is not None]
         if gray is not None and cfg.render.lookahead:  # a later decision may cover these people here
             covered = {layer.tid for layer in layers}
             for p in people:
@@ -183,7 +209,7 @@ class Analyzer:
                 if gray is not None:
                     layer.motion = make_motion_ref(gray, person.mask, person.box)
                 layers.append(layer)
-        timings["garment"], _ = _lap(clock)
+        timings["garment"], _ = self._lap(clock)
 
         people = people + waiting
         risky = risky + waiting
@@ -201,6 +227,10 @@ class Analyzer:
             people=[(p.tid, p.box) for p in people],
             refs=refs,
         )
+
+    def _lap(self, start: float) -> tuple[float, float]:
+        now = self.clock()
+        return now - start, now
 
     def _body_rule(self, im: np.ndarray, rgb: np.ndarray, people: list[Person]) -> int:
         """Women the eye left uncovered: a big back view, a hips close-up or a bare belly is covered anyway
@@ -238,6 +268,8 @@ class Analyzer:
         track = self.tracker.tracks[person.tid]
         if person.put_off and not track.risk.risky:
             return "small"
+        if self.governor is not None and self.governor.plain:
+            return "plain"  # this PC is too slow for dresses right now: the plain cover hides more and costs a tenth
         return choose_mode(person.height, track.garment, self.cfg.garment.small_h)
 
     def _coast(self, people: list, layers: list, cut: bool) -> int:
@@ -325,8 +357,3 @@ def eye_crop(image: np.ndarray, box: tuple[int, int, int, int], mask: np.ndarray
     crop = image[y1:y2, x1:x2].copy()
     crop[~inside] = (crop[~inside] * CROP_BACKGROUND).astype(np.uint8)  # isolate the person
     return crop
-
-
-def _lap(start: float) -> tuple[float, float]:
-    now = time.perf_counter()
-    return now - start, now

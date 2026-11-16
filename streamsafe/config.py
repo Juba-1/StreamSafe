@@ -60,9 +60,15 @@ class EyeConfig:
     eye_budget: int = 0
     # realtime only, and only with eye_budget = 0: set the budget once at start from this PC's own measured model
     # times (analysis/headroom.py). It stays 0 where a full eye batch fits well inside the slate limit (a fast
-    # TensorRT path) and comes on where it does not (CUDA after a TensorRT failure, a small card). Off until a
-    # GPU run has checked the rule (SPEED_PLAN.md, E9)
-    eye_budget_auto: bool = False
+    # TensorRT path) and comes on where it does not (CUDA after a TensorRT failure, DirectML, a small card).
+    # On since the laptop field report of 15 Nov 2026 and the consumer-card runs (SPEED_PLAN.md, E9 / 3.6):
+    # without it a mid-range card showed the slate after most cuts
+    eye_budget_auto: bool = True
+    # realtime only: while the stream runs, a decision that took longer than the headroom limit lowers the budget
+    # (down to 1 crop), and a long calm stretch at the full budget raises it again, never above where it started
+    # (analysis/headroom.py, BudgetGovernor). A game or an encoder that takes the GPU away in mid-stream then
+    # costs a few more plain covers instead of the slate. It can only add covers
+    eye_budget_adapt: bool = True
     eye_max_age: int = 9  # with a budget: a covered person's look waits behind everybody else at most this long
     scene_prior: bool = True  # beach / pool scenes lower the threshold slightly
     full_res_crops: bool = True  # eye crops from the native frame (run36: women 63->77%, men 54->47%)
@@ -146,6 +152,9 @@ class GarmentConfig:
     fabric_ds: int = 2  # cloth shading computed at 1/N resolution (outline at full resolution)
     color: str = "navy"  # one colour for everybody (streamer setting): a palette name or "#RRGGBB"
     logo: str = ""  # optional image on the chest (sponsor / ad mode), drawn in its own exact colours
+    # garments of one decision are built side by side on this many threads (the same pixels in the same order;
+    # cloth is CPU work and was up to 90 ms of a decision with six covered people). 0 = half the CPU cores, at most 4
+    garment_threads: int = 0
 
 
 @dataclass
