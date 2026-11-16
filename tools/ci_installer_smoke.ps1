@@ -119,8 +119,11 @@ if ($encText -match '"chosen": "[a-z0-9_]+"') {
     Start-Sleep -Seconds 2
   }
   Start-Sleep -Seconds 3
-  if (-not $eng.HasExited) { Stop-Process -Id $eng.Id -Force }
-  if (-not $plat.HasExited) { Start-Sleep -Seconds 3; if (-not $plat.HasExited) { Stop-Process -Id $plat.Id -Force } }
+  # the whole tree: the engine's own FFmpeg and analyzer processes too (else they hold files of the program folder)
+  if (-not $eng.HasExited) { & taskkill /T /F /PID $eng.Id | Out-Null }
+  if (-not $plat.HasExited) { Start-Sleep -Seconds 3; if (-not $plat.HasExited) { & taskkill /T /F /PID $plat.Id | Out-Null } }
+  Start-Sleep -Seconds 2
+  Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($installDir) } | ForEach-Object { Write-Host "left over: $($_.Name) $($_.Id)"; Stop-Process -Id $_.Id -Force }
   $out = Get-Content (Join-Path $live "engine_out.txt") -Raw -ErrorAction SilentlyContinue
   Write-Host ($out -split "`n" | Where-Object { $_ -match "^STATUS" } | Out-String)
   Check (([regex]::Matches($out, '"obs_connected"')).Count -ge 2) "OBS connected twice (stop and start again without a restart)"
