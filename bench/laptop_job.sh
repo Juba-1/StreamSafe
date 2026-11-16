@@ -62,9 +62,9 @@ echo "T1=$T1 CROWD=$CROWD"
 
 # ---- how busy does each load level really keep the card (alone)?
 for L in 40 70 90; do
-  python -m bench.gpu_load --duty 0.$L --secs 9 > /dev/null & sleep 3
-  U=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits -l 1 & P=$!; sleep 5; kill $P)
-  wait; echo "LOAD_ALONE $L% duty -> utilization samples: $(echo $U | tr '\n' ' ')"
+  python -m bench.gpu_load --duty 0.$L --secs 9 > /dev/null & GP=$!; sleep 3
+  U=$(timeout 5 nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits -l 1)
+  wait $GP; echo "LOAD_ALONE $L% duty -> utilization samples: $(echo $U | tr '\n' ' ')"
 done
 
 # run NAME CLIP SECS trt|cuda old|new LOAD [late] [VAR=VALUE ...]
