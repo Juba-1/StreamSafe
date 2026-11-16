@@ -14,8 +14,10 @@ picture and sound stay one unit through the delay, drops included (how: ``avpipe
 
 from __future__ import annotations
 
+import collections
 import contextlib
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -27,6 +29,7 @@ from typing import Any, Protocol
 import cv2
 import numpy as np
 
+from streamsafe.io import link
 from streamsafe.io.avpipe import AUDIO_RATE, AudioBuffer, AviReader, row_bytes
 
 DEFAULT_SIZE = (1920, 1080)
@@ -120,7 +123,17 @@ class FFmpegSource:
     ``fps=...:start_time=0``, the sound by ``aresample=async:first_pts=0`` (fills gaps, trims overlaps, follows a
     drifting sender clock) - so the sound of frame ``k`` is always the samples ``k * rate / fps`` onwards: tied
     to the picture's own clock, not to arrival times. False: picture only, raw frames on the pipe as before.
+
+    A listener (``srt://...?mode=listener``) stays a listener: FFmpeg's own listener takes one caller and ends
+    when that caller goes, so it is started again at once (``relisten``) - OBS may connect late, stop, and
+    connect again without anything being restarted by hand. Frames keep one running number over all
+    connections, and the sound of a frame from an earlier connection is never looked up in a later one (it is
+    silence): sound can not land on the wrong picture. What the link does is said in ``STATUS`` lines
+    (``io/link.py``). ``error`` holds why the input gave up ("" when it simply ended).
     """
+
+    QUICK_S = 3.0  # an FFmpeg that ends this soon without one frame did not open its input at all
+    GIVE_UP_AFTER = 3  # ... this many times in a row: the input fails (port busy), nothing is retried for ever
 
     def __init__(
         self,
@@ -131,18 +144,24 @@ class FFmpegSource:
         input_args: tuple[str, ...] = (),
         live: bool | None = None,
         audio: bool = True,
+        relisten: bool | None = None,
+        spawn: Callable[..., Any] | None = None,
     ) -> None:
         exe = shutil.which(ffmpeg)
-        if exe is None:
+        if exe is None and spawn is None:
             raise FileNotFoundError("ffmpeg not found on PATH")
         self.size, self.fps, self.url = fit_16x9(*size), fps, url
         self.live = url.split("://", 1)[0].lower() in LIVE_SCHEMES if live is None else live
-        self.frame_index = -1  # number (in the decoded stream) of the frame frames() gave last
+        self.frame_index = -1  # number (over all connections) of the frame frames() gave last
         self.dropped_audio_frames = 0
+        self.error = ""
+        self.connections = 0  # how many times a sender started sending
+        self._port = link.listener_port(url)
+        self.relisten = self._port is not None if relisten is None else relisten
         w, h = self.size
         # no "-fflags nobuffer": with FFmpeg 6.1 it decodes nothing from mp4 files or SRT/mpegts (tested).
         # "fps=" makes any input rate (OBS virtual camera at 60 fps) the engine's rate
-        cmd = [exe, "-hide_banner", "-loglevel", "error", *input_args, "-i", url]
+        cmd = [exe or ffmpeg, "-hide_banner", "-loglevel", "error", *input_args, "-i", url]
         if audio:
             # a small interleave window: if the sound stalls, the picture is not held back for it
             cmd += ["-map", "0:v:0", "-map", "0:a:0?",
@@ -151,12 +170,43 @@ class FFmpegSource:
                     "-c:a", "pcm_s16le", "-max_interleave_delta", "100000", "-flush_packets", "1", "-f", "avi", "pipe:1"]  # fmt: skip
         else:
             cmd += ["-an", "-vf", f"scale={w}:{h},fps={fps}", "-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]
-        self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, bufsize=w * h * 3)
-        assert self._proc.stdout is not None
-        self._avi = AviReader(self._proc.stdout) if audio else None
-        self._sound = AudioBuffer(fps) if audio else None
+        self._cmd, self._audio_on = cmd, audio
+        self._spawn = spawn or subprocess.Popen
+        self._closed = threading.Event()
+        self._keep_s = 30.0
         self._n_read = 0
+        self._fails = 0
+        self._errors: collections.deque[str] = collections.deque(maxlen=6)
+        self._audio: tuple[int, AudioBuffer | None] = (0, None)  # (number of this connection's first frame, its sound)
+        self._start()
         self._live_reader = _LatestFrames(self._read_one) if self.live else None  # start draining at once
+
+    def _start(self) -> None:
+        w, h = self.size
+        self._errors.clear()
+        self._proc = self._spawn(self._cmd, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=w * h * 3)
+        assert self._proc.stdout is not None
+        self._avi = AviReader(self._proc.stdout) if self._audio_on else None
+        sound = AudioBuffer(self.fps, self._keep_s) if self._audio_on else None
+        self._audio = (self._n_read, sound)
+        self._sound = sound
+        self._got = False
+        self._began = time.monotonic()
+        threading.Thread(target=self._drain_errors, args=(self._proc,), name="source-errors", daemon=True).start()
+        if self._port is not None:
+            link.status("waiting_obs", port=self._port)
+
+    def _drain_errors(self, proc: Any) -> None:
+        """FFmpeg's own messages: passed on (the engine log) and the last ones kept as the reason of a failure."""
+        stream = getattr(proc, "stderr", None)
+        if stream is None:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            for raw in stream:
+                line = raw.decode("utf-8", "replace").rstrip() if isinstance(raw, bytes) else str(raw).rstrip()
+                if line:
+                    self._errors.append(line)
+                    print(f"INPUT {line}", file=sys.stderr, flush=True)
 
     @property
     def has_audio(self) -> bool:
@@ -165,14 +215,19 @@ class FFmpegSource:
 
     def audio_keep(self, seconds: float) -> None:
         """How much sound is kept for frames still waiting to be shown (the runner: delay + margin)."""
+        self._keep_s = seconds
         if self._sound is not None:
             self._sound.keep_s = seconds
 
     def audio_chunk(self, index: int) -> np.ndarray | None:
-        """Sound of frame ``index`` (int16 [n, 2] at 48 kHz); None when there is none (no track, not arrived, gone)."""
-        return self._sound.chunk(index) if self._sound is not None else None
+        """Sound of frame ``index`` (int16 [n, 2] at 48 kHz); None when there is none (no track, not arrived, gone,
+        or the frame came over an earlier connection than the one sending now)."""
+        first, sound = self._audio
+        if sound is None or index < first:
+            return None
+        return sound.chunk(index - first)
 
-    def _read_one(self) -> tuple[int, np.ndarray] | None:
+    def _read_frame(self) -> np.ndarray | None:
         w, h = self.size
         assert self._proc.stdout is not None
         if self._avi is None:
@@ -185,9 +240,42 @@ class FFmpegSource:
             if len(buf) == row_bytes(w) * h != w * h * 3:  # rows padded to 4 bytes (never for 16:9 sizes)
                 buf = np.frombuffer(buf, np.uint8).reshape(h, -1)[:, : w * 3].tobytes()
         if len(buf) != w * h * 3:
-            return None  # stream ended
-        self._n_read += 1
-        return self._n_read - 1, np.frombuffer(buf, np.uint8).reshape(h, w, 3).copy()
+            return None  # this FFmpeg ended
+        return np.frombuffer(buf, np.uint8).reshape(h, w, 3).copy()
+
+    def _read_one(self) -> tuple[int, np.ndarray] | None:
+        while True:
+            frame = self._read_frame()
+            if frame is not None:
+                if not self._got:
+                    self._got, self._fails = True, 0
+                    self.connections += 1
+                    if self._port is not None:
+                        link.status("obs_connected")
+                self._n_read += 1
+                return self._n_read - 1, frame
+            if self._closed.is_set():
+                return None
+            self._reap()
+            quick = time.monotonic() - self._began < self.QUICK_S
+            why = link.reason_of(" ".join(self._errors), "input_ended")
+            if self._got:
+                if self._port is not None:
+                    link.status("obs_disconnected")
+            elif quick or not self.relisten:
+                self._fails += 1
+            if not self.relisten or self._fails >= self.GIVE_UP_AFTER:
+                if not self._got and (self.live or self._n_read == 0):  # never opened: say why
+                    self.error = why
+                    link.status("input_failed", reason=why, detail=" ".join(self._errors)[-300:])
+                return None
+            if self._closed.wait(0.3 if self._got else 0.5):
+                return None
+            self._start()
+
+    def _reap(self) -> None:
+        with contextlib.suppress(Exception):
+            self._proc.wait(timeout=3)
 
     def frames(self) -> Iterator[np.ndarray]:
         numbered = self._live_reader if self._live_reader is not None else iter(self._read_one, None)
@@ -195,6 +283,7 @@ class FFmpegSource:
             yield frame
 
     def close(self) -> None:
+        self._closed.set()
         if self._proc.poll() is None:
             self._proc.terminate()
             try:
@@ -203,11 +292,51 @@ class FFmpegSource:
                 self._proc.kill()
 
 
-def windows_device(name: str, size: tuple[int, int] = DEFAULT_SIZE, fps: float = 30.0) -> FFmpegSource:
-    """A DirectShow device by its name on Windows ("OBS Virtual Camera"), through FFmpeg: OpenCV's DirectShow
-    backend opens devices by index only (Fable review), and an index changes when a webcam is plugged in."""
+def parse_dshow_devices(text: str) -> dict[str, list[str]]:
+    """``ffmpeg -list_devices true -f dshow -i dummy`` -> {"video": [names], "audio": [names]} (both FFmpeg
+    formats: the newer `"name" (video)` lines and the older "DirectShow video devices" sections)."""
+    out: dict[str, list[str]] = {"video": [], "audio": []}
+    section = ""
+    for line in text.splitlines():
+        low = line.lower()
+        if "directshow video devices" in low:
+            section = "video"
+        elif "directshow audio devices" in low:
+            section = "audio"
+        m = re.search(r'"([^"]+)"(?:\s+\((video|audio|none)\))?\s*$', line)
+        if not m or "alternative name" in low or m.group(1).startswith("@device"):
+            continue
+        kind = m.group(2) if m.group(2) in ("video", "audio") else section
+        if kind and m.group(1) not in out[kind]:
+            out[kind].append(m.group(1))
+    return out
+
+
+def list_devices(ffmpeg: str = "ffmpeg") -> dict[str, list[str]]:
+    """The capture devices Windows offers (cameras, capture cards, the OBS Virtual Camera; microphones and the
+    sound inputs of capture cards). Empty lists anywhere else or when FFmpeg cannot be asked."""
+    exe = shutil.which(ffmpeg)
+    if exe is None or sys.platform != "win32":
+        return {"video": [], "audio": []}
+    try:
+        done = subprocess.run(
+            [exe, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
+            capture_output=True, timeout=20, check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )  # fmt: skip
+    except (OSError, subprocess.SubprocessError):
+        return {"video": [], "audio": []}
+    return parse_dshow_devices(done.stderr.decode("utf-8", "replace"))
+
+
+def windows_device(name: str, size: tuple[int, int] = DEFAULT_SIZE, fps: float = 30.0, sound: str = "", audio: bool = True) -> FFmpegSource:
+    """A DirectShow device by its name on Windows ("OBS Virtual Camera", a capture card), through FFmpeg: OpenCV's
+    DirectShow backend opens devices by index only (Fable review), and an index changes when a webcam is plugged in.
+    ``sound``: the name of the device's sound input (a capture card carries the console's sound as a second
+    DirectShow device); "" = picture only (a camera)."""
     args = ("-f", "dshow", "-rtbufsize", "256M")
-    return FFmpegSource(f"video={name}", size, fps, input_args=args, live=True, audio=False)  # a camera: no sound
+    if sound and audio:
+        return FFmpegSource(f"video={name}:audio={sound}", size, fps, input_args=args, live=True, audio=True)
+    return FFmpegSource(f"video={name}", size, fps, input_args=args, live=True, audio=False)
 
 
 class DeviceSource:
@@ -249,7 +378,8 @@ class DeviceSource:
 def open_source(
     spec: str, fps: float = 30.0, max_seconds: float = 1e9, size: tuple[int, int] | None = None, audio: bool = True
 ) -> FrameSource:
-    """``device:<index|name>`` -> device; ``scheme://...`` -> FFmpeg; anything else -> video file.
+    """``device:<index|name>`` -> device (``device:<name>|<sound device>``: with the sound of a capture card);
+    ``scheme://...`` -> FFmpeg; ``file:<path>`` -> a video file with its sound; anything else -> video file (picture).
 
     ``size``: output frame size; None = the file's own size (live inputs default to 1080p).
     ``audio``: FFmpeg inputs also carry their sound (devices and plain video files are picture only)."""
@@ -259,7 +389,18 @@ def open_source(
             return DeviceSource(device, size or DEFAULT_SIZE, fps)
         if sys.platform != "win32":
             raise ValueError(f"capture devices by name need Windows; use an index here: {spec!r}")
-        return windows_device(device, size or DEFAULT_SIZE, fps)
+        name, _, sound = device.partition("|")
+        return windows_device(name.strip(), size or DEFAULT_SIZE, fps, sound.strip(), audio)
+    if spec.startswith("file:") and "://" not in spec:  # a recorded video WITH its sound, read in order
+        path = spec[len("file:") :]
+        if size is None:
+            cap = cv2.VideoCapture(path)
+            if not cap.isOpened():
+                raise FileNotFoundError(f"cannot open video: {path}")
+            size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+            cap.release()
+        args = ("-t", f"{max_seconds:g}") if max_seconds < 1e8 else ()
+        return FFmpegSource(path, size, fps, input_args=args, live=False, audio=audio)
     if "://" in spec:
         return FFmpegSource(spec, size or DEFAULT_SIZE, fps, audio=audio)
     return VideoFileSource(spec, fps, max_seconds, size)

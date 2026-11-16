@@ -1,7 +1,6 @@
 """Product runtime settings: backend, folders, TensorRT only when ready, DirectML otherwise, stream key handling."""
 
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -261,20 +260,14 @@ def test_choose_into_only_for_network_streams_and_fails_closed(tmp_path, monkeyp
     assert env3["ENCODER"] == "libx264"  # an explicit choice is kept
 
 
-def test_sink_encoder_default_follows_the_environment():
-    import importlib
-    import inspect
-
+def test_sink_encoder_default_follows_the_environment(monkeypatch):
+    """The encoder is read from $ENCODER when the sink is made (the app sets it after its probe), else libx264."""
     from streamsafe.io import sinks
 
-    def default():
-        return inspect.signature(sinks.FFmpegSink.__init__).parameters["encoder"].default
-
-    try:
-        os.environ["ENCODER"] = "h264_mf"
-        importlib.reload(sinks)
-        assert default() == "h264_mf"
-    finally:
-        os.environ.pop("ENCODER", None)
-        importlib.reload(sinks)
-    assert default() == "libx264"
+    s = sinks.FFmpegSink("out.ts", (64, 36), 30.0, spawn=lambda cmd, **kw: None)
+    monkeypatch.setenv("ENCODER", "h264_mf")
+    assert "h264_mf" in sinks.FFmpegSink("out.ts", (64, 36), 30.0, spawn=lambda cmd, **kw: None)._cmd
+    assert "h264_nvenc" in sinks.FFmpegSink("out.ts", (64, 36), 30.0, encoder="h264_nvenc", spawn=lambda cmd, **kw: None)._cmd
+    monkeypatch.delenv("ENCODER")
+    assert "libx264" in sinks.FFmpegSink("out.ts", (64, 36), 30.0, spawn=lambda cmd, **kw: None)._cmd
+    assert "libx264" in s._cmd

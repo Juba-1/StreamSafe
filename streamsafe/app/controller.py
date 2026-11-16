@@ -16,9 +16,12 @@ from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from streamsafe.app import engine, fetch, heads, keystore, modelpack, nvidia_pack, paths, release, updates
+from streamsafe import session_report
+from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, release, updates
 from streamsafe.app import settings as settings_mod
-from streamsafe.app.settings import OUTPUT_RTMP, Settings
+from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, Settings
+from streamsafe.branding import PRODUCT_NAME
+from streamsafe.io import link
 from streamsafe.translate import pack as translate_pack
 
 Log = Callable[[str], None]
@@ -66,6 +69,10 @@ class Controller:
         self.last_exit: int | None = None
         self.update: updates.Update | None = None
         self._engine_lines: list[str] = []
+        self.link = engine.LinkState()
+        self.port_moved_from = 0  # the port that was busy when the last start picked another one (0: it was free)
+        self._report_line = ""  # the engine's own report of this run
+        self._closed_out = True  # the end of the last run has been written up
 
     # --- settings and key ---------------------------------------------------------------------------------
     def save_settings(self) -> None:
@@ -110,7 +117,7 @@ class Controller:
         if self.expired():
             out.append("why_expired")
         out += self.settings.problems()
-        if self.settings.output == OUTPUT_RTMP and not settings_mod.valid_key(key):
+        if self.settings.output == OUTPUT_RTMP and "bad_key" in self.target(key).problems:
             out.append("bad_key")
         if self.models_problem():
             out.append("why_models")
@@ -280,9 +287,78 @@ class Controller:
     def roll_back(self) -> None:
         modelpack.rollback(paths.models_dir(self.env))
 
+    # --- the two links: OBS -> us, us -> the platform ------------------------------------------------------
+    def target(self, key: str) -> ingest.Target:
+        """Server and key as they will be used (``ingest.resolve``). Holds the key: never log it."""
+        return ingest.resolve(self.settings.rtmp_url, key, self.settings.platform)
+
+    def take_pasted(self, server: str, key: str) -> tuple[str, str]:
+        """What the two boxes should show after a paste: a whole address is split into (server, key), spaces go,
+        a Kick server gets its ``/app``. Values that cannot be used come back as typed (``blockers`` says why)."""
+        t = ingest.resolve(server, key, self.settings.platform)
+        if "bad_rtmp" in t.problems:
+            return ingest.squeeze(server), ingest.squeeze(key)
+        return t.server, t.key
+
+    def obs_server(self) -> str:
+        """What goes into OBS: Settings -> Stream -> Service "Custom" -> Server."""
+        return f"srt://127.0.0.1:{self.settings.srt_port}"
+
+    def free_port(self) -> bool:
+        """Before a start: when the SRT port is taken by another program, move to a free one (kept in the
+        settings). True when it moved - OBS then needs the new server address (``obs_server``)."""
+        s = self.settings
+        self.port_moved_from = 0
+        if s.input != INPUT_SRT or not 1024 <= s.srt_port <= 65535 or link.udp_port_free(s.srt_port):
+            return False
+        self.port_moved_from, s.srt_port = s.srt_port, link.free_udp_port(s.srt_port + 1)
+        self.save_settings()
+        return True
+
+    def record_file(self) -> str:
+        """A new file name for a recording, in the folder of the settings (default: Videos/<product>)."""
+        folder = Path(self.settings.record_dir) if self.settings.record_dir else Path.home() / "Videos" / PRODUCT_NAME
+        return str(folder / f"{PRODUCT_NAME}_{time.strftime('%Y%m%d_%H%M%S')}.mp4")
+
+    def test_connection(self, key: str, cancel: threading.Event | None = None) -> str:
+        """Send a few seconds of the black slate to the platform. "" when it took the stream, else a reason word
+        (``why_<reason>`` in i18n). The channel is live for those seconds: the window warns first."""
+        t = self.target(key)
+        if t.problems:
+            return t.problems[0]
+        env = engine.engine_env(os.environ, self.use_nvidia, t.url, self.env)
+        clean = engine.Redactor(t.key, t.url)
+        lines: list[str] = []
+
+        def line(text: str) -> None:
+            lines.append(clean.clean(text))
+            self.log(lines[-1])
+
+        code = engine.run_tool(["link-test", "--output", f"env:{engine.OUTPUT_ENV}"], env, line, cancel, timeout_s=90)
+        if code == 0 and any(text.startswith("LINK_TEST ok") for text in lines):
+            return ""
+        failed = next((text for text in reversed(lines) if text.startswith("LINK_TEST failed")), "")
+        return (failed.split()[2] if len(failed.split()) > 2 else "") or ("cancelled" if code < 0 else "unknown")
+
+    def devices(self) -> dict[str, list[str]]:
+        """The capture devices of this PC (cameras, capture cards / their sound inputs), for the settings."""
+        lines: list[str] = []
+        engine.run_tool(["devices"], self.tool_env(False), lines.append, timeout_s=40)
+        for text in lines:
+            if text.startswith("DEVICES "):
+                with contextlib.suppress(ValueError):
+                    found = json.loads(text[len("DEVICES ") :])
+                    return {"video": list(found.get("video", [])), "audio": list(found.get("audio", []))}
+        return {"video": [], "audio": []}
+
     # --- the engine -----------------------------------------------------------------------------------------
     def _engine_line(self, line: str) -> None:
-        self._engine_lines = [*self._engine_lines[-30:], line]
+        self._engine_lines = [*self._engine_lines[-60:], line]
+        event = link.parse(line)
+        if event is not None:
+            self.link.take(event)
+        elif line.startswith("SESSION_REPORT "):
+            self._report_line = line[len("SESSION_REPORT ") :].strip()
         self.log(line)
 
     KEEP_LOGS = 10
@@ -302,39 +378,79 @@ class Controller:
         if why:
             raise RuntimeError(why[0])
         s = self.settings
-        url = engine.output_url(s.rtmp_url, key) if s.output == OUTPUT_RTMP else ""
+        self.free_port()
+        target = self.target(key) if s.output == OUTPUT_RTMP else ingest.Target("", "")
+        url = target.url
         env = engine.engine_env(
             os.environ, self.use_nvidia, url, self.env, translate=s.translate_ar and not self.translate_problem(), brand_image=s.brand_image
         )
         state = paths.obs_state_file(self.env)
         state.unlink(missing_ok=True)  # a line left by an earlier run must not look like this run's
         state.parent.mkdir(parents=True, exist_ok=True)
-        self.engine.redactor_secrets(key, url)
+        self.engine.redactor_secrets(key, target.key, url)
         self.tracker.reset()
         self.last_exit = None
         self._engine_lines = []
-        self.engine.start(engine.exe_command(engine.run_args(s, paths.reports_dir(self.env))), env, self._new_log())
+        self.link = engine.LinkState()
+        self._report_line, self._closed_out = "", False
+        record = self.record_file() if s.output == OUTPUT_RECORD else ""
+        self.engine.start(engine.exe_command(engine.run_args(s, paths.reports_dir(self.env), record)), env, self._new_log())
 
     def status(self) -> str:
         running = self.engine.running
         if not running and self.engine.exit_code is not None and not self.engine.stop_requested:
             self.last_exit = self.engine.exit_code
+        if not running and self.engine.exit_code is not None:
+            self.close_out()
         failed = self.last_exit not in (None, 0)
         return self.tracker.update(running, engine.read_state(paths.obs_state_file(self.env)), failed)
+
+    def close_out(self) -> Path | None:
+        """Once per run, when the engine has ended: every start that did not end well leaves ONE report that says
+        why, with the engine's last lines under it. The engine's own report gets the lines added; an engine that
+        wrote none (refused at start, crashed, killed) gets a report written here."""
+        if self._closed_out:
+            return None
+        self._closed_out = True
+        code = self.engine.exit_code
+        time.sleep(0.05)  # the reader thread may still be handing over the last lines
+        lines = list(self._engine_lines)
+        try:
+            if self._report_line and Path(self._report_line).is_file():
+                path = Path(self._report_line)
+                if code != 0 or self.link.stopped in session_report.FAILED_REASONS:
+                    session_report.add_log(path, lines)
+                return path
+            reason = self.link.stopped if self.link.stopped in session_report.FAILED_REASONS else "start_failed"
+            detail = f"exit code {code}: {self.exit_reason()} {self.link.detail}".strip()
+            return session_report.write_failure(reason, detail, lines, paths.reports_dir(self.env))
+        except OSError as exc:
+            self.log(f"report not written: {exc}")
+            return None
 
     def exit_reason(self) -> str:
         """i18n key explaining why the engine ended on its own (by its exit code / last lines)."""
         text = " ".join(self._engine_lines)
-        if self.last_exit == 4 or "BETA_EXPIRED" in text:
+        code = self.engine.exit_code if self.last_exit is None else self.last_exit
+        if code == 4 or "BETA_EXPIRED" in text:
             return "engine_expired"
-        if self.last_exit == 5 or "HEADS_" in text:
+        if code == 5 or "HEADS_" in text:
             return "engine_no_heads"
+        if code == 6 or "WEAK_GPU" in text:
+            return "engine_weak_gpu"
         if "NO_ENCODER" in text:
             return "engine_no_encoder"
+        if self.link.stopped == "input_failed" or code == 7:
+            return "engine_port_busy" if self.link.reason == "port_busy" else "engine_input_failed"
+        if self.link.stopped == "platform_failed" or code == 8:
+            return "engine_platform_failed"
+        if self.link.stopped == "input_ended":
+            return "engine_input_ended"
         return "engine_exit"
 
     def stop(self) -> None:
         self.engine.stop()
+        self.close_out()
 
     def last_report(self) -> Path | None:
         return engine.last_report(paths.reports_dir(self.env))
