@@ -42,3 +42,14 @@ def test_a_run_stopped_before_any_frame_still_leaves_a_report(tmp_path, monkeypa
     assert cli.main(["--input", "x.mp4", "--report-dir", str(tmp_path)]) == 130
     txt = next(tmp_path.glob("session_*.txt")).read_text(encoding="utf-8")
     assert "never_started" in txt and "البث ما بدأ" in txt
+
+
+def test_runtime_and_slow_path_are_named():
+    from streamsafe import session_report as sr
+
+    assert [sr.runtime_of(g) for g in ("onnx-trt", "onnx-trt+cuda", "onnx-dml", "cpu", "")] == ["tensorrt", "cuda", "directml", "cpu", ""]
+    r = sr.build({"summary": {"frames_out": 900, "seconds": 30, "gpu": "onnx-dml", "slate_episodes": 18}}, 30.0)
+    assert "slow_runtime" in r["problems"] and r["slate_episodes"] == 18
+    text = sr.text(r)
+    assert "DirectML" in text and "18" in text
+    assert "slow_runtime" not in sr.build({"summary": {"frames_out": 900, "gpu": "onnx-trt"}}, 30.0)["problems"]

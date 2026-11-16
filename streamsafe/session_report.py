@@ -51,11 +51,16 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
     reason = s.get("stop_reason", "")
     if reason in FAILED_REASONS:
         problems.append(reason)
+    runtime = runtime_of(str(s.get("gpu") or ""))
+    if runtime in ("cuda", "directml") and s.get("frames_out"):
+        problems.append("slow_runtime")
     return dict(
         app_version=__version__,
         created=time.strftime("%Y-%m-%d %H:%M:%S"),
         os=f"{platform.system()} {platform.release()}",
         device=_device(s),
+        runtime=runtime,
+        slate_episodes=s.get("slate_episodes"),
         stop_reason=reason,
         stop_detail=s.get("stop_detail", ""),
         input_connections=s.get("input_connections"),
@@ -79,6 +84,28 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
 
 
 FAILED_REASONS = ("input_failed", "platform_failed", "error", "start_failed")
+
+RUNTIME_TEXT = {
+    "tensorrt": "إنفيديا - الوضع السريع / NVIDIA fast mode (TensorRT)",
+    "cuda": "إنفيديا - الوضع العادي، أبطأ: جهّز الوضع السريع من تبويب الفحص / NVIDIA normal mode (slower: prepare the fast mode)",
+    "directml": "DirectML - أبطأ وضع: على كرت إنفيديا فعّل الوضع السريع / DirectML (slowest: on an NVIDIA card turn on the fast mode)",
+    "cpu": "المعالج / CPU",
+    "": "-",
+}
+
+
+def runtime_of(gpu: str) -> str:
+    """What the models ran on, in one word: tensorrt / cuda / directml / cpu ("" = unknown). A run where only some
+    models were on TensorRT ("onnx-trt+cuda") counts as the slower one."""
+    g = gpu.lower()
+    if "dml" in g or "directml" in g:
+        return "directml"
+    if "cuda" in g:
+        return "cuda"
+    if "trt" in g or "tensorrt" in g:
+        return "tensorrt"
+    return "cpu" if g == "cpu" else ""
+
 
 AR_REASONS = {
     "user": "أوقفته أنت",
@@ -110,6 +137,7 @@ AR_PROBLEMS = {
     "platform_failed": "المنصة رفضت البث: راجع عنوان البث والمفتاح",
     "error": "البرنامج توقف بسبب خطأ",
     "start_failed": "المحرك توقف قبل ما يبدأ البث",
+    "slow_runtime": "البرنامج اشتغل على الوضع الأبطأ: فعّل الوضع السريع لإنفيديا من تبويب الفحص عشان ما تكثر الشاشة الكاملة",
     "analyzer_errors": "حصلت أخطاء في التحليل (البث كان مغطى وقتها)",
     "worker_restarts": "محرك التحليل أعاد التشغيل أثناء البث",
     "long_failclosed": "الشاشة تغطت بالكامل لفترة طويلة بسبب بطء أو خطأ",
@@ -129,7 +157,9 @@ def text(r: dict[str, Any]) -> str:
         f"قرارات بالثانية / decisions per second: {r['decisions_per_s']}   أبطأ 5% / p95: {r['decision_ms_p95']} ms",
         f"لقطات فيها شخصيات تحتاج تغطية / risky decisions: {r['risky_decisions']}",
         f"تغطية كاملة للمشهد / full-scene cover: {r['full_cover_s']} s",
-        f"تغطية احتياطية (خطأ أو بطء) / fail-closed cover: {r['failclosed_s']} s",
+        f"تغطية احتياطية (خطأ أو بطء) / fail-closed cover: {r['failclosed_s']} s"
+        + (f"   مرات / episodes: {r['slate_episodes']}" if r.get("slate_episodes") is not None else ""),
+        f"طريقة التشغيل / runtime: {RUNTIME_TEXT.get(r.get('runtime', ''), r.get('runtime', ''))}",
         f"صوت مكتوم / muted audio: {r['muted_s']} s",
         f"النتيجة / verdict: {ar_verdict} ({r['verdict']})",
     ]

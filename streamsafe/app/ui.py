@@ -733,6 +733,11 @@ class App(tk.Tk):
         if why:
             self.message.configure(text=self.tr("not_ready", why=self.tr(why[0])))
             return
+        slow = self.ctrl.has_nvidia_gpu() and not self.ctrl.use_nvidia and bool(self.ctrl.check_result.verdict) and not self._busy.is_set()
+        # an NVIDIA card on the slow path: the field report's slates every few seconds. Offer the fast mode first.
+        if slow and messagebox.askyesno(PRODUCT_NAME, self.tr("nvidia_needed", gb=release.NVIDIA_DOWNLOAD_GB)):
+            self.enable_nvidia()
+            return
         if not self.ctrl.remember(key):
             self._vars["remember"].set(False)
         self.ctrl.save_settings()

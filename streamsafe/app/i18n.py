@@ -324,6 +324,10 @@ TEXT: dict[str, tuple[str, str]] = {
         "انتهى الدخل (OBS وقف أو خلص الفيديو). تقرير الجلسة جاهز.",
         "The input ended (OBS stopped or the video finished). The session report is ready.",
     ),
+    "nvidia_needed": (
+        "كرتك إنفيديا بس الوضع السريع مو مفعل، فالبرنامج بيشتغل أبطأ وممكن تكثر الشاشة الكاملة وتقطيع الغطاء. نفعّله الحين؟ (تنزيل حوالي {gb} جيجا وتجهيز حوالي 4 دقايق، مرة وحدة بس). «لا» يبدأ بالوضع البطيء.",
+        "Your card is NVIDIA but the fast mode is off, so protection runs slower: more full-screen covers and choppier clothing. Turn it on now? (about {gb} GB download and about 4 minutes of preparation, once). «No» starts in the slow mode.",
+    ),
     # --- updates ---
     "update_app": (
         "نسخة جديدة من البرنامج: {version}. نزّلها من الفريق وثبّتها فوق القديمة.",
