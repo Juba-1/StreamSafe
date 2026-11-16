@@ -96,6 +96,41 @@ $encText = (& $cli encoder-probe | Out-String)
 Write-Host $encText
 if ($encText -notmatch '"chosen": "[a-z0-9_]+"') { Write-Host "::warning::no H.264 encoder works on this runner (a PC with a graphics card or Media Foundation has one)" }
 
+Step "the live path of the installed program: OBS over SRT -> engine -> RTMP (selftest-stream: no models, every frame covered)"
+$ffmpeg = Join-Path $installDir "ffmpeg\bin\ffmpeg.exe"
+if ($encText -match '"chosen": "[a-z0-9_]+"') {
+  $live = Join-Path $OutDir "live"; New-Item -ItemType Directory -Force $live | Out-Null
+  $flv = Join-Path $live "platform.flv"
+  # the "platform": FFmpeg listening for one RTMP publisher
+  $plat = Start-Process $ffmpeg -ArgumentList "-hide_banner","-loglevel","error","-y","-listen","1","-i","rtmp://127.0.0.1:19350/app/test_key_123","-c","copy",$flv -PassThru -WindowStyle Hidden
+  Start-Sleep -Seconds 2
+  $eng = Start-Process $cli -ArgumentList "selftest-stream","--input","srt://127.0.0.1:19000?mode=listener","--output","rtmp://127.0.0.1:19350/app/test_key_123","--delay","1","--size","640x360","--report-dir",$live `
+    -RedirectStandardOutput (Join-Path $live "engine_out.txt") -RedirectStandardError (Join-Path $live "engine_err.txt") -PassThru -WindowStyle Hidden
+  $end = (Get-Date).AddSeconds(60); $up = $false
+  while ((Get-Date) -lt $end -and -not $eng.HasExited) {
+    if ((Get-Content (Join-Path $live "engine_out.txt") -Raw -ErrorAction SilentlyContinue) -match '"waiting_obs"') { $up = $true; break }
+    Start-Sleep -Milliseconds 500
+  }
+  Check $up "the SRT listener is up (STATUS waiting_obs)"
+  # OBS stand-in, twice (OBS stops and starts again): the engine must take both without a restart
+  foreach ($round in 1, 2) {
+    & $ffmpeg -hide_banner -loglevel error -re -f lavfi -i "testsrc2=size=640x360:rate=30:duration=6" -f lavfi -i "sine=frequency=440:duration=6" `
+      -c:v $(if ($encText -match '"chosen": "([a-z0-9_]+)"') { $Matches[1] } else { "h264_mf" }) -g 30 -c:a aac -f mpegts "srt://127.0.0.1:19000?mode=caller"
+    Start-Sleep -Seconds 2
+  }
+  Start-Sleep -Seconds 3
+  if (-not $eng.HasExited) { Stop-Process -Id $eng.Id -Force }
+  if (-not $plat.HasExited) { Start-Sleep -Seconds 3; if (-not $plat.HasExited) { Stop-Process -Id $plat.Id -Force } }
+  $out = Get-Content (Join-Path $live "engine_out.txt") -Raw -ErrorAction SilentlyContinue
+  Write-Host ($out -split "`n" | Where-Object { $_ -match "^STATUS" } | Out-String)
+  Check (([regex]::Matches($out, '"obs_connected"')).Count -ge 2) "OBS connected twice (stop and start again without a restart)"
+  Check ($out -match '"platform_connected"') "the platform (local RTMP) took the stream"
+  Check ((Test-Path $flv) -and (Get-Item $flv).Length -gt 20000) "the platform received video ($(if (Test-Path $flv) { (Get-Item $flv).Length } else { 0 }) bytes)"
+  Check ($out -notmatch "test_key_123") "the stream key is never printed"
+} else {
+  Write-Host "::warning::no H.264 encoder on this runner: the live path smoke is skipped"
+}
+
 Step "the engine refuses to stream with test heads (fail closed)"
 if (-not $RealHeads) {
   $out = (& $cli run --input "device:none" --output window | Out-String)
