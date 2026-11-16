@@ -1,108 +1,63 @@
 """Arabic on a picture: letter shaping, right-to-left order, line breaking and a readable box.
 
 Shaping (isolated / initial / medial / final forms, lam-alef) is ``arabic-reshaper`` (MIT). The right-to-left
-ordering is a small bidi pass written here (a paragraph that is right-to-left, Latin words and numbers inside
-it stay left-to-right): the usual ``python-bidi`` is LGPL and Pillow's own bidi needs libraries Windows wheels
-do not carry. Text is drawn with Pillow's BASIC layout engine so the result is the same on every platform.
+ordering is the Unicode bidirectional algorithm, written in ``bidi.py`` (the usual ``python-bidi`` is LGPL and
+Pillow's own bidi needs libraries Windows wheels do not carry). Text is drawn with Pillow's BASIC layout engine so
+the result is the same on every platform.
 """
 
 from __future__ import annotations
 
-import unicodedata
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
+from streamsafe.translate import bidi, textproc
+
 FONT_FILE = "NotoSansArabic-Regular.ttf"  # SIL OFL 1.1; the pack carries both fonts (fallbacks below for a missing file)
 LATIN_FILE = "NotoSans-Regular.ttf"  # Noto Sans Arabic has no Latin letters: names, buttons ("X") and digits use this
 _FALLBACK_FONTS = ("segoeui.ttf", "tahoma.ttf", "arial.ttf", "DejaVuSans.ttf", "NotoSansArabic-Regular.ttf")
 _FALLBACK_LATIN = ("segoeui.ttf", "arial.ttf", "DejaVuSans.ttf", "NotoSans-Regular.ttf")
-_MIRROR = str.maketrans("()[]{}<>«»", ")(][}{><»«")
 BG = (20, 20, 20)  # BGR of the box: near black, like the dark outline game subtitles are drawn with
 BG_ALPHA = 255  # fully opaque: not one letter of the English may show through (owner requirement)
 PAD_X_K, PAD_Y_K = 0.45, 0.35  # padding around the English text, as a share of its line height
 MAX_WIDTH = 0.92  # of the frame width
 
 
-def _cls(c: str) -> str:
-    """'R' right-to-left letter, 'L' left-to-right letter, 'D' digit, 'N' neutral / weak."""
-    b = unicodedata.bidirectional(c)
-    if b in ("R", "AL"):
-        return "R"
-    if b == "L":
-        return "L"
-    if b in ("EN", "AN"):
-        return "D"
-    return "N"
+def visual_order(text: str, base: str | None = None) -> str:
+    """Logical text -> the characters in the order they are drawn from left to right: the Unicode bidirectional
+    algorithm (``bidi.reorder``). ``base`` 'R' / 'L' is the direction of the paragraph; None: right-to-left when the
+    text has an Arabic letter (the presentation forms the shaper writes are Arabic letters too), else left-to-right."""
+    return bidi.reorder(text, base)
 
 
-def visual_order(text: str) -> str:
-    """Logical text of a right-to-left paragraph -> the characters in the order they are drawn from left to right.
-    Letters of the Arabic presentation forms (what the shaper writes) are right-to-left letters here."""
-    if not text:
+_PLUS = re.compile(r"\b[A-Za-z]+[+#]+(?=\s|$)")  # C++, C#
+
+
+def hold_together(text: str) -> str:
+    """Marks around what must stay one left-to-right piece inside the Arabic line: "@name" and "#tag" (the bare
+    algorithm puts the sign on the far side of the name: "name@"), web addresses, player and brand names with signs
+    in them ("WhatUp!"), "C++". Only for a line that has Arabic: a Latin line needs none."""
+    if bidi.base_of(text) != "R":
         return text
-    kinds = [_cls(c) for c in text]
-    n = len(text)
-    # digit groups: "3.5", "1,000", "50%" belong to the number
-    for i, c in enumerate(text):
-        if (kinds[i] == "N" and c in ".,:%+-/" and 0 < i < n - 1 and kinds[i - 1] == "D" and kinds[i + 1] == "D") or (
-            kinds[i] == "N" and c in "%$" and i > 0 and kinds[i - 1] == "D"
-        ):
-            kinds[i] = "D"
-    # strong direction of every character: neutrals take the direction of their neighbours when both agree,
-    # else the paragraph's (right-to-left)
-    side = ["R"] * n  # 'R' (level 1) or 'L' (level 2: Latin letters and numbers)
-    prev_l = False  # a digit after a Latin letter continues that Latin run
-    for i, k in enumerate(kinds):
-        if k == "L" or (k == "D" and prev_l):
-            side[i] = "L"
-            prev_l = True
-        elif k == "D":
-            side[i] = "L"  # numbers read left-to-right even between Arabic words
-            prev_l = False
-        elif k == "R":
-            prev_l = False
-    i = 0
-    while i < n:
-        if kinds[i] == "N":
-            j = i
-            while j < n and kinds[j] == "N":
-                j += 1
-            left = side[i - 1] if i > 0 and kinds[i - 1] != "N" else "R"
-            right = side[j] if j < n else "R"
-            # a number next to a neutral counts as right-to-left for it, a Latin letter as left-to-right
-            lk = kinds[i - 1] if i > 0 else "R"
-            rk = kinds[j] if j < n else "R"
-            both_l = left == "L" and right == "L" and lk == "L" and rk == "L"
-            for m in range(i, j):
-                side[m] = "L" if both_l else "R"
-            i = j
-        else:
-            i += 1
-    runs: list[tuple[str, str]] = []
-    for c, s in zip(text, side, strict=True):
-        if runs and runs[-1][0] == s:
-            runs[-1] = (s, runs[-1][1] + c)
-        else:
-            runs.append((s, c))
-    out = []
-    for s, chunk in reversed(runs):
-        out.append(chunk if s == "L" else chunk[::-1].translate(_MIRROR))
-    return "".join(out)
+    return _PLUS.sub(lambda m: bidi.ltr(m.group(0)), textproc.sub_keep(text, bidi.ltr))
 
 
 _reshaper = None
 
 
-def shape(text: str) -> str:
-    """Logical Arabic -> shaped letters in drawing order (left to right)."""
+def shape(text: str, base: str | None = None) -> str:
+    """Logical Arabic -> shaped letters in drawing order (left to right). ``base``: the paragraph's direction when
+    ``text`` is one line of a longer paragraph (a line of Latin names inside an Arabic paragraph is still read from
+    the right)."""
     global _reshaper
     if _reshaper is None:
         import arabic_reshaper
 
         _reshaper = arabic_reshaper.ArabicReshaper(configuration={"delete_harakat": True, "support_ligatures": True})
-    return visual_order(_reshaper.reshape(text))
+    return visual_order(hold_together(_reshaper.reshape(text)), base)
 
 
 @dataclass(frozen=True)
@@ -160,12 +115,12 @@ class ArabicRenderer:
     def _length(self, visual: str, px: int) -> float:
         return sum(self.font(px, latin).getlength(t) for latin, t in self._segments(visual))
 
-    def _wrap(self, text: str, px: int, max_w: float) -> list[str]:
+    def _wrap(self, text: str, px: int, max_w: float, base: str | None = None) -> list[str]:
         lines: list[str] = []
         cur: list[str] = []
         for word in text.split():
             trial = " ".join([*cur, word])
-            if cur and self._length(shape(trial), px) > max_w:
+            if cur and self._length(shape(trial, base), px) > max_w:
                 lines.append(" ".join(cur))
                 cur = [word]
             else:
@@ -188,8 +143,9 @@ class ArabicRenderer:
         px = int(min(max(en_h / max(1, lines) * 0.95, 20), 0.07 * fh))  # about as tall as one line of the English
         pad_x, pad_y = round(PAD_X_K * en_h), round(PAD_Y_K * en_h)
         max_w = min(MAX_WIDTH * fw, max(en_w + 2 * pad_x, 0.5 * fw)) - 2 * pad_x
-        lines = self._wrap(text, px, max_w)
-        shaped = [shape(ln) for ln in lines]
+        base = bidi.base_of(text)  # of the whole paragraph: every line of it is laid out in that direction
+        lines = self._wrap(text, px, max_w, base)
+        shaped = [shape(ln, base) for ln in lines]
         text_w = max(self._length(s, px) for s in shaped)
         line_h = round(px * 1.45)
         w = int(min(MAX_WIDTH * fw, max(en_w + 2 * pad_x, text_w + 2 * pad_x)))

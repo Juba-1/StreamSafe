@@ -1,0 +1,348 @@
+genre	category	en	ar
+crime	subtitle	I told you to wait in the car.	قلت لك أن تنتظر في السيارة.
+crime	subtitle	We've got ten minutes before the cops show up.	أمامنا عشر دقائق قبل أن تصل الشرطة.
+crime	subtitle	You think I'm scared of you?	هل تظن أنني خائف منك؟
+crime	subtitle	Nobody was supposed to get hurt.	لم يكن من المفترض أن يتأذى أحد.
+crime	subtitle	Keep your head down and drive.	أخفض رأسك وقُد.
+crime	subtitle	That's the last favor I'm doing for your brother.	هذه آخر خدمة أقدمها لأخيك.
+crime	subtitle	Where's the money, Tony?	أين المال يا توني؟
+crime	subtitle	Relax, I know a guy who can fix this.	اهدأ، أعرف شخصًا يستطيع حل هذا.
+crime	slang	Yo, this ride is sick!	يا رجل، هذه السيارة مذهلة!
+crime	slang	Chill, bro, nobody's gonna snitch.	اهدأ يا صاح، لن يشي بنا أحد.
+crime	slang	We're totally screwed if the feds find out.	سنقع في ورطة كبيرة إن علم العملاء الفيدراليون.
+crime	slang	Ain't nobody got time for that.	لا أحد لديه وقت لذلك.
+crime	slang	Dude, you gotta be kidding me.	يا رجل، لا بد أنك تمزح.
+crime	slang	That deal went south real quick.	فشلت تلك الصفقة بسرعة.
+crime	slang	He's all bark and no bite.	إنه يهدد كثيرًا ولا يفعل شيئًا.
+crime	hud	Press E to enter the vehicle	اضغط E لركوب السيارة
+crime	hud	Hold F to steal the car	اضغط مطولًا على F لسرقة السيارة
+crime	hud	Press TAB to open the weapon wheel	اضغط TAB لفتح عجلة الأسلحة
+crime	hud	Hold [RT] to accelerate	اضغط مطولًا على [RT] للتسارع
+crime	mission	Lose the cops.	اهرب من الشرطة.
+crime	mission	Drive to the warehouse at the docks.	قُد إلى المستودع في الميناء.
+crime	mission	Follow the van without being spotted.	اتبع الشاحنة الصغيرة دون أن يراك أحد.
+crime	mission	Pick up the package before midnight.	استلم الطرد قبل منتصف الليل.
+crime	mission	Mission failed: the target escaped.	فشلت المهمة: هرب الهدف.
+crime	ui	Wanted level increased	ارتفع مستوى الملاحقة
+crime	ui	Garage full	المرآب ممتلئ
+crime	ui	You earned $2,500	ربحت 2,500$
+crime	social	@dadbodsquad just posted a new video	نشر @dadbodsquad فيديو جديدًا للتو
+crime	social	Follow @Officialpoach for more clips!	تابع @Officialpoach لمزيد من المقاطع!
+crime	social	#ViceNights is trending right now	#ViceNights يتصدر الآن
+crime	social	lol did you see that crash on the bridge??	هههه هل رأيت ذلك الحادث على الجسر؟؟
+crime	social	Check out my stream at twitch.tv/night_rider99	شاهد بثي على twitch.tv/night_rider99
+crime	item	Armored SUV	سيارة دفع رباعي مصفحة
+crime	item	Silenced pistol	مسدس بكاتم صوت
+crime	tutorial	Stealing a parked car will alert nearby witnesses.	سرقة سيارة متوقفة ستنبّه الشهود القريبين.
+western	subtitle	This town ain't big enough for the both of us.	هذه البلدة لا تتسع لنا نحن الاثنين.
+western	subtitle	I've been riding for three days straight.	أمتطي حصاني منذ ثلاثة أيام متواصلة.
+western	subtitle	The sheriff wants a word with you.	المأمور يريد التحدث معك.
+western	subtitle	My father built this ranch with his own hands.	بنى أبي هذه المزرعة بيديه.
+western	subtitle	You'd better saddle up, the storm is coming.	من الأفضل أن تسرج حصانك، العاصفة قادمة.
+western	subtitle	There's a bounty on his head, dead or alive.	هناك مكافأة على رأسه، حيًّا أو ميتًا.
+western	subtitle	We ride at dawn.	ننطلق عند الفجر.
+western	subtitle	I never forget a face, stranger.	لا أنسى وجهًا أبدًا أيها الغريب.
+western	slang	Well, I'll be damned.	يا للعجب.
+western	slang	Howdy, partner!	مرحبًا يا رفيق!
+western	slang	That fella's a no-good cheat.	ذلك الرجل غشاش لا خير فيه.
+western	slang	Reckon we oughta head back.	أظن أن علينا العودة.
+western	hud	Press E to mount the horse	اضغط E لامتطاء الحصان
+western	hud	Hold [LT] to aim	اضغط مطولًا على [LT] للتصويب
+western	hud	Press Q to whistle for your horse	اضغط Q للصفير لحصانك
+western	hud	Tap X repeatedly to calm the horse	اضغط X بشكل متكرر لتهدئة الحصان
+western	mission	Track the wolf through the snow.	تتبّع الذئب عبر الثلج.
+western	mission	Return the stolen cattle to the ranch.	أعد الماشية المسروقة إلى المزرعة.
+western	mission	Defend the stagecoach from the bandits.	دافع عن العربة ضد قطاع الطرق.
+western	mission	Collect the bounty from the sheriff's office.	استلم المكافأة من مكتب المأمور.
+western	ui	Honor increased	ارتفع الشرف
+western	ui	Horse bonding level 3	مستوى الترابط مع الحصان 3
+western	ui	Camp supplies are running low	مؤن المخيم على وشك النفاد
+western	item	Hunting rifle	بندقية صيد
+western	item	Perfect deer pelt	جلد غزال مثالي
+western	item	Canned beans	فاصولياء معلبة
+western	item	Lasso	حبل الوهق
+western	tutorial	Brush your horse regularly to keep it clean and healthy.	نظّف حصانك بالفرشاة بانتظام ليبقى نظيفًا وبصحة جيدة.
+western	tutorial	Animals will flee if they catch your scent.	ستهرب الحيوانات إذا شمّت رائحتك.
+western	tutorial	Use dead eye to slow down time and mark your targets.	استخدم العين القاتلة لإبطاء الوقت وتحديد أهدافك.
+scifi	subtitle	Captain, the reactor is going critical.	أيها القبطان، المفاعل يقترب من الحالة الحرجة.
+scifi	subtitle	We lost contact with the colony two weeks ago.	فقدنا الاتصال بالمستعمرة منذ أسبوعين.
+scifi	subtitle	The android refuses to follow my orders.	الروبوت يرفض تنفيذ أوامري.
+scifi	subtitle	Set a course for the outer rim.	حدّد مسارًا نحو الحافة الخارجية.
+scifi	subtitle	Humanity was never meant to come this far.	لم يكن مقدّرًا للبشرية أن تصل إلى هذا الحد.
+scifi	subtitle	Your implant is leaking data.	شريحتك المزروعة تسرّب البيانات.
+scifi	subtitle	I can hack the door, but I need thirty seconds.	أستطيع اختراق الباب، لكنني أحتاج إلى ثلاثين ثانية.
+scifi	subtitle	Shields are down to twelve percent!	انخفضت الدروع إلى اثني عشر بالمئة!
+scifi	slang	This rig is totally fried.	هذا الجهاز احترق تمامًا.
+scifi	slang	Don't flatline on me now, choom.	لا تمت الآن يا صاحبي.
+scifi	hud	Press F to scan the object	اضغط F لمسح الجسم
+scifi	hud	Hold E to hack the terminal	اضغط مطولًا على E لاختراق الطرفية
+scifi	hud	Press [Y] to open the star map	اضغط [Y] لفتح خريطة النجوم
+scifi	hud	Oxygen: 34%	الأكسجين: 34%
+scifi	mission	Restore power to the research lab.	أعد الطاقة إلى مختبر الأبحاث.
+scifi	mission	Find the missing engineer on deck 4.	اعثر على المهندس المفقود في الطابق 4.
+scifi	mission	Decide the fate of the colony.	قرّر مصير المستعمرة.
+scifi	mission	Upload the virus to the main server.	ارفع الفيروس إلى الخادم الرئيسي.
+scifi	ui	Skill points available: 3	نقاط المهارة المتاحة: 3
+scifi	ui	New dialogue option unlocked	تم فتح خيار حوار جديد
+scifi	ui	Reputation with the Syndicate decreased	انخفضت سمعتك لدى النقابة
+scifi	ui	Fast travel unavailable during combat	التنقل السريع غير متاح أثناء القتال
+scifi	item	Plasma rifle	بندقية بلازما
+scifi	item	Medkit	حقيبة إسعافات
+scifi	item	Encrypted data chip	شريحة بيانات مشفرة
+scifi	item	Legendary cyberdeck	حاسوب اختراق أسطوري
+scifi	tutorial	Overheating your weapon will force a cooldown.	ارتفاع حرارة سلاحك سيفرض فترة تبريد.
+scifi	tutorial	Persuasion checks depend on your charisma stat.	اختبارات الإقناع تعتمد على مستوى جاذبيتك.
+scifi	tutorial	Upgrade your ship's engine to reach distant systems.	طوّر محرك سفينتك للوصول إلى الأنظمة البعيدة.
+scifi	social	New message from Dr_Vance_77: meet me at the bar	رسالة جديدة من Dr_Vance_77: قابلني في الحانة
+fantasy	subtitle	The old king has been hollow for a hundred years.	الملك العجوز بلا روح منذ مئة عام.
+fantasy	subtitle	Seek the flame, ashen one.	ابحث عن اللهب أيها الرمادي.
+fantasy	subtitle	None who enter the catacombs ever return.	لا يعود أحد ممن يدخلون السراديب.
+fantasy	subtitle	Your sword is strong, but your heart is weak.	سيفك قوي، لكن قلبك ضعيف.
+fantasy	subtitle	The dragon sleeps beneath the mountain.	التنين نائم تحت الجبل.
+fantasy	subtitle	I have waited an age for a worthy opponent.	انتظرت دهرًا خصمًا يستحق.
+fantasy	subtitle	Take this ring, it will protect you from the curse.	خذ هذا الخاتم، سيحميك من اللعنة.
+fantasy	subtitle	Forgive me, I can no longer hold back the darkness.	سامحني، لم أعد قادرًا على صدّ الظلام.
+fantasy	ui	YOU DIED	لقد مت
+fantasy	ui	Bonfire lit	أُشعلت النار
+fantasy	ui	Victory achieved	تحقق النصر
+fantasy	ui	Souls retrieved	استُعيدت الأرواح
+fantasy	ui	Level up	ارتقاء في المستوى
+fantasy	ui	Equip load exceeded	تجاوزت حمل العتاد
+fantasy	ui	Boss defeated	هُزم الزعيم
+fantasy	hud	Press E to rest at the bonfire	اضغط E للاستراحة عند النار
+fantasy	hud	Press [B] to dodge	اضغط [B] للمراوغة
+fantasy	hud	Hold [LB] to block	اضغط مطولًا على [LB] للصد
+fantasy	hud	Press F to pick up the item	اضغط F لالتقاط الغرض
+fantasy	mission	Defeat the guardian of the bridge.	اهزم حارس الجسر.
+fantasy	mission	Light the three beacons.	أشعل المنارات الثلاث.
+fantasy	mission	Find the blacksmith in the ruined village.	اعثر على الحداد في القرية المدمرة.
+fantasy	item	Estus flask	قارورة إستوس
+fantasy	item	Greatsword of the fallen knight	السيف العظيم للفارس الساقط
+fantasy	item	Rusty iron key	مفتاح حديدي صدئ
+fantasy	item	Healing potion	جرعة علاج
+fantasy	item	Dragon scale shield	درع من حراشف التنين
+fantasy	item	Scroll of fire	لفافة النار
+fantasy	tutorial	Rolling makes you briefly invincible.	التدحرج يجعلك منيعًا لفترة وجيزة.
+fantasy	tutorial	Heavy armor slows your stamina recovery.	الدروع الثقيلة تبطئ استعادة قدرة التحمل.
+fantasy	tutorial	Parry at the right moment to stagger your enemy.	صدّ الضربة في اللحظة المناسبة لتُفقد عدوك توازنه.
+fantasy	tutorial	If you die, you will drop all your souls where you fell.	إذا مت، ستُسقط كل أرواحك حيث سقطت.
+br	ui	Victory Royale!	انتصار ملكي!
+br	ui	You placed #2	حللت في المركز الثاني
+br	ui	12 players remaining	بقي 12 لاعبًا
+br	ui	The storm is closing in 30 seconds	العاصفة ستضيق خلال 30 ثانية
+br	ui	Your squad has been eliminated	تم إقصاء فريقك
+br	ui	Reviving teammate...	جارٍ إنعاش زميلك...
+br	ui	Supply drop incoming	صندوق إمدادات في الطريق
+br	ui	Waiting for players	بانتظار اللاعبين
+br	hud	Press F to open the chest	اضغط F لفتح الصندوق
+br	hud	Hold E to revive	اضغط مطولًا على E للإنعاش
+br	hud	Press SPACE to deploy your glider	اضغط SPACE لفتح المظلة الشراعية
+br	hud	Press G to ping the location	اضغط G للإشارة إلى الموقع
+br	social	xX_Sniper_Xx eliminated NoobMaster69 with a shotgun	قضى xX_Sniper_Xx على NoobMaster69 ببندقية خرطوش
+br	social	TTV_Blaze knocked out you	أسقطك TTV_Blaze
+br	social	[SQUAD] Ghost_Wolf: need ammo, anyone got light rounds?	[SQUAD] Ghost_Wolf: أحتاج ذخيرة، هل مع أحدكم طلقات خفيفة؟
+br	social	[ALL] k1ller_queen: gg wp everyone	[ALL] k1ller_queen: مباراة جيدة ولعب جميل للجميع
+br	social	[TEAM] Maverick: push now, they're one shot!	[TEAM] Maverick: اهجموا الآن، تكفيهم ضربة واحدة!
+br	social	[SQUAD] Luna_x: I'm down, res me pls	[SQUAD] Luna_x: سقطت، أنعشوني من فضلكم
+br	slang	He's cracked, push him!	درعه مكسور، اهجموا عليه!
+br	slang	I'm one HP, bail!	بقيت لي نقطة صحة واحدة، انسحبوا!
+br	slang	Third party incoming, rotate!	فريق ثالث قادم، غيّروا مواقعكم!
+br	slang	Let's drop hot at the factory.	لننزل في المصنع حيث القتال محتدم.
+br	slang	Nice clutch, dude!	إنقاذ رائع يا رجل!
+br	item	Legendary assault rifle	بندقية هجومية أسطورية
+br	item	Small shield potion	جرعة درع صغيرة
+br	item	Level 3 helmet	خوذة من المستوى 3
+br	item	Sniper ammo x20	ذخيرة قنص ×20
+br	tutorial	Stay inside the safe zone to avoid storm damage.	ابقَ داخل المنطقة الآمنة لتتجنب ضرر العاصفة.
+br	tutorial	Knocked players can be revived by teammates.	اللاعبون الساقطون يمكن أن ينعشهم زملاؤهم.
+br	mission	Deal 500 damage with pistols.	ألحق 500 نقطة ضرر بالمسدسات.
+br	mission	Land at three different named locations.	اهبط في ثلاثة مواقع مسماة مختلفة.
+shooter	subtitle	Contact front! Two hostiles behind the truck!	عدو في الأمام! مسلحان خلف الشاحنة!
+shooter	subtitle	Bravo team, you are cleared to engage.	فريق برافو، لديكم الإذن بالاشتباك.
+shooter	subtitle	We need air support, now!	نحتاج دعمًا جويًّا، الآن!
+shooter	subtitle	Hold this position until evac arrives.	حافظوا على هذا الموقع حتى تصل مروحية الإخلاء.
+shooter	subtitle	Sergeant, the bridge is rigged to blow.	أيها الرقيب، الجسر مفخخ.
+shooter	subtitle	Check your corners and stay quiet.	تفقدوا الزوايا والتزموا الهدوء.
+shooter	subtitle	Man down! I need a medic over here!	سقط جندي! أحتاج مسعفًا هنا!
+shooter	subtitle	Good work, soldier. Head back to base.	أحسنت أيها الجندي. عد إلى القاعدة.
+shooter	hud	Press R to reload	اضغط R لإعادة التلقيم
+shooter	hud	Press C to crouch	اضغط C للانحناء
+shooter	hud	Hold SHIFT to sprint	اضغط مطولًا على SHIFT للركض
+shooter	hud	Press 4 to throw a grenade	اضغط 4 لرمي قنبلة
+shooter	hud	Press [X] to plant the bomb	اضغط [X] لزرع القنبلة
+shooter	hud	Reloading...	جارٍ إعادة التلقيم...
+shooter	ui	Enemy UAV overhead	طائرة استطلاع معادية في الجو
+shooter	ui	Headshot +50	إصابة في الرأس +50
+shooter	ui	Double kill	قتل مزدوج
+shooter	ui	Your team captured point B	سيطر فريقك على النقطة B
+shooter	ui	Bomb has been planted	زُرعت القنبلة
+shooter	ui	Round 7 of 13	الجولة 7 من 13
+shooter	ui	Match starts in 10 seconds	تبدأ المباراة خلال 10 ثوانٍ
+shooter	mission	Secure the landing zone.	أمّن منطقة الهبوط.
+shooter	mission	Destroy the anti-air guns.	دمّر المدافع المضادة للطائرات.
+shooter	mission	Escort the convoy through the city.	رافق القافلة عبر المدينة.
+shooter	mission	Eliminate the sniper in the tower.	اقضِ على القناص في البرج.
+shooter	item	Flashbang	قنبلة ضوئية
+shooter	item	Extended magazine	مخزن ذخيرة موسّع
+shooter	item	Red dot sight	منظار النقطة الحمراء
+shooter	item	Body armor	سترة واقية
+shooter	tutorial	Aim down sights for better accuracy.	صوّب عبر المنظار لدقة أفضل.
+shooter	tutorial	Crouching reduces weapon recoil.	الانحناء يقلل ارتداد السلاح.
+shooter	social	[TEAM] viper_tv: rush B no stop	[TEAM] viper_tv: اندفعوا نحو B دون توقف
+shooter	social	[ALL] DarkAngel_22: ez game lol	[ALL] DarkAngel_22: مباراة سهلة هههه
+shooter	slang	He's camping in the corner again.	إنه متربص في الزاوية مجددًا.
+shooter	slang	That was a total fluke.	كانت تلك ضربة حظ بحتة.
+sports	subtitle	What a goal! The keeper had no chance.	يا له من هدف! لم تكن للحارس أي فرصة.
+sports	subtitle	He shoots from distance... and it hits the post!	يسدد من بعيد... والكرة ترتطم بالقائم!
+sports	subtitle	The referee points to the spot. Penalty!	الحكم يشير إلى نقطة الجزاء. ركلة جزاء!
+sports	subtitle	They've been the better team in this second half.	كانوا الفريق الأفضل في هذا الشوط الثاني.
+sports	subtitle	A brilliant save by the goalkeeper!	تصدٍّ رائع من حارس المرمى!
+sports	subtitle	That's a clear foul, and it's a yellow card.	هذا خطأ واضح، وبطاقة صفراء.
+sports	subtitle	Three points that could decide the title race.	ثلاث نقاط قد تحسم سباق اللقب.
+sports	subtitle	The crowd is on its feet!	الجماهير تقف على أقدامها!
+sports	ui	Half time	نهاية الشوط الأول
+sports	ui	Full time	نهاية المباراة
+sports	ui	Extra time	الوقت الإضافي
+sports	ui	Substitution	تبديل
+sports	ui	Offside	تسلل
+sports	ui	Team management	إدارة الفريق
+sports	ui	Transfer market	سوق الانتقالات
+sports	ui	Career mode	طور المهنة
+sports	ui	Kick off	ضربة البداية
+sports	ui	Player of the match	رجل المباراة
+sports	ui	Possession 58%	الاستحواذ 58%
+sports	ui	Shots on target: 6	تسديدات على المرمى: 6
+sports	hud	Press [A] to pass	اضغط [A] للتمرير
+sports	hud	Hold [B] to shoot	اضغط مطولًا على [B] للتسديد
+sports	hud	Press [RB] to switch player	اضغط [RB] لتبديل اللاعب
+sports	hud	Hold [RT] to sprint	اضغط مطولًا على [RT] للركض السريع
+sports	tutorial	Hold the shoot button longer for a more powerful shot.	اضغط زر التسديد مدة أطول لتسديدة أقوى.
+sports	tutorial	Use the right stick to perform skill moves.	استخدم العصا اليمنى لتنفيذ المهارات.
+sports	tutorial	Tired players are more likely to get injured.	اللاعبون المتعبون أكثر عرضة للإصابة.
+sports	mission	Win the league without losing a match.	فز بالدوري دون خسارة أي مباراة.
+sports	mission	Score a hat-trick with any striker.	سجّل ثلاثية بأي مهاجم.
+sports	social	GoalMachine_10 wants to trade with you	GoalMachine_10 يريد إجراء تبادل معك
+sports	item	Gold player pack	حزمة لاعبين ذهبية
+racing	subtitle	You're two seconds behind the leader.	أنت متأخر بثانيتين عن المتصدر.
+racing	subtitle	Box this lap, we're switching to wet tires.	ادخل منطقة الصيانة في هذه اللفة، سنبدّل إلى إطارات المطر.
+racing	subtitle	Nice overtake! Keep pushing.	تجاوز رائع! واصل الضغط.
+racing	subtitle	Watch your fuel, you won't make it to the end.	انتبه للوقود، لن تصل إلى النهاية.
+racing	subtitle	The rear tires are overheating.	الإطارات الخلفية ترتفع حرارتها.
+racing	subtitle	Yellow flag in sector two, slow down.	علم أصفر في القطاع الثاني، خفف السرعة.
+racing	ui	Lap 3/5	اللفة 3/5
+racing	ui	Final lap	اللفة الأخيرة
+racing	ui	New lap record	رقم قياسي جديد للفة
+racing	ui	Position: 4th	المركز: الرابع
+racing	ui	Wrong way	اتجاه خاطئ
+racing	ui	Race finished	انتهى السباق
+racing	ui	Top speed: 312 km/h	السرعة القصوى: 312 كم/س
+racing	ui	Restart race	إعادة السباق
+racing	ui	Tuning shop	ورشة التعديل
+racing	ui	Garage	المرآب
+racing	ui	Time trial	سباق ضد الزمن
+racing	ui	Photo mode	وضع التصوير
+racing	hud	Press [A] to shift up	اضغط [A] لرفع الغيار
+racing	hud	Hold [LT] to brake	اضغط مطولًا على [LT] للكبح
+racing	hud	Press N to activate nitro	اضغط N لتفعيل النيترو
+racing	hud	Press R to reset the car	اضغط R لإعادة السيارة إلى المسار
+racing	tutorial	Brake before the corner, then accelerate on the way out.	اكبح قبل المنعطف، ثم تسارع عند الخروج منه.
+racing	tutorial	Drafting behind another car increases your speed.	السير خلف سيارة أخرى مباشرةً يزيد سرعتك.
+racing	tutorial	Driving on grass reduces your grip.	القيادة على العشب تقلل تماسك سيارتك.
+racing	mission	Finish in the top three to unlock the next cup.	احتل أحد المراكز الثلاثة الأولى لفتح الكأس التالية.
+racing	mission	Drift for 2,000 points in one run.	انجرف لتحقيق 2,000 نقطة في جولة واحدة.
+racing	item	Turbo kit	طقم توربو
+racing	item	Racing slicks	إطارات سباق ملساء
+racing	social	SpeedDemon_88 beat your best time!	تغلب SpeedDemon_88 على أفضل زمن لك!
+racing	slang	Floor it!	ادعس على البنزين!
+survival	subtitle	We need to find shelter before nightfall.	علينا أن نجد مأوى قبل حلول الليل.
+survival	subtitle	I haven't eaten in two days.	لم آكل منذ يومين.
+survival	subtitle	The river water isn't safe to drink.	ماء النهر غير صالح للشرب.
+survival	subtitle	Something is moving in the bushes.	شيء ما يتحرك بين الشجيرات.
+survival	subtitle	If we keep the fire going, the wolves will stay away.	إذا أبقينا النار مشتعلة، ستبتعد الذئاب.
+survival	subtitle	This cabin looks abandoned.	يبدو هذا الكوخ مهجورًا.
+survival	ui	You are starving	أنت تتضور جوعًا
+survival	ui	You are freezing	أنت تتجمد
+survival	ui	Inventory full	الحقيبة ممتلئة
+survival	ui	Crafting	الصناعة
+survival	ui	Not enough resources	الموارد غير كافية
+survival	ui	Day 14	اليوم 14
+survival	ui	Thirst: 20%	العطش: 20%
+survival	ui	Your tool broke	انكسرت أداتك
+survival	ui	Base under attack	القاعدة تتعرض للهجوم
+survival	ui	Requires: 10 wood, 4 stone	المتطلبات: 10 خشب، 4 حجر
+survival	hud	Press E to gather wood	اضغط E لجمع الخشب
+survival	hud	Hold F to drink	اضغط مطولًا على F للشرب
+survival	hud	Press B to open the build menu	اضغط B لفتح قائمة البناء
+survival	hud	Press I to open your inventory	اضغط I لفتح الحقيبة
+survival	item	Stone axe	فأس حجرية
+survival	item	Wooden pickaxe	معول خشبي
+survival	item	Raw meat	لحم نيء
+survival	item	Bandage	ضمادة
+survival	item	Campfire	نار مخيم
+survival	item	Iron ore	خام الحديد
+survival	item	Sleeping bag	كيس نوم
+survival	item	Rope	حبل
+survival	tutorial	Cook raw meat before eating it to avoid getting sick.	اطهُ اللحم النيء قبل أكله حتى لا تمرض.
+survival	tutorial	Build a bed to set your respawn point.	ابنِ سريرًا لتحديد نقطة عودتك.
+survival	tutorial	Tools wear out with use and must be repaired.	الأدوات تبلى مع الاستخدام ويجب إصلاحها.
+survival	mission	Craft a workbench.	اصنع طاولة عمل.
+survival	mission	Survive the first night.	انجُ من الليلة الأولى.
+survival	mission	Collect 20 berries.	اجمع 20 حبة توت.
+survival	social	[Server] Wolfpack_Dan joined the game	[Server] انضم Wolfpack_Dan إلى اللعبة
+survival	social	<Mira_Builds> anyone want to trade iron for food?	<Mira_Builds> هل يريد أحد مبادلة الحديد بالطعام؟
+horror	subtitle	Did you hear that?	هل سمعت ذلك؟
+horror	subtitle	Don't turn around. It's right behind you.	لا تلتفت. إنه خلفك تمامًا.
+horror	subtitle	The lights went out again.	انطفأت الأضواء مجددًا.
+horror	subtitle	She's been dead for twenty years.	إنها ميتة منذ عشرين عامًا.
+horror	subtitle	We should never have come to this house.	ما كان علينا أن نأتي إلى هذا البيت أبدًا.
+horror	subtitle	Hide! It can't see you if you stay still.	اختبئ! لا يستطيع رؤيتك إذا بقيت ساكنًا.
+horror	subtitle	The door is locked from the other side.	الباب مقفل من الجهة الأخرى.
+horror	subtitle	There's blood on the floor, and it's still warm.	هناك دم على الأرض، وما زال دافئًا.
+horror	subtitle	Whatever you do, don't make a sound.	مهما فعلت، لا تصدر أي صوت.
+horror	subtitle	I think the phone lines have been cut.	أظن أن خطوط الهاتف قُطعت.
+horror	hud	Press F to turn on the flashlight	اضغط F لتشغيل المصباح
+horror	hud	Hold SHIFT to hold your breath	اضغط مطولًا على SHIFT لحبس أنفاسك
+horror	hud	Press E to hide in the locker	اضغط E للاختباء في الخزانة
+horror	hud	Press Q to look behind you	اضغط Q للنظر خلفك
+horror	ui	Battery low	البطارية ضعيفة
+horror	ui	You found a key	عثرت على مفتاح
+horror	ui	The door is jammed	الباب عالق
+horror	ui	Sanity decreasing	سلامتك العقلية تتراجع
+horror	ui	Note added to journal	أُضيفت ملاحظة إلى المذكرات
+horror	ui	No ammo	لا توجد ذخيرة
+horror	mission	Find a way out of the basement.	جد طريقًا للخروج من القبو.
+horror	mission	Restore the power in the generator room.	أعد الكهرباء في غرفة المولد.
+horror	mission	Escape the asylum before dawn.	اهرب من المصحة قبل الفجر.
+horror	mission	Collect all eight pages.	اجمع الصفحات الثماني كلها.
+horror	item	Rusty key	مفتاح صدئ
+horror	item	Old photograph	صورة قديمة
+horror	item	Flashlight batteries	بطاريات المصباح
+horror	item	First aid spray	بخاخ إسعافات أولية
+horror	tutorial	Running makes noise and attracts enemies.	الركض يصدر ضجيجًا ويجذب الأعداء.
+horror	tutorial	Save your ammo; not every enemy needs to be killed.	وفّر ذخيرتك؛ ليس من الضروري قتل كل عدو.
+horror	tutorial	Combine herbs to create stronger medicine.	ادمج الأعشاب لصنع دواء أقوى.
+horror	slang	Nope, I'm out of here.	مستحيل، سأغادر هذا المكان.
+horror	slang	This place gives me the creeps.	هذا المكان يثير القشعريرة في جسدي.
+crime	subtitle	Put the gun down and nobody gets hurt.	ضع السلاح أرضًا ولن يتأذى أحد.
+crime	subtitle	I've been in this business longer than you've been alive.	أنا في هذا المجال منذ ما قبل ولادتك.
+crime	ui	Property purchased	تم شراء العقار
+crime	ui	New contact added to your phone	أُضيفت جهة اتصال جديدة إلى هاتفك
+crime	social	Jay_Norris: yo where u at? party at 9	Jay_Norris: يا رجل أين أنت؟ الحفلة الساعة 9
+crime	social	Liked by beachvibes_305 and 1,204 others	أعجب به beachvibes_305 و1,204 آخرين
+crime	social	Subscribe to WhatUp! for daily updates	اشترك في WhatUp! للحصول على تحديثات يومية
+crime	slang	No way, that's my jam!	مستحيل، هذه أغنيتي المفضلة!
+crime	slang	Quit messing around and get in.	كف عن العبث واركب.
+western	subtitle	Easy, boy. Nobody's going to hurt you.	اهدأ يا فتى. لن يؤذيك أحد.
+western	mission	Rob the train before it reaches the bridge.	اسرق القطار قبل أن يصل إلى الجسر.
+scifi	social	[Comms] Rook-7: hostile drones detected near the airlock	[Comms] Rook-7: رُصدت طائرات مسيّرة معادية قرب غرفة معادلة الضغط
+scifi	slang	That's some next-level tech right there.	هذه تقنية من مستوى آخر تمامًا.
+fantasy	social	Summoned by host xDarkSoul_Kn1ght	تم استدعاؤك من قبل المضيف xDarkSoul_Kn1ght
+fantasy	slang	Git gud.	تمرّن أكثر.
+sports	slang	He absolutely smashed that one!	سددها بقوة هائلة!
+sports	social	[Club] Coach_Rami: training at 8, don't be late	[Club] Coach_Rami: التمرين الساعة 8، لا تتأخروا
+racing	slang	You totally wrecked my bumper, man.	حطمت مصدّ سيارتي تمامًا يا رجل.
+racing	social	[Lobby] Drift_King_KSA: gg, rematch?	[Lobby] Drift_King_KSA: مباراة جيدة، هل نعيدها؟
+survival	slang	We're toast if that bear finds us.	انتهى أمرنا إن وجدنا ذلك الدب.
+horror	social	Unknown number: I can see you.	رقم مجهول: أستطيع رؤيتك.
+shooter	mission	Defuse the bomb in under 40 seconds.	فكك القنبلة في أقل من 40 ثانية.
+br	tutorial	Higher rarity weapons deal more damage.	الأسلحة الأعلى ندرة تُلحق ضررًا أكبر.
