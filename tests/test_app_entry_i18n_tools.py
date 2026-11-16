@@ -50,7 +50,15 @@ def test_run_is_refused_on_builtin_graphics(product_env, monkeypatch, capsys, tm
     monkeypatch.setattr(heads, "why_not", lambda env: "")
     monkeypatch.setattr(syscheck, "_gpus", lambda: [syscheck.Gpu("Intel(R) UHD Graphics 630", "intel", 1.0)])
     monkeypatch.delenv("STREAMSAFE_SKIP_GPU_CHECK", raising=False)
-    assert entry.main(["run", "--input", "x", "--output", "window"]) == entry.WEAK_GPU_EXIT == 6
+    import cv2
+    import numpy as np
+
+    clip = str(tmp_path / "clip.mp4")  # the input opens first (OBS can connect while the slower checks run)
+    w = cv2.VideoWriter(clip, cv2.VideoWriter_fourcc(*"mp4v"), 30, (64, 36))
+    for _ in range(3):
+        w.write(np.zeros((36, 64, 3), np.uint8))
+    w.release()
+    assert entry.main(["run", "--input", clip, "--output", "window", "--report-dir", str(tmp_path)]) == entry.WEAK_GPU_EXIT == 6
     out = capsys.readouterr().out
     assert "WEAK_GPU" in out and "Nothing was streamed" in out
 
@@ -82,7 +90,7 @@ def used_keys() -> set[str]:
 
 def test_every_text_exists_in_both_languages():
     assert i18n.missing() == []
-    unknown = {k for k in used_keys() if k not in i18n.TEXT and not k.startswith(("chk_", "p_", "st_hint", "src_"))}
+    unknown = {k for k in used_keys() if k not in i18n.TEXT and not k.startswith(("chk_", "p_", "st_hint", "src_", "plat_", "why_"))}
     assert unknown == set()
     for k in ("src_private", "src_missing", "src_network", "src_other"):
         assert k in i18n.TEXT

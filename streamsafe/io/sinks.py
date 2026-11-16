@@ -3,6 +3,7 @@
   * ``VideoFileSink``  - an MP4 file (optionally downscaled; review copies)
   * ``FFmpegSink``     - H.264 to anything FFmpeg can write: ``rtmp://`` / ``rtmps://`` (Twitch,
                          Kick, YouTube ingest), ``srt://`` (back into OBS as a Media Source), a file
+  * ``RecordSink``     - the protected picture and sound as a video file ("record only", ``record:<file>``)
   * ``WindowSink``     - an on-screen window (OBS: Window Capture of "StreamSafe Output")
 ``ThreadedSink`` runs any sink on its own thread so a slow encoder never delays the renderer.
 
@@ -12,19 +13,24 @@ int16 [n, 2] at 48 kHz or None for silence (muted, or no sound known for this fr
 
 from __future__ import annotations
 
+import collections
+import contextlib
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
-from typing import Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import cv2
 import numpy as np
 
 from streamsafe.branding import PRODUCT_NAME
+from streamsafe.io import link
 from streamsafe.io.avpipe import AUDIO_RATE, AviWriter
 
 WINDOW_TITLE = f"{PRODUCT_NAME} Output"
@@ -52,31 +58,70 @@ class VideoFileSink:
         self._writer.release()
 
 
+STREAM_SCHEMES = ("rtmp://", "rtmps://", "srt://", "udp://")
+_PROGRESS = re.compile(
+    r"^(frame|fps|stream_\d+_\d+_q|bitrate|total_size|out_time_us|out_time_ms|out_time|dup_frames|drop_frames|speed|progress)=(.*)$"
+)
+
+
+class PlatformRefused(ConnectionError):  # noqa: N818 - a refusal, not an error
+    """The platform never took the stream (wrong address or key, no network): ``reason`` is a short word
+    (``io/link.py``), the text never holds the address or the key."""
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        super().__init__(f"the platform did not accept the stream ({reason}) {detail}".strip())
+        self.reason = reason
+
+
 class FFmpegSink:
     """Raw BGR frames (+ their sound) -> FFmpeg -> H.264 (+ AAC) at ``url``. The container follows the URL scheme.
 
     ``audio`` (default): the output always has a sound track - Twitch and YouTube ingest need one - made of each
     frame's own samples, or silence for a frame written without sound. One frame and exactly one frame's worth of
-    samples go down one pipe together, so the two cannot drift apart. False: picture only, as before."""
+    samples go down one pipe together, so the two cannot drift apart. False: picture only, as before.
+
+    The connection is made when the first frame is written, not before: a platform never sees an idle connection
+    while the models load or OBS has not started. For a network address the link is watched and said in
+    ``STATUS`` lines (``io/link.py``):
+      * it never came up (wrong address / key): tried ``GIVE_UP_BEFORE_FIRST`` times, then ``PlatformRefused``
+        ends the run with the reason - nothing is retried for ever behind the streamer's back;
+      * it was up and broke (network drop, the platform restarted): tried again for as long as the run lasts,
+        after 1, 2, 4, 8, then every 15 seconds. Frames of the time in between are not sent at all, and the first
+        second after a new connection is the black slate without sound: what viewers get around a drop is
+        nothing or the slate, never a frame that skipped the protection (every frame written here already went
+        through the gate).
+    FFmpeg's own messages are passed on with the address and the key blanked out."""
+
+    RETRY_S = (1.0, 2.0, 4.0, 8.0, 15.0)
+    GIVE_UP_BEFORE_FIRST = 3
+    IO_TIMEOUT_S = 10  # a network write that hangs this long is an error (FFmpeg -rw_timeout), not a frozen stream
 
     def __init__(
         self,
         url: str,
         size: tuple[int, int],
         fps: float = 30.0,
-        encoder: str = os.environ.get("ENCODER") or "libx264",  # the installed app picks the one that works (app/encoders.py)
+        encoder: str | None = None,  # None: $ENCODER (the installed app picks the one that works, app/encoders.py) or libx264
         bitrate: str = "6000k",
         ffmpeg: str = "ffmpeg",
         audio: bool = True,
         audio_bitrate: str = "160k",
+        spawn: Callable[..., Any] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         exe = shutil.which(ffmpeg)
-        if exe is None:
+        if exe is None and spawn is None:
             raise FileNotFoundError("ffmpeg not found on PATH")
+        encoder = encoder or os.environ.get("ENCODER") or "libx264"
         w, h = size
+        self.size, self.fps = size, fps
         self.takes_audio = audio
+        self.network = url.startswith(STREAM_SCHEMES)
+        self.connected = False  # the platform is taking the stream right now
+        self.reconnects = 0
+        self.unsent = 0  # frames not sent because the link was down
         fmt = "flv" if url.startswith(("rtmp://", "rtmps://")) else "mpegts" if url.startswith(("srt://", "udp://")) else None
-        cmd = [exe, "-hide_banner", "-loglevel", "error", "-y"]
+        cmd = [exe or ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:2", "-stats_period", "0.5", "-y"]
         if audio:  # our own stream, nothing to probe: start at once
             cmd += ["-probesize", "32", "-analyzeduration", "0", "-f", "avi", "-i", "pipe:0"]
         else:
@@ -89,27 +134,182 @@ class FFmpegSink:
             cmd += ["-c:a", "aac", "-b:a", audio_bitrate, "-ar", str(AUDIO_RATE), "-ac", "2"]
         if fmt:
             cmd += ["-f", fmt]
-        self._proc = subprocess.Popen([*cmd, url], stdin=subprocess.PIPE)
-        assert self._proc.stdin is not None
-        self._avi = AviWriter(self._proc.stdin, size, fps) if audio else None
+        if url.startswith(("rtmp://", "rtmps://")):
+            cmd += ["-rw_timeout", str(self.IO_TIMEOUT_S * 1_000_000)]
+        self._cmd = [*cmd, url]
+        self._spawn = spawn or subprocess.Popen
+        self._clock = clock
+        self._secrets = link.Secrets(url if self.network else "")
+        self._proc: Any = None
+        self._avi: AviWriter | None = None
+        self._errors: collections.deque[str] = collections.deque(maxlen=6)
+        self._ever = False  # the platform took the stream at least once
+        self._attempt = 0  # failed tries in a row
+        self._retry_at = 0.0
+        self._slate_left = 0
+        self._sizes: list[int] = []
+        self._closed = False
 
+    # --- one FFmpeg process ---------------------------------------------------------------------------------
+    def _open(self) -> None:
+        self._errors.clear()
+        self._sizes = []
+        if self.network:
+            link.status("platform_connecting")
+        self._proc = self._spawn(self._cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        threading.Thread(target=self._watch, args=(self._proc,), name="sink-output", daemon=True).start()
+        try:
+            self._avi = AviWriter(self._proc.stdin, self.size, self.fps) if self.takes_audio else None
+        except OSError:
+            self._lost()
+
+    def _watch(self, proc: Any) -> None:
+        """FFmpeg's progress (bytes that left for the platform) and its error lines, on their own thread."""
+        stream = getattr(proc, "stderr", None)
+        if stream is None:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            for raw in stream:
+                line = raw.decode("utf-8", "replace").strip() if isinstance(raw, bytes) else str(raw).strip()
+                m = _PROGRESS.match(line)
+                if m is None:
+                    if line:
+                        clean = self._secrets.clean(line)
+                        self._errors.append(clean)
+                        print(f"OUTPUT {clean}", file=sys.stderr, flush=True)
+                    continue
+                if m.group(1) == "total_size" and m.group(2).strip().isdigit() and proc is self._proc:
+                    self._progress(int(m.group(2)))
+
+    def _progress(self, total: int) -> None:
+        # connected = bytes kept leaving over two reports in a row (a refused stream dies before the second)
+        if total > 0 and (not self._sizes or total > self._sizes[-1]):
+            self._sizes.append(total)
+        if len(self._sizes) >= 2 and not self.connected:
+            self.connected, self._ever, self._attempt = True, True, 0
+            if self.network:
+                link.status("platform_connected")
+
+    def _kill(self) -> None:
+        proc, self._proc, self._avi = self._proc, None, None
+        if proc is None:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            proc.stdin.close()
+        try:
+            proc.wait(timeout=3)
+        except Exception:
+            with contextlib.suppress(Exception):
+                proc.kill()
+
+    def _lost(self) -> None:
+        """This FFmpeg is gone. A file output: an error. A network output: try again later, or give up when the
+        platform never took the stream."""
+        self._kill()
+        time.sleep(0.05)  # let the watcher read FFmpeg's last words
+        detail = " | ".join(self._errors)[-300:]
+        reason = link.reason_of(detail, "broken")
+        was_up, self.connected = self.connected, False
+        if not self.network:
+            raise ConnectionError(f"ffmpeg output stopped {detail}".strip())
+        self._attempt += 1
+        if not self._ever and self._attempt >= self.GIVE_UP_BEFORE_FIRST:
+            link.status("platform_failed", reason=reason, detail=detail)
+            raise PlatformRefused(reason, detail)
+        wait = self.RETRY_S[min(self._attempt, len(self.RETRY_S)) - 1]
+        self._retry_at = self._clock() + wait
+        self.reconnects += int(was_up)
+        link.status("platform_lost", reason=reason, retry_s=wait, attempt=self._attempt, detail=detail)
+
+    # --- frames ---------------------------------------------------------------------------------------------
     def write(self, frame: np.ndarray, audio: np.ndarray | None = None) -> None:
-        assert self._proc.stdin is not None
+        if self._proc is None:
+            if self._clock() < self._retry_at:
+                self.unsent += 1
+                return  # the link is down: this frame is simply not sent
+            again = self._attempt > 0
+            self._open()
+            if self._proc is None:
+                return
+            if again:
+                self._slate_left = int(self.fps)  # back on the air with the slate first
+        elif self._proc.poll() is not None:
+            self._lost()
+            self.unsent += 1
+            return
+        if self._slate_left > 0:
+            self._slate_left -= 1
+            frame, audio = np.zeros_like(frame), None
         try:
             if self._avi is not None:
                 self._avi.write(frame, audio)
             else:
                 self._proc.stdin.write(np.ascontiguousarray(frame).tobytes())
-        except OSError as exc:  # BrokenPipeError; on Windows a closed pipe is "Invalid argument"
-            raise ConnectionError("ffmpeg output stopped") from exc
+        except (OSError, ValueError):  # BrokenPipeError; on Windows a closed pipe is "Invalid argument"
+            self.unsent += 1
+            self._lost()
 
     def close(self) -> None:
-        if self._proc.stdin:
-            self._proc.stdin.close()
+        self._closed = True
+        proc, self._proc = self._proc, None
+        if proc is None:
+            return
+        with contextlib.suppress(OSError, ValueError):
+            proc.stdin.close()
         try:
-            self._proc.wait(timeout=30)
+            proc.wait(timeout=30)
         except subprocess.TimeoutExpired:
-            self._proc.kill()
+            proc.kill()
+
+
+class RecordSink(FFmpegSink):
+    """The protected picture with its sound into a video file ("record only": a creator who uploads videos and
+    does not stream). Written as Matroska while it runs - that file stays playable whatever happens (a crash, a
+    power cut) - and turned into the MP4 that was asked for when the recording ends, without encoding again. If
+    that last step cannot be done the .mkv stays and is the recording."""
+
+    def __init__(self, path: str, size: tuple[int, int], fps: float = 30.0, bitrate: str = "12000k", **kw: Any) -> None:
+        self.path = str(path)
+        root, ext = os.path.splitext(self.path)
+        self._wants_mp4 = ext.lower() in (".mp4", ".mov", ".m4v")
+        self._work = root + ".recording.mkv" if self._wants_mp4 else self.path
+        os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
+        super().__init__(self._work, size, fps, bitrate=bitrate, **kw)
+        self.result = ""
+
+    def _open(self) -> None:
+        link.status("recording", file=self.path)
+        super()._open()
+
+    def close(self) -> None:
+        started = self._proc is not None
+        super().close()
+        if not started and not os.path.exists(self._work):
+            return
+        self.result = self._work
+        if self._wants_mp4:
+            cmd = [
+                self._cmd[0],
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                self._work,
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                self.path,
+            ]
+            try:
+                done = self._spawn(cmd, stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if done.wait(timeout=600) == 0 and os.path.getsize(self.path) > 0:
+                    os.remove(self._work)
+                    self.result = self.path
+            except (OSError, subprocess.SubprocessError):
+                pass
+        link.status("recorded", file=self.result)
 
 
 class WindowSink:
@@ -211,23 +411,49 @@ class MultiSink:
 
 class ThreadedSink:
     """Writes on a background thread. Frames are passed by reference: callers must not modify a
-    frame after writing it (the engine never does - each output frame is a fresh buffer)."""
+    frame after writing it (the engine never does - each output frame is a fresh buffer).
 
-    def __init__(self, sink: FrameSink, max_queue: int = 64) -> None:
+    ``keepalive_fps`` (a stream to a platform): once the first frame went out, a gap of more than ``STALE_S``
+    without a new frame (OBS stopped sending, the input is being reopened) is filled with the black slate and
+    silence at that rate - the platform keeps a live stream that shows the slate instead of dropping the channel
+    or freezing on the last picture. ``filled`` counts those frames."""
+
+    STALE_S = 0.5
+
+    def __init__(self, sink: FrameSink, max_queue: int = 64, keepalive_fps: float = 0.0) -> None:
         self.sink = sink
         self.takes_audio = takes_audio(sink)
+        self.keepalive_fps = keepalive_fps
+        self.filled = 0
         self._queue: queue.Queue[tuple[np.ndarray, np.ndarray | None] | None] = queue.Queue(maxsize=max_queue)
         self._error: BaseException | None = None
         self._thread = threading.Thread(target=self._run, name="sink", daemon=True)
         self._thread.start()
 
     def _run(self) -> None:
-        while (item := self._queue.get()) is not None:
+        last: np.ndarray | None = None
+        wait: float | None = None
+        while True:
+            try:
+                item = self._queue.get(timeout=wait)
+            except queue.Empty:
+                if self._error is None and last is not None:
+                    try:
+                        _write(self.sink, np.zeros_like(last), None)
+                        self.filled += 1
+                    except BaseException as exc:
+                        self._error = exc
+                wait = 1.0 / self.keepalive_fps
+                continue
+            if item is None:
+                return
             if self._error is None:
                 try:
                     _write(self.sink, *item)
                 except BaseException as exc:  # reported to the caller on the next write
                     self._error = exc
+            if self.keepalive_fps > 0:
+                last, wait = item[0], self.STALE_S
 
     def write(self, frame: np.ndarray, audio: np.ndarray | None = None) -> None:
         if self._error is not None:
@@ -253,11 +479,13 @@ def open_sink(
     spec: str, size: tuple[int, int], fps: float = 30.0, preview_size: tuple[int, int] = (960, 540), audio: bool = True
 ) -> FrameSink:
     """``window`` -> on-screen window; ``scheme://...`` -> FFmpeg stream (with sound unless ``audio`` is off);
-    else an MP4 review file (picture only)."""
+    ``record:<file>`` -> a full-quality recording with sound (``RecordSink``); else an MP4 review file (picture only)."""
     if spec == "window":
         return WindowSink()
+    if spec.startswith("record:"):
+        return ThreadedSink(RecordSink(spec[len("record:") :], size, fps, audio=audio))
     if "://" in spec:
-        return ThreadedSink(FFmpegSink(spec, size, fps, audio=audio))
+        return ThreadedSink(FFmpegSink(spec, size, fps, audio=audio), keepalive_fps=fps if spec.startswith(STREAM_SCHEMES) else 0.0)
     return ThreadedSink(VideoFileSink(spec, fps, preview_size))
 
 

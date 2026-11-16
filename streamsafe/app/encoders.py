@@ -61,9 +61,9 @@ def output_of(args: Sequence[str]) -> str:
 
 
 def choose_into(env: MutableMapping[str, str], args: Sequence[str], run: Run = subprocess.run) -> None:
-    """Before ``run``: when the output is a network stream and no ``ENCODER`` is set, find a working one and put
+    """Before ``run``: when the output is a network stream or a recording and no ``ENCODER`` is set, find a working one and put
     it into ``env``. Raises SystemExit (with the reason) when there is none."""
-    if env.get("ENCODER") or not output_of(args).startswith(STREAM_SCHEMES):
+    if env.get("ENCODER") or not output_of(args).startswith((*STREAM_SCHEMES, "record:")):
         return
     from streamsafe.app import paths
 

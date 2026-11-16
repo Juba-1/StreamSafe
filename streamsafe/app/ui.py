@@ -21,7 +21,7 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk
 
-from streamsafe.app import build_info, controller, engine, i18n, modelpack, paths, release, updates
+from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, paths, release, updates
 from streamsafe.app import settings as cfg
 from streamsafe.branding import PRODUCT_NAME
 
@@ -209,55 +209,140 @@ class App(tk.Tk):
             b.pack(side="right" if self.rtl else "left", padx=4, expand=True, fill="x")
         self.message = self.label(h, "", fg="#b3261e", font=(FONT, 10, "bold"))
         self.pack_row(self.message, fill="x")
+        # the two links while it runs: OBS -> us, us -> the platform (or the recording)
+        self.link_box = tk.Frame(h, bg="#f5f7fa", padx=10, pady=6)
+        self.lk_in = self.label(self.link_box, "", bg="#f5f7fa", font=(FONT, 10, "bold"), wraplength=520)
+        self.lk_in.pack(fill="x")
+        self.lk_out = self.label(self.link_box, "", bg="#f5f7fa", font=(FONT, 10, "bold"), wraplength=520)
+        self.lk_out.pack(fill="x")
+        self.lk_copy = ttk.Button(self.link_box, text=self.tr("copy_server"), command=lambda: self.copy(self.ctrl.obs_server()))
+        self._link_shown: tuple = ()
         self.report_btn = ttk.Button(h, text=self.tr("open_report"), command=self.open_report)
         self.pack_row(self.report_btn, pady=(10, 2))
         self.logbox = tk.Label(h, text="", bg="white", fg="#8a94a1", font=(FONT, 8), anchor="w", justify="left", wraplength=580)
         self.logbox.pack(fill="x", side="bottom")
 
     # --- settings -------------------------------------------------------------------------------------------
+    def scroll_area(self, tab: tk.Frame) -> tk.Frame:
+        """A frame inside ``tab`` that scrolls with the mouse wheel when it is taller than the window."""
+        canvas = tk.Canvas(tab, bg="white", highlightthickness=0)
+        bar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
+        inner = tk.Frame(canvas, bg="white")
+        win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=bar.set)
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        bar.pack(side="left" if self.rtl else "right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        def wheel(event: tk.Event) -> None:
+            with contextlib.suppress(tk.TclError):  # a canvas of a window rebuilt since (language switch) is gone
+                if canvas.winfo_exists() and str(self.nb.select()) == str(tab) and event.delta:
+                    canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+
+        self.bind_all("<MouseWheel>", wheel, add="+")
+        return inner
+
     def build_settings(self) -> None:
-        s, st = self.sets, self.ctrl.settings
+        st = self.ctrl.settings
+        s = self.settings_body = self.scroll_area(self.sets)
         v = self.var
         v("input", tk.StringVar, st.input).set(st.input)
         v("srt_port", tk.StringVar, str(st.srt_port))
         v("camera", tk.StringVar, st.camera)
+        v("camera_sound", tk.StringVar, st.camera_sound)
+        v("input_file", tk.StringVar, st.input_file)
         v("output", tk.StringVar, st.output)
+        v("platform", tk.StringVar, self.tr("plat_" + st.platform))
         v("rtmp_url", tk.StringVar, st.rtmp_url)
+        v("record_dir", tk.StringVar, st.record_dir)
         v("key", tk.StringVar, self.ctrl.stored_key() if "key" not in self._vars else self._vars["key"].get())
         v("remember", tk.BooleanVar, st.remember_key)
         v("delay", tk.StringVar, f"{st.delay:g}")
         v("translate", tk.BooleanVar, st.translate_ar)
+        side = "right" if self.rtl else "left"
 
-        def field(parent: tk.Misc, caption: str, var: tk.Variable, width: int = 34, show: str = "") -> None:
+        def field(
+            parent: tk.Misc, caption: str, var: tk.Variable, width: int = 34, show: str = "", combo: list[str] | None = None
+        ) -> tk.Widget:
             fr = tk.Frame(parent, bg="white")
             lab = self.label(fr, caption, wraplength=200)
-            ent = tk.Entry(fr, textvariable=var, width=width, justify="left", show=show, relief="solid", bd=1)
-            if self.rtl:
-                lab.pack(side="right", padx=(8, 0))
-                ent.pack(side="right", fill="x", expand=True)
+            if combo is not None:
+                ent: tk.Widget = ttk.Combobox(fr, textvariable=var, values=combo, width=width)
             else:
-                lab.pack(side="left", padx=(0, 8))
-                ent.pack(side="left", fill="x", expand=True)
-            self.pack_row(fr, fill="x")
+                ent = tk.Entry(fr, textvariable=var, width=width, justify="left", show=show, relief="solid", bd=1)
+            lab.pack(side=side, padx=(8, 0) if self.rtl else (0, 8))
+            ent.pack(side=side, fill="x", expand=True)
+            self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
+            return ent
 
+        def choice(text_key: str, value: str, name: str) -> None:
+            self.pack_row(ttk.Radiobutton(s, text=self.tr(text_key), value=value, variable=v(name, tk.StringVar, "")))
+
+        def small(text: str) -> tk.Label:
+            lab = self.label(s, text, fg="#6b7785", font=(FONT, 9))
+            self.pack_row(lab, fill="x", padx=(0, 22) if self.rtl else (22, 0))
+            return lab
+
+        def buttons(*items: tuple[str, Callable[[], None]]) -> tk.Frame:
+            fr = tk.Frame(s, bg="white")
+            for text, cmd in items:
+                ttk.Button(fr, text=text, command=cmd).pack(side=side, padx=4)
+            self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
+            return fr
+
+        # 1. where the picture comes from
         self.label(s, self.tr("sec_in"), font=(FONT, 11, "bold")).pack(fill="x")
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("in_srt"), value=cfg.INPUT_SRT, variable=v("input", tk.StringVar, "")))
+        choice("in_srt", cfg.INPUT_SRT, "input")
         field(s, self.tr("srt_port"), v("srt_port", tk.StringVar, ""), 8)
-        self.srt_hint = self.label(s, "", fg="#6b7785", font=(FONT, 9))
-        self.pack_row(self.srt_hint, fill="x")
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("in_camera"), value=cfg.INPUT_CAMERA, variable=v("input", tk.StringVar, "")))
-        field(s, self.tr("camera_name"), v("camera", tk.StringVar, ""))
+        fr = tk.Frame(s, bg="white")
+        self.srt_hint = self.label(fr, "", fg="#1f5fbf", font=(FONT, 9, "bold"), wraplength=420)
+        ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda: self.copy(self.obs_server())).pack(side=side, padx=4)
+        self.srt_hint.pack(side=side, fill="x", expand=True)
+        self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
+        buttons((self.tr("obs_guide"), self.show_obs_guide))
+        choice("in_camera", cfg.INPUT_CAMERA, "input")
+        self.camera_box = field(s, self.tr("camera_name"), v("camera", tk.StringVar, ""), combo=[st.camera] if st.camera else [])
+        self.sound_box = field(s, self.tr("camera_sound"), v("camera_sound", tk.StringVar, ""), combo=[""])
+        buttons((self.tr("refresh_devices"), self.refresh_devices))
+        small(self.tr("camera_hint"))
+        choice("in_file", cfg.INPUT_FILE, "input")
+        field(s, self.tr("input_file"), v("input_file", tk.StringVar, ""))
+        buttons((self.tr("pick_file"), self.pick_input_file))
         ttk.Separator(s).pack(fill="x", pady=10)
+
+        # 2. where the protected picture goes
         self.label(s, self.tr("sec_out"), font=(FONT, 11, "bold")).pack(fill="x")
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("out_window"), value=cfg.OUTPUT_WINDOW, variable=v("output", tk.StringVar, "")))
-        self.pack_row(ttk.Radiobutton(s, text=self.tr("out_rtmp"), value=cfg.OUTPUT_RTMP, variable=v("output", tk.StringVar, "")))
-        field(s, self.tr("rtmp_url"), v("rtmp_url", tk.StringVar, ""))
-        field(s, self.tr("stream_key"), v("key", tk.StringVar, ""), show="•")
-        self.pack_row(ttk.Checkbutton(s, text=self.tr("remember_key"), variable=v("remember", tk.BooleanVar, False)))
+        choice("out_rtmp", cfg.OUTPUT_RTMP, "output")
+        names = [self.tr("plat_" + p) for p in ingest.PLATFORMS]
+        plat = field(s, self.tr("platform"), v("platform", tk.StringVar, ""), combo=names)
+        plat.configure(state="readonly")  # type: ignore[call-arg]
+        plat.bind("<<ComboboxSelected>>", lambda e: self.on_platform())
+        url_entry = field(s, self.tr("rtmp_url"), v("rtmp_url", tk.StringVar, ""))
+        key_entry = field(s, self.tr("stream_key"), v("key", tk.StringVar, ""), show="•")
+        for ent in (url_entry, key_entry):
+            ent.bind("<FocusOut>", lambda e: self.tidy_target(), add="+")
+            ent.bind("<<Paste>>", lambda e: self.after(50, self.tidy_target), add="+")
+        self.platform_hint = small("")
+        self.pack_row(
+            ttk.Checkbutton(s, text=self.tr("remember_key"), variable=v("remember", tk.BooleanVar, False)),
+            padx=(0, 22) if self.rtl else (22, 0),
+        )
         if not self.ctrl.keys.available:
-            self.pack_row(self.label(s, self.tr("key_no_store"), fg="#6b7785", font=(FONT, 9)), fill="x")
-        field(s, self.tr("delay"), v("delay", tk.StringVar, ""), 8)
+            small(self.tr("key_no_store"))
+        tf = buttons((self.tr("test_link"), self.on_test_link))
+        self.test_result = self.label(tf, "", font=(FONT, 9, "bold"), wraplength=380)
+        self.test_result.pack(side=side, padx=8)
+        choice("out_record", cfg.OUTPUT_RECORD, "output")
+        field(s, self.tr("record_dir"), v("record_dir", tk.StringVar, ""))
+        buttons((self.tr("pick_folder"), self.pick_record_dir))
+        small(self.tr("record_hint", folder=self.ctrl.record_file().rsplit(os.sep, 1)[0]))
+        choice("out_window", cfg.OUTPUT_WINDOW, "output")
+        small(self.tr("window_hint"))
         ttk.Separator(s).pack(fill="x", pady=10)
+
+        # 3. the rest
+        field(s, self.tr("delay"), v("delay", tk.StringVar, ""), 8)
         self.pack_row(
             ttk.Checkbutton(
                 s, text=self.tr("translate_ar"), variable=v("translate", tk.BooleanVar, False), command=self.on_translate_toggle
@@ -268,7 +353,6 @@ class App(tk.Tk):
         self.label(s, self.tr("sec_brand"), font=(FONT, 11, "bold")).pack(fill="x")
         self.pack_row(self.label(s, self.tr("brand_hint"), fg="#6b7785", font=(FONT, 9)), fill="x")
         fr = tk.Frame(s, bg="white")
-        side = "right" if self.rtl else "left"
         ttk.Button(fr, text=self.tr("brand_pick"), command=self.pick_brand).pack(side=side, padx=4)
         ttk.Button(fr, text=self.tr("brand_remove"), command=lambda: self.set_brand("")).pack(side=side, padx=4)
         self.brand_label = self.label(fr, "", fg="#44505e", font=(FONT, 9))
@@ -289,6 +373,106 @@ class App(tk.Tk):
         v("input", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
         v("srt_port", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
         self.show_srt_hint()
+        self.show_platform_hint()
+
+    # --- the links: OBS, platform, devices, recordings ---------------------------------------------------
+    def obs_server(self) -> str:
+        port = str(self._vars["srt_port"].get()).strip() or "9000"
+        return f"srt://127.0.0.1:{port}"
+
+    def platform_value(self) -> str:
+        """The platform id of the name shown in the list."""
+        shown = str(self._vars["platform"].get())
+        return next((p for p in ingest.PLATFORMS if self.tr("plat_" + p) == shown), "custom")
+
+    def on_platform(self) -> None:
+        """A platform picked: its own server goes into the box (a server typed for another platform is replaced)."""
+        plat, url = self.platform_value(), str(self._vars["rtmp_url"].get()).strip()
+        known = {ingest.normalise(u) for u in ingest.PRESETS.values() if u}
+        if not url or ingest.normalise(url) in known:
+            self._vars["rtmp_url"].set(ingest.PRESETS.get(plat, ""))
+        self.show_platform_hint()
+
+    def show_platform_hint(self) -> None:
+        plat = self.platform_value()
+        self.platform_hint.configure(text=self.tr("plat_hint_" + plat))
+
+    def tidy_target(self) -> None:
+        """After a paste or leaving a box: a whole address is split into server and key, spaces go, Kick's server
+        gets its ``/app``, and the platform follows the address."""
+        url, key = str(self._vars["rtmp_url"].get()), str(self._vars["key"].get())
+        if not url.strip() and not key.strip():
+            return
+        self.ctrl.settings.platform = self.platform_value()
+        server, clean_key = self.ctrl.take_pasted(url, key)
+        if server != url:
+            self._vars["rtmp_url"].set(server)
+        if clean_key != key:
+            self._vars["key"].set(clean_key)
+        guess = ingest.guess_platform(server)
+        if guess != "custom" and guess != self.platform_value():
+            self._vars["platform"].set(self.tr("plat_" + guess))
+        self.show_platform_hint()
+
+    def show_obs_guide(self) -> None:
+        messagebox.showinfo(self.tr("obs_guide"), self.tr("obs_guide_text", server=self.obs_server()))
+
+    def refresh_devices(self) -> None:
+        def work() -> None:
+            found = self.ctrl.devices()
+
+            def show() -> None:
+                self.camera_box.configure(values=found["video"])  # type: ignore[call-arg]
+                self.sound_box.configure(values=["", *found["audio"]])  # type: ignore[call-arg]
+                if not found["video"]:
+                    messagebox.showinfo(PRODUCT_NAME, self.tr("no_devices"))
+
+            self.post(show)
+
+        threading.Thread(target=work, name="devices", daemon=True).start()
+
+    def pick_input_file(self) -> None:
+        path = filedialog.askopenfilename(
+            title=self.tr("pick_file"), filetypes=[(self.tr("videos"), "*.mp4 *.mkv *.mov *.avi *.flv *.ts *.webm"), ("*", "*.*")]
+        )
+        if path:
+            self._vars["input_file"].set(path)
+            self._vars["input"].set(cfg.INPUT_FILE)
+            self._vars["output"].set(cfg.OUTPUT_RECORD)
+
+    def pick_record_dir(self) -> None:
+        path = filedialog.askdirectory(title=self.tr("pick_folder"))
+        if path:
+            self._vars["record_dir"].set(path)
+
+    def on_test_link(self) -> None:
+        self.collect()
+        self.tidy_target()
+        self.collect()
+        key = str(self._vars["key"].get()).strip()
+        problems = self.ctrl.target(key).problems
+        if problems:
+            self.test_result.configure(text=self.tr(problems[0]), fg="#b3261e")
+            return
+        if self.ctrl.engine.running or self._busy.is_set():
+            self.test_result.configure(text=self.tr("test_busy"), fg="#b3261e")
+            return
+        if not messagebox.askyesno(PRODUCT_NAME, self.tr("test_warn")):
+            return
+        self.test_result.configure(text=self.tr("test_running"), fg="#44505e")
+
+        def work() -> None:
+            why = self.ctrl.test_connection(key)
+
+            def show() -> None:
+                if why:
+                    self.test_result.configure(text=self.tr("test_fail", why=self.tr("why_" + why)), fg="#b3261e")
+                else:
+                    self.test_result.configure(text=self.tr("test_ok"), fg="#1b7f3b")
+
+            self.post(show)
+
+        threading.Thread(target=work, name="link-test", daemon=True).start()
 
     def show_brand(self) -> None:
         path = self.ctrl.settings.brand_image
@@ -307,8 +491,7 @@ class App(tk.Tk):
         self.show_brand()
 
     def show_srt_hint(self) -> None:
-        port = self._vars["srt_port"].get().strip() or "9000"
-        self.srt_hint.configure(text=self.tr("srt_hint", port=port))
+        self.srt_hint.configure(text=self.tr("srt_hint", server=self.obs_server()))
 
     def collect(self) -> None:
         """Window fields -> settings (values that are not valid stay as typed so that ``problems`` reports them)."""
@@ -316,6 +499,9 @@ class App(tk.Tk):
         st.lang = self.lang
         st.input, st.output = str(v["input"].get()), str(v["output"].get())
         st.camera, st.rtmp_url = str(v["camera"].get()).strip(), str(v["rtmp_url"].get()).strip()
+        st.camera_sound, st.input_file = str(v["camera_sound"].get()).strip(), str(v["input_file"].get()).strip()
+        st.record_dir = str(v["record_dir"].get()).strip()
+        st.platform = self.platform_value()
         st.remember_key = bool(v["remember"].get())
         st.translate_ar = bool(v["translate"].get())
         try:
@@ -437,7 +623,68 @@ class App(tk.Tk):
             date = build_info.EXPIRES
             self.banner.configure(text=self.tr("beta_days" if left > 1 else "beta_last_day", days=left, date=date), fg="#b26a00")
 
+    def show_link(self) -> None:
+        """The two links in plain words (from the engine's STATUS lines), redrawn only when they change."""
+        lk, st = self.ctrl.link, self.ctrl.settings
+        running = self.ctrl.engine.running
+        shown = (
+            running,
+            lk.input,
+            lk.platform,
+            lk.reason,
+            lk.retry_s,
+            lk.record_file,
+            lk.recorded,
+            st.srt_port,
+            self.ctrl.port_moved_from,
+            self.lang,
+        )
+        if shown == self._link_shown:
+            return
+        self._link_shown = shown
+        if not running and not lk.stopped:
+            self.link_box.pack_forget()
+            return
+        green, amber, red, grey = "#1b7f3b", "#b26a00", "#b3261e", "#44505e"
+        server = self.ctrl.obs_server()
+        why = self.tr("why_" + lk.reason) if lk.reason else ""
+        if st.input == cfg.INPUT_SRT:
+            text, color = {
+                "connected": (self.tr("lk_obs_ok"), green),
+                "disconnected": (self.tr("lk_obs_lost", server=server), amber),
+                "failed": (self.tr("lk_obs_failed", why=why), red),
+            }.get(lk.input, (self.tr("lk_obs_wait", server=server), amber))
+            if self.ctrl.port_moved_from and lk.input != "connected":
+                text = self.tr("port_moved", old=self.ctrl.port_moved_from, new=st.srt_port, server=server) + "\n" + text
+        else:
+            text, color = (self.tr("lk_in_ok"), green) if lk.input == "connected" or running else (self.tr("lk_in_wait"), grey)
+            if lk.input == "failed":
+                text, color = self.tr("lk_in_failed", why=why), red
+        self.lk_in.configure(text=text, fg=color)
+        if st.output == cfg.OUTPUT_RTMP:
+            text, color = {
+                "connecting": (self.tr("lk_plat_connecting"), amber),
+                "connected": (self.tr("lk_plat_ok"), green),
+                "lost": (self.tr("lk_plat_lost", why=why, s=f"{lk.retry_s:g}"), amber),
+                "failed": (self.tr("lk_plat_failed", why=why), red),
+            }.get(lk.platform, (self.tr("lk_plat_wait"), grey))
+        elif st.output == cfg.OUTPUT_RECORD:
+            text, color = (
+                (self.tr("lk_rec_done", file=lk.record_file), green)
+                if lk.recorded
+                else ((self.tr("lk_rec", file=lk.record_file), green) if lk.record_file else (self.tr("lk_rec_wait"), grey))
+            )
+        else:
+            text, color = self.tr("lk_window"), grey
+        self.lk_out.configure(text=text, fg=color)
+        if st.input == cfg.INPUT_SRT and lk.input != "connected" and running:
+            self.lk_copy.pack(anchor=self.side, pady=(4, 0))
+        else:
+            self.lk_copy.pack_forget()
+        self.link_box.pack(fill="x", pady=6, after=self.message)
+
     def update_controls(self) -> None:
+        self.show_link()
         running = self.ctrl.engine.running
         busy = self._busy.is_set()
         can = not running and not busy and not self.ctrl.expired()

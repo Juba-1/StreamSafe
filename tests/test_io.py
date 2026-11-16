@@ -59,7 +59,7 @@ def test_srt_input_realtime_pipeline(tmp_path):
     video = str(tmp_path / "walk.mp4")
     make_video(video, n=90, cut_at=10**6)
     port = _free_port()
-    source = FFmpegSource(f"srt://127.0.0.1:{port}?mode=listener", (1920, 1080), 30.0)
+    source = FFmpegSource(f"srt://127.0.0.1:{port}?mode=listener", (1920, 1080), 30.0, relisten=False)  # ends with the sender
     time.sleep(1.0)
     sender = subprocess.Popen(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-re", "-i", video, "-c:v", "libx264", "-preset", "ultrafast",
