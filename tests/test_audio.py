@@ -377,7 +377,7 @@ def test_realtime_srt_in_with_sound_like_obs(tmp_path):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
-    source = FFmpegSource(f"srt://127.0.0.1:{port}?mode=listener", SIZE, FPS)
+    source = FFmpegSource(f"srt://127.0.0.1:{port}?mode=listener", SIZE, FPS, relisten=False)  # ends with the sender
     time.sleep(1.0)
     sender = subprocess.Popen(
         ["ffmpeg", "-hide_banner", "-loglevel", "error", "-re", "-i", src_path, "-c:v", "libx264", "-preset", "ultrafast",
