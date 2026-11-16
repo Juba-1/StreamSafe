@@ -253,7 +253,7 @@ class App(tk.Tk):
         v("camera_sound", tk.StringVar, st.camera_sound)
         v("input_file", tk.StringVar, st.input_file)
         v("output", tk.StringVar, st.output)
-        v("platform", tk.StringVar, self.tr("plat_" + st.platform))
+        v("platform", tk.StringVar, "").set(self.tr("plat_" + st.platform))  # the name in this language
         v("rtmp_url", tk.StringVar, st.rtmp_url)
         v("record_dir", tk.StringVar, st.record_dir)
         v("key", tk.StringVar, self.ctrl.stored_key() if "key" not in self._vars else self._vars["key"].get())
@@ -272,7 +272,10 @@ class App(tk.Tk):
             else:
                 ent = tk.Entry(fr, textvariable=var, width=width, justify="left", show=show, relief="solid", bd=1)
             lab.pack(side=side, padx=(8, 0) if self.rtl else (0, 8))
-            ent.pack(side=side, fill="x", expand=True)
+            if width >= 20:
+                ent.pack(side=side, fill="x", expand=True)
+            else:
+                ent.pack(side=side)
             self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
             return ent
 
@@ -382,8 +385,9 @@ class App(tk.Tk):
 
     def platform_value(self) -> str:
         """The platform id of the name shown in the list."""
-        shown = str(self._vars["platform"].get())
-        return next((p for p in ingest.PLATFORMS if self.tr("plat_" + p) == shown), "custom")
+        shown = str(self._vars["platform"].get()).replace(RLE, "").replace(PDF, "")
+        names = {i18n.t(lang, "plat_" + p): p for p in ingest.PLATFORMS for lang in i18n.LANGS}  # either language: a rebuild
+        return names.get(shown, "custom")
 
     def on_platform(self) -> None:
         """A platform picked: its own server goes into the box (a server typed for another platform is replaced)."""
@@ -394,8 +398,8 @@ class App(tk.Tk):
         self.show_platform_hint()
 
     def show_platform_hint(self) -> None:
-        plat = self.platform_value()
-        self.platform_hint.configure(text=self.tr("plat_hint_" + plat))
+        with contextlib.suppress(tk.TclError, AttributeError):
+            self.platform_hint.configure(text=self.tr("plat_hint_" + self.platform_value()))
 
     def tidy_target(self) -> None:
         """After a paste or leaving a box: a whole address is split into server and key, spaces go, Kick's server
@@ -491,7 +495,8 @@ class App(tk.Tk):
         self.show_brand()
 
     def show_srt_hint(self) -> None:
-        self.srt_hint.configure(text=self.tr("srt_hint", server=self.obs_server()))
+        with contextlib.suppress(tk.TclError, AttributeError):  # a trace may fire while the window is being rebuilt
+            self.srt_hint.configure(text=self.tr("srt_hint", server=self.obs_server()))
 
     def collect(self) -> None:
         """Window fields -> settings (values that are not valid stay as typed so that ``problems`` reports them)."""
