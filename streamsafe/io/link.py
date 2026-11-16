@@ -128,7 +128,20 @@ def listener_port(url: str) -> int | None:
 _REASONS = (
     ("port_busy", ("address already in use", "only one usage of each socket", "error number -10048")),
     ("no_device", ("could not find video device", "could not find audio", "i/o error opening", "cannot open capture device")),
-    ("refused_key", ("netstream.publish", "publish.badname", "unauthorized", "authentication", "error number -10053", "403 forbidden")),
+    # Amazon IVS (Kick) closes the encrypted connection without a word on a wrong key or a wrong path (TESTED live,
+    # runs/live_kick_r1: "Error in the pull function ... End of file" for the address without /app)
+    (
+        "refused_key",
+        (
+            "netstream.publish",
+            "publish.badname",
+            "unauthorized",
+            "authentication",
+            "error number -10053",
+            "403 forbidden",
+            "error in the pull function",
+        ),
+    ),
     ("no_route", ("failed to resolve", "name or service not known", "no such host", "error number -11001", "network is unreachable")),
     ("refused", ("connection refused", "error number -10061", "cannot open connection")),
     ("timeout", ("timed out", "error number -10060", "error number -138")),

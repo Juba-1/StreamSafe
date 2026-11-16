@@ -3,7 +3,8 @@
 #   OBS stand-in (FFmpeg, the GTA 6 trailer looped, over SRT) -> the engine with the real models -> RTMPS ($STREAM_URL)
 #   RUN_NAME=live_kick_r1 [MINUTES=8] bash tools/live_e2e_job.sh      (through tools/pod_guard.sh)
 # Faults on purpose while live: OBS stops and comes back (at OBS_OFF_S), the connection to the platform is cut
-# (at NET_CUT_S). Before the main run: a raw push to the address form many users paste (Kick without /app) and the
+# (at NET_CUT_S). A background job of a script starts with Ctrl+C ignored (POSIX), so the engine gets the
+# normal Ctrl+C handler back explicitly: the stop at the end then works like the Stop button (report written). Before the main run: a raw push to the address form many users paste (Kick without /app) and the
 # app's "Test connection" on the right one. STREAM_URL comes from a RunPod secret; it is never printed, and every
 # file is scrubbed of it before upload to the work store (runs/$RUN_NAME).
 set -u
@@ -70,7 +71,8 @@ echo "B_EXIT $?"; grep -E "LINK_TEST|STATUS" $R/b_linktest.txt | tail -6
 sleep 20
 
 echo "== C: live run, ${MINUTES} min: OBS off at ${OBS_OFF_S}s for 15 s, platform link cut at ${NET_CUT_S}s"
-python -u -m streamsafe --input "srt://127.0.0.1:9000?mode=listener" --output "$STREAM_URL" --mode realtime --size 1920x1080 --delay 2 \
+python -u -c "import runpy, signal, sys; signal.signal(signal.SIGINT, signal.default_int_handler); sys.argv[0] = 'streamsafe'; runpy.run_module('streamsafe', run_name='__main__')" \
+  --input "srt://127.0.0.1:9000?mode=listener" --output "$STREAM_URL" --mode realtime --size 1920x1080 --delay 2 \
   --report-dir $R --stats $R/c_stats.json > $R/c_engine.log 2>&1 &
 EP=$!
 for i in $(seq 1 120); do grep -q '"waiting_obs"' $R/c_engine.log && break; sleep 1; done

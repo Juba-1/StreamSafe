@@ -118,6 +118,7 @@ def test_secrets_never_leave():
         ("Error opening output rtmp://127.0.0.1:1/app/key: Connection refused", "refused"),
         ("Failed to resolve hostname nowhere.invalid: Name or service not known", "no_route"),
         ("Server error: NetStream.Publish.BadName", "refused_key"),
+        ("[tls @ 0x1] Error in the pull function. | [tls @ 0x1] IO error: End of file | Error opening output: I/O error", "refused_key"),
         ("Connection timed out", "timeout"),
         ("Error in the push function. av_interleaved_write_frame(): Broken pipe", "broken"),
         ("something new", "unknown"),
