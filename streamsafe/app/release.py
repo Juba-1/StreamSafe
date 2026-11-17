@@ -64,6 +64,7 @@ PRODUCT_PLANS: dict[str, str] = {
     "pdt_0Ns8wbYzBAuDWpHK6G7z8": "pro",  # Pro yearly 950 SAR
 }
 BUY_URL = "https://streamsafe-sa.vercel.app/#pricing"  # where a streamer subscribes
+SUPPORT_URL = ""  # launch period: Ali's support page (Ko-fi / PayPal.me); the Home tab shows a small support box when set
 LICENSE_GRACE_DAYS = 3  # no internet: a key that was valid keeps working this long
 LICENSE_RECHECK_HOURS = 6  # while protection runs, the key is checked again this often
 

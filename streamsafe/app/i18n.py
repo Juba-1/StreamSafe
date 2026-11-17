@@ -150,6 +150,11 @@ TEXT: dict[str, tuple[str, str]] = {
     "bad_delay": ("التأخير لازم يكون بين 0.5 و 10 ثواني.", "The delay must be between 0.5 and 10 seconds."),
     "bad_key": ("اكتب مفتاح البث (بدون مسافات).", "Enter the stream key (no spaces)."),
     # --- run ---
+    "support_text": (
+        "StreamSafe مجاني وقت إطلاق اللعبة. إذا عجبك وحاب تساعدنا نكمل، ادعمنا ولك الشكر.",
+        "StreamSafe is free during the GTA 6 launch. If you like it and want to help us keep going, you can support us. Thank you!",
+    ),
+    "support_button": ("ادعمنا", "Support us"),
     "start_sub": ("يشغّل التغطية ويبدأ البث", "Covers and starts your stream"),
     "stop_sub": ("يوقف البث بأمان", "Ends the stream safely"),
     "quick_title": ("جهّز بثك في ٣ خطوات", "Set up your stream in 3 steps"),

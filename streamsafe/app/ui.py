@@ -400,6 +400,13 @@ class App(tk.Tk):
         self.buttons(s3, (self.tr("obs_guide"), self.show_obs_guide))
         self.small(s3, self.tr("console_hint"))
 
+        if release.SUPPORT_URL:  # launch period: free, with a friendly way to help
+            sup = tk.Frame(h, bg=SAND, padx=12, pady=10)
+            sup.pack(fill="x", pady=(0, 10))
+            ttk.Button(sup, text=self.tr("support_button"), command=lambda: webbrowser.open(release.SUPPORT_URL)).pack(
+                side="left" if self.rtl else "right"
+            )
+            self.label(sup, self.tr("support_text"), bg=SAND, wraplength=420).pack(side=side, fill="x", expand=True)
         foot = tk.Frame(h, bg=CARD)
         foot.pack(fill="x", pady=(4, 0))
         self.report_btn = ttk.Button(foot, text=self.tr("open_report"), command=self.open_report)

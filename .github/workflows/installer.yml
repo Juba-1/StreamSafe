@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
     inputs:
       beta_days:
-        description: "Beta length in days from today (the build stops starting streams after it)"
-        default: "30"
+        description: "Beta length in days from today (the build stops starting streams after it); 0 = never expires"
+        default: "0"
       nvidia_runtime_test:
         description: "Also test the NVIDIA runtime switch (downloads about 3.5 GB of NVIDIA libraries; no GPU needed)"
         type: boolean
@@ -40,7 +40,7 @@ jobs:
       - name: "build facts: version, expiry date (default +30 days), exe version resources"
         id: meta
         shell: pwsh
-        run: python tools/build_meta.py --days ${{ inputs.beta_days || 30 }} --build ${{ github.run_number }} --out build
+        run: python tools/build_meta.py --days ${{ inputs.beta_days || '0' }} --build ${{ github.run_number }} --out build
       - name: "fetch the real risk heads from the private HF store (needs repo secret HF_HEADS_TOKEN, read-only)"
         if: env.HF_HEADS_TOKEN != ''
         env:
