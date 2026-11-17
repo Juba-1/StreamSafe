@@ -22,7 +22,7 @@ import webbrowser
 from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk
 
-from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, paths, plan, release, updates
+from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, passkey, paths, plan, release, updates
 from streamsafe.app import settings as cfg
 from streamsafe.branding import PRODUCT_NAME
 
@@ -122,6 +122,7 @@ class App(tk.Tk):
         self.after(POLL_MS, self.tick)
         self.after(100, self.refresh_check)
         self.after(600, self.look_for_updates)
+        threading.Thread(target=self.sync_pass_clock, daemon=True).start()
 
     # --- thread hand-over -----------------------------------------------------------------------------------
     def post(self, fn: Callable[[], None]) -> None:
@@ -507,6 +508,12 @@ class App(tk.Tk):
         self.license_label = self.label(c, "", font=(FONT, 10, "bold"), wraplength=520)
         self.pack_row(self.license_label, fill="x")
         self.field(c, self.tr("license_key"), self._vars["license_key"], show="•")
+        code = passkey.device_code()
+        fr = tk.Frame(c, bg=SAND, padx=10, pady=6)
+        ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda: self.copy(code)).pack(side=side)
+        tk.Label(fr, text=self.tr("pass_device", code=code), bg=SAND, fg=INK, font=(FONT, 10, "bold")).pack(side=side, padx=10)
+        self.pack_row(fr, fill="x", pady=4)
+        self.small(c, self.tr("pass_device_hint"))
         lf = self.buttons(
             c, (self.tr("license_activate"), self.on_activate_license), (self.tr("license_deactivate"), self.on_deactivate_license)
         )
@@ -650,16 +657,15 @@ class App(tk.Tk):
 
     def show_license(self) -> None:
         from streamsafe.app import license as lic
-        from streamsafe.app import passkey
-
         held = lic.load(self.ctrl.env)
         st = self.ctrl.license_status
-        sp, sp_on = passkey.load(self.ctrl.env), passkey.active(self.ctrl.env)
+        sp = passkey.load(self.ctrl.env)
         if held is None and sp is not None:  # a supporter's pass: Pro until its last day
-            if sp_on is not None:
+            why = passkey.why_off(self.ctrl.env)
+            if not why:
                 text, color = self.tr("pass_on", date=sp.expires.isoformat(), who=sp.who or "-"), "#1b7f3b"
             else:
-                text, color = self.tr("pass_ended", date=sp.expires.isoformat()), "#b26a00"
+                text, color = self.pass_reason(why, sp.expires.isoformat()), "#b26a00"
         elif held is not None:
             plan_name = self.tr("plan_" + held.plan)
             text = self.tr("license_on", plan=plan_name, key=lic.masked(held.key)) + (self.tr("license_grace") if st.grace else "")
@@ -671,15 +677,28 @@ class App(tk.Tk):
         with contextlib.suppress(tk.TclError, AttributeError):
             self.license_label.configure(text=text, fg=color)
 
+    def pass_reason(self, why: str, date: str) -> str:
+        """Why a supporter's key gives no Pro, in words."""
+        return {
+            "invalid": self.tr("pass_invalid"),
+            "other_device": self.tr("pass_other_device"),
+            "clock": self.tr("pass_clock"),
+            "expired": self.tr("pass_ended", date=date) if date else self.tr("pass_expired"),
+        }.get(why, self.tr("pass_invalid"))
+
+    def sync_pass_clock(self) -> None:
+        """Off the window's thread: a supporter's key follows the internet's date, not only the PC clock."""
+        with contextlib.suppress(Exception):
+            passkey.sync_clock(self.ctrl.env)
+            self.post(self.show_license)
+
     def on_activate_license(self) -> None:
         key = str(self._vars["license_key"].get())
 
         def work() -> str:
-            from streamsafe.app import passkey
-
-            if passkey.is_pass(key):  # a supporter's pass: checked here, no network
+            if passkey.is_pass(key):  # a supporter's pass: checked here (and the internet's date)
                 why = passkey.activate(key, self.ctrl.env)
-                return {"invalid": self.tr("pass_invalid"), "expired": self.tr("pass_expired")}.get(why, "")
+                return self.pass_reason(why, "") if why else ""
             st = self.ctrl.activate_license(key)
             return "" if st.ok else self.tr("why_license_" + (st.reason or "invalid"))
 
@@ -698,7 +717,6 @@ class App(tk.Tk):
 
         def work() -> str:
             from streamsafe.app import license as lic
-            from streamsafe.app import passkey
 
             passkey.forget(self.ctrl.env)
             if lic.load(self.ctrl.env) is None:

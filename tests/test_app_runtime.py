@@ -170,7 +170,7 @@ def test_settings_never_hold_the_key_and_survive_garbage(tmp_path):
     assert cfg.load(f).lang == "en" and cfg.load(f).srt_port == 9100
     f.write_text('{"lang": 5, "srt_port": "x", "input": "nope", "delay": 3}', encoding="utf-8")
     s = cfg.load(f)
-    assert s.lang == "ar" and s.srt_port == 9000 and s.input == cfg.INPUT_CAMERA and s.delay == 3.0
+    assert s.lang == "ar" and s.srt_port == 9000 and s.input == cfg.INPUT_SRT and s.delay == 3.0
     f.write_text("not json", encoding="utf-8")
     assert cfg.load(f) == cfg.Settings()
 
@@ -178,7 +178,8 @@ def test_settings_never_hold_the_key_and_survive_garbage(tmp_path):
 def test_settings_problems_and_validators():
     s = cfg.Settings(input=cfg.INPUT_SRT, srt_port=80, output=cfg.OUTPUT_RTMP, rtmp_url="http://x", delay=99)
     assert s.problems() == ["bad_port", "bad_rtmp", "bad_delay"]
-    assert cfg.Settings().problems() == []
+    assert cfg.Settings().problems() == ["bad_rtmp"]  # a new copy: the platform still to be picked
+    assert cfg.Settings(platform="kick").problems() == []
     assert cfg.valid_rtmp_url("rtmps://live.twitch.tv/app") and not cfg.valid_rtmp_url("rtmp://") and not cfg.valid_rtmp_url("rtmp://a b")
     assert cfg.valid_key("live_1234_abc") and not cfg.valid_key("a b") and not cfg.valid_key("") and not cfg.valid_key("a/b")
 

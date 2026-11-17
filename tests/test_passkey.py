@@ -1,14 +1,23 @@
+"""Supporter Pro pass: one PC, one month, no way back with the clock or a copied file."""
+
 import base64
 import datetime as dt
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
-cryptography = pytest.importorskip("cryptography")
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat  # noqa: E402
+pytest.importorskip("cryptography")
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat
 
-from streamsafe.app import passkey, plan, release  # noqa: E402
+from streamsafe.app import passkey, plan, release
+
+MINE, OTHER = "pc-ali", "pc-friend"
+D = dt.date
 
 
 def b64(b):
@@ -16,46 +25,110 @@ def b64(b):
 
 
 @pytest.fixture
-def signer(monkeypatch):
-    k = Ed25519PrivateKey.generate()
-    monkeypatch.setattr(release, "PASS_PUBLIC_KEYS", (k.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex(),))
-
-    def make(last, plan_="pro", who="ali"):
-        note = json.dumps({"p": plan_, "e": last, "w": who, "i": "abc"}).encode()
-        return f"SSP-{b64(note)}.{b64(k.sign(note))}"
-
-    return make
+def k(monkeypatch):
+    key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(release, "PASS_PUBLIC_KEYS", (key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex(),))
+    monkeypatch.setattr(passkey, "machine_id", lambda: MINE)
+    monkeypatch.setattr(passkey, "internet_today", lambda *a, **kw: None)  # no network in tests
+    return key
 
 
+def make(key, last="2026-12-17", mid=MINE, who="ali"):
+    note = json.dumps({"p": "pro", "e": last, "d": passkey.device_code(mid), "w": who, "i": "abc"}).encode()
+    return f"SSP-{b64(note)}.{b64(key.sign(note))}"
+
+
+@pytest.fixture
 def env(tmp_path):
-    return {"STREAMSAFE_HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path), "APPDATA": str(tmp_path)}
+    return {"STREAMSAFE_DATA_DIR": str(tmp_path), "LOCALAPPDATA": str(tmp_path)}
 
 
-def test_pass_turns_pro_on_then_off(signer, tmp_path):
-    e = env(tmp_path)
-    key = signer("2026-12-17")
-    assert plan.current(e) == "basic"
-    assert passkey.activate(key, e, today=lambda: dt.date(2026, 11, 17)) == ""
-    assert passkey.active(e, today=lambda: dt.date(2026, 12, 17)) is not None  # the last day still works
-    assert passkey.active(e, today=lambda: dt.date(2026, 12, 18)) is None  # then it stops by itself
-    passkey.forget(e)
-    assert passkey.load(e) is None
+def day(y, m, d):
+    return lambda: D(y, m, d)
 
 
-def test_changed_or_foreign_key_is_refused(signer, tmp_path):
-    e = env(tmp_path)
-    key = signer("2026-12-17")
+def test_month_then_off_by_itself(k, env):
+    assert plan.current(env) == "basic"
+    assert passkey.activate(make(k), env, today=day(2026, 11, 17)) == ""
+    assert passkey.why_off(env, today=day(2026, 12, 17)) == ""  # the last day still works
+    assert passkey.why_off(env, today=day(2026, 12, 18)) == "expired"  # then it stops by itself
+
+
+def test_pro_follows_the_pass(k, env, monkeypatch):
+    monkeypatch.setattr(passkey, "_local_today", lambda: D(2026, 11, 20))
+    passkey.activate(make(k), env)
+    assert plan.current(env) == "pro" and plan.allows("custom_brand", env)
+    monkeypatch.setattr(passkey, "_local_today", lambda: D(2027, 1, 1))
+    assert plan.current(env) == "basic"
+
+
+def test_one_pc_only(k, env):
+    assert passkey.activate(make(k, mid=OTHER), env, today=day(2026, 11, 17)) == "other_device"
+    assert passkey.activate(make(k), env, today=day(2026, 11, 17)) == ""
+    assert passkey.why_off(env, today=day(2026, 11, 18), mid=OTHER) == "other_device"  # pass.json copied to another PC
+
+
+def test_cannot_be_used_again_after_it_ends(k, env):
+    key = make(k)
+    passkey.activate(key, env, today=day(2026, 11, 17))
+    passkey.why_off(env, today=day(2026, 12, 20))  # the app ran after the end
+    passkey.forget(env)  # "deactivate" and paste it again
+    assert passkey.activate(key, env, today=day(2026, 12, 20)) == "expired"
+    assert passkey.activate(key, env, today=day(2026, 12, 1)) == "clock"  # ... with the clock set back
+    assert passkey.why_off(env, today=day(2026, 12, 1)) == "none"
+
+
+def test_clock_set_back_turns_pro_off(k, env):
+    passkey.activate(make(k), env, today=day(2026, 11, 17))
+    passkey.why_off(env, today=day(2026, 12, 10))
+    assert passkey.why_off(env, today=day(2026, 11, 20)) == "clock"
+    assert passkey.why_off(env, today=day(2026, 12, 9)) == ""  # one day of slack (time zones)
+
+
+def test_internet_date_counts(k, env):
+    passkey.activate(make(k), env, today=day(2026, 11, 17))
+    passkey.sync_clock(env, fetch=lambda: D(2026, 12, 25))  # the PC clock says November, the internet says after the end
+    assert passkey.why_off(env, today=day(2026, 11, 18)) == "clock"
+    assert passkey.activate(make(k), env, today=day(2026, 11, 18), net=lambda: D(2026, 12, 25)) == "clock"
+    fresh = {"STREAMSAFE_DATA_DIR": env["STREAMSAFE_DATA_DIR"] + "_new"}
+    assert passkey.activate(make(k), fresh, today=day(2026, 11, 18), net=lambda: D(2026, 12, 25)) == "expired"
+
+
+def test_changed_key_or_other_signer_refused(k, env):
+    key = make(k)
     body, sig = key[4:].split(".")
     note = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
-    note["e"] = "2099-01-01"  # someone edits the date
-    forged = "SSP-" + b64(json.dumps(note).encode()) + "." + sig
-    assert passkey.activate(forged, e) == "invalid"
-    assert passkey.activate("SSP-garbage", e) == "invalid"
-    assert passkey.activate(signer("2020-01-01"), e) == "expired"
+    note["e"] = "2099-01-01"
+    assert passkey.activate("SSP-" + b64(json.dumps(note).encode()) + "." + sig, env) == "invalid"
+    assert passkey.activate(make(Ed25519PrivateKey.generate()), env) == "invalid"
+    assert passkey.activate("SSP-garbage", env) == "invalid"
     assert passkey.is_pass(" ssp-x ") and not passkey.is_pass("ABCD-1234")
 
 
-def test_real_key_shape_with_spaces(signer, tmp_path):
-    e = env(tmp_path)
-    key = signer("2030-01-01")
-    assert passkey.activate(key[:20] + "\n " + key[20:], e) == ""  # pasted with a line break
+def test_pasted_with_spaces_and_line_breaks(k, env):
+    key = make(k, last="2030-01-01")
+    assert passkey.activate(key[:20] + "\n " + key[20:40] + " " + key[40:], env, today=day(2026, 11, 17)) == ""
+
+
+def test_device_code_shape():
+    c = passkey.device_code("x")
+    assert len(c) == 9 and c[4] == "-" and c == passkey.device_code("x") != passkey.device_code("y")
+
+
+def test_make_pass_tool_round_trip(k, env, monkeypatch, tmp_path):
+    """The real tool makes a key the app accepts."""
+    tool = Path(__file__).resolve().parents[1] / "tools" / "make_pass.py"
+    priv = k.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()).hex()
+    out = subprocess.run(
+        [sys.executable, str(tool), "--device", passkey.device_code(MINE).lower(), "--who", "Sara", "--days", "30"],
+        env={**os.environ, "PASS_SIGNING_KEY": priv},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert passkey.activate(out[0], env) == ""
+    p = passkey.active(env)
+    assert p is not None and p.who == "Sara" and p.expires == dt.date.today() + dt.timedelta(days=30)
+    bad_env = {**os.environ, "PASS_SIGNING_KEY": priv}
+    bad = subprocess.run([sys.executable, str(tool), "--device", "123", "--who", "x"], env=bad_env, capture_output=True)
+    assert bad.returncode != 0

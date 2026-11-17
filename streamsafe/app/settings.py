@@ -20,14 +20,15 @@ DEFAULT_CAMERA = "OBS Virtual Camera"
 class Settings:
     lang: str = "ar"  # "ar" / "en"
     # INPUT_CAMERA: a capture device (OBS Virtual Camera, a capture card); INPUT_SRT: OBS streams to us over SRT;
-    # INPUT_FILE: a video that is already recorded (with OUTPUT_RECORD: "protect a finished video")
-    input: str = INPUT_CAMERA
+    # INPUT_FILE: a video that is already recorded (with OUTPUT_RECORD: "protect a finished video").
+    # The defaults are the Home tab's three steps: OBS sends to us (SRT), we send to the platform.
+    input: str = INPUT_SRT
     camera: str = DEFAULT_CAMERA
     camera_sound: str = ""  # the sound input that belongs to the device (a capture card); "" = picture only
     input_file: str = ""
     srt_port: int = 9000
     # OUTPUT_WINDOW: a window OBS captures; OUTPUT_RTMP: we stream to the platform; OUTPUT_RECORD: a video file
-    output: str = OUTPUT_WINDOW
+    output: str = OUTPUT_RTMP
     platform: str = "custom"  # ingest.PLATFORMS: which preset fills the address
     rtmp_url: str = ""  # the ingest address WITHOUT the stream key ("" = the platform's preset)
     record_dir: str = ""  # where recordings go ("" = the user's Videos folder)
@@ -88,9 +89,9 @@ def load(path: Path) -> Settings:
     if s.lang not in ("ar", "en"):
         s.lang = "ar"
     if s.input not in (INPUT_CAMERA, INPUT_SRT, INPUT_FILE):
-        s.input = INPUT_CAMERA
+        s.input = INPUT_SRT
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
-        s.output = OUTPUT_WINDOW
+        s.output = OUTPUT_RTMP
     if s.resolution not in RESOLUTIONS:
         s.resolution = "1080p"
     if s.fps not in FPS_CHOICES:

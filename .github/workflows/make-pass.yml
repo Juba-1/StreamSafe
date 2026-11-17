@@ -6,6 +6,9 @@ name: make-pass
 on:
   workflow_dispatch:
     inputs:
+      device:
+        description: "Device code from the supporter's app (XXXX-XXXX)"
+        required: true
       who:
         description: "Supporter name or email (shown in their app)"
         required: true
@@ -25,9 +28,10 @@ jobs:
       - run: pip install -q cryptography
       - env:
           PASS_SIGNING_KEY: ${{ secrets.PASS_SIGNING_KEY }}
+          DEVICE: ${{ inputs.device }}
           WHO: ${{ inputs.who }}
           DAYS: ${{ inputs.days }}
         run: |
-          out=$(python tools/make_pass.py --who "$WHO" --days "$DAYS")
+          out=$(python tools/make_pass.py --device "$DEVICE" --who "$WHO" --days "$DAYS")
           { echo "### Pro key"; echo; echo '```'; echo "$out" | head -1; echo '```'; echo; echo "$out" | tail -1; } >> "$GITHUB_STEP_SUMMARY"
           echo "made (see the summary)"

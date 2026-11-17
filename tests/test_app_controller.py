@@ -23,6 +23,7 @@ def ctrl(tmp_path, monkeypatch):
     monkeypatch.setattr(updates, "expired", lambda today=None, expires=None: False)
     monkeypatch.delenv("OBS_STATE", raising=False)
     c = controller.Controller(env, FakeProtector(), log=lambda line: lines.append(line))
+    c.settings.input, c.settings.output = "camera", "window"  # these tests drive the engine without OBS or a platform
     lines.clear()
     yield c
     c.engine.stop(2)
