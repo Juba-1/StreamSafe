@@ -18,6 +18,7 @@ import queue
 import sys
 import threading
 import tkinter as tk
+import webbrowser
 from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk
 
@@ -366,6 +367,20 @@ class App(tk.Tk):
         )
         self.pack_row(self.label(s, self.tr("translate_hint", mb=release.TRANSLATE_DOWNLOAD_MB), fg="#6b7785", font=(FONT, 9)), fill="x")
         ttk.Separator(s).pack(fill="x", pady=10)
+        # the subscription (Dodo licence key)
+        self.label(s, self.tr("sec_license"), font=(FONT, 11, "bold")).pack(fill="x")
+        self.license_label = self.label(s, "", font=(FONT, 10, "bold"), wraplength=520)
+        self.pack_row(self.license_label, fill="x")
+        v("license_key", tk.StringVar, "")
+        field(s, self.tr("license_key"), self._vars["license_key"], show="•")
+        lf = buttons(
+            (self.tr("license_activate"), self.on_activate_license),
+            (self.tr("license_deactivate"), self.on_deactivate_license),
+        )
+        if release.BUY_URL:
+            ttk.Button(lf, text=self.tr("license_buy"), command=lambda: webbrowser.open(release.BUY_URL)).pack(side=side, padx=4)
+        self.show_license()
+        ttk.Separator(s).pack(fill="x", pady=10)
         self.label(s, self.tr("sec_brand"), font=(FONT, 11, "bold")).pack(fill="x")
         pro = plan.allows("custom_brand", self.ctrl.env)
         self.pack_row(self.label(s, self.tr("brand_hint" if pro else "brand_pro_only"), fg="#6b7785", font=(FONT, 9)), fill="x")
@@ -492,6 +507,53 @@ class App(tk.Tk):
             self.post(show)
 
         threading.Thread(target=work, name="link-test", daemon=True).start()
+
+    def show_license(self) -> None:
+        from streamsafe.app import license as lic
+
+        held = lic.load(self.ctrl.env)
+        st = self.ctrl.license_status
+        if held is not None:
+            plan_name = self.tr("plan_" + held.plan)
+            text = self.tr("license_on", plan=plan_name, key=lic.masked(held.key)) + (self.tr("license_grace") if st.grace else "")
+            color = "#1b7f3b"
+        elif release.LICENSE_REQUIRED:
+            text, color = self.tr("license_needed"), "#b3261e"
+        else:
+            text, color = self.tr("license_beta"), "#44505e"
+        with contextlib.suppress(tk.TclError, AttributeError):
+            self.license_label.configure(text=text, fg=color)
+
+    def on_activate_license(self) -> None:
+        key = str(self._vars["license_key"].get())
+
+        def work() -> str:
+            st = self.ctrl.activate_license(key)
+            return "" if st.ok else self.tr("why_license_" + (st.reason or "invalid"))
+
+        def done(err: str) -> None:
+            self._vars["license_key"].set("")
+            if err:
+                messagebox.showwarning(PRODUCT_NAME, err)
+            self.build()  # the plan may have changed what the window offers (the logo)
+            self.nb.select(self.sets)
+
+        self.job("license", work, done)
+
+    def on_deactivate_license(self) -> None:
+        if not messagebox.askyesno(PRODUCT_NAME, self.tr("license_deactivate_ask")):
+            return
+
+        def work() -> str:
+            return "" if self.ctrl.deactivate_license() else self.tr("license_deactivate_offline")
+
+        def done(err: str) -> None:
+            if err:
+                messagebox.showwarning(PRODUCT_NAME, err)
+            self.build()
+            self.nb.select(self.sets)
+
+        self.job("license", work, done)
 
     def show_brand(self) -> None:
         path = self.ctrl.settings.brand_image if plan.allows("custom_brand", self.ctrl.env) else ""

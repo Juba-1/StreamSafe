@@ -8,11 +8,8 @@ connected every copy is on the normal plan. ``STREAMSAFE_PLAN`` overrides it for
 
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Mapping
-
-from streamsafe.app import paths
 
 BASIC, PRO = "basic", "pro"
 FEATURES = {"custom_brand": PRO}  # feature -> the lowest plan that has it
@@ -24,12 +21,10 @@ def current(env: Mapping[str, str] | None = None) -> str:
     forced = env.get("STREAMSAFE_PLAN", "")
     if forced in _ORDER:
         return forced
-    try:
-        data = json.loads((paths.data_dir(dict(env)) / "license.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return BASIC
-    got = data.get("plan") if isinstance(data, dict) else None
-    return got if got in _ORDER else BASIC
+    from streamsafe.app import license
+
+    lic = license.load(env)  # written only by license.activate (the product the key was bought for)
+    return lic.plan if lic is not None and lic.plan in _ORDER else BASIC
 
 
 def allows(feature: str, env: Mapping[str, str] | None = None) -> bool:

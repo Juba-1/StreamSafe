@@ -89,13 +89,15 @@ def test_key_is_masked_and_never_saved_to_settings(app):
 
     entries = [w for w in all_widgets(app.sets) if isinstance(w, tk.Entry)]
     masked = [e for e in entries if str(e.cget("show")) == "•"]
-    assert len(masked) == 1
+    assert len(masked) == 2  # the stream key and the subscription key
     app._vars["key"].set("never_in_settings_123")
+    app._vars["license_key"].set("licence_never_in_settings_456")
     app.collect()
     app.ctrl.save_settings()
     from streamsafe.app import paths
 
-    assert "never_in_settings_123" not in paths.settings_file(app.ctrl.env).read_text(encoding="utf-8")
+    text = paths.settings_file(app.ctrl.env).read_text(encoding="utf-8")
+    assert "never_in_settings_123" not in text and "licence_never_in_settings_456" not in text
 
 
 def test_models_missing_shows_setup_and_start_is_refused_with_a_reason(app):

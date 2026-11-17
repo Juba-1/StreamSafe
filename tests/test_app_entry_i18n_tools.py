@@ -90,7 +90,9 @@ def used_keys() -> set[str]:
 
 def test_every_text_exists_in_both_languages():
     assert i18n.missing() == []
-    unknown = {k for k in used_keys() if k not in i18n.TEXT and not k.startswith(("chk_", "p_", "st_hint", "src_", "plat_", "why_"))}
+    unknown = {
+        k for k in used_keys() if k not in i18n.TEXT and not k.startswith(("chk_", "p_", "st_hint", "src_", "plat_", "why_", "plan_"))
+    }
     assert unknown == set()
     for k in ("src_private", "src_missing", "src_network", "src_other"):
         assert k in i18n.TEXT

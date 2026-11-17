@@ -362,6 +362,51 @@ TEXT: dict[str, tuple[str, str]] = {
         "من تروفو: Creator Studio > Stream Key. الصق المفتاح بس.",
         "On Trovo: Creator Studio > Stream Key. Paste the key only.",
     ),
+    "sec_license": ("الاشتراك", "Subscription"),
+    "license_key": ("مفتاح الاشتراك", "Subscription key"),
+    "license_activate": ("تفعيل", "Activate"),
+    "license_deactivate": ("إلغاء التفعيل من هذا الجهاز", "Deactivate on this PC"),
+    "license_buy": ("اشترك", "Subscribe"),
+    "plan_basic": ("العادي", "Standard"),
+    "plan_pro": ("Pro", "Pro"),
+    "license_on": ("✓ الاشتراك مفعّل: {plan} (المفتاح {key})", "✓ Subscription active: {plan} (key {key})"),
+    "license_grace": (
+        " - بدون إنترنت الحين، يشتغل كم يوم وبعدها يحتاج يتأكد",
+        " - offline now: works a few days, then it must check again",
+    ),
+    "license_needed": (
+        "تحتاج اشتراك عشان تشغّل الحماية: الصق المفتاح اللي وصلك على الإيميل واضغط «تفعيل».",
+        "Protection needs a subscription: paste the key from your e-mail and press «Activate».",
+    ),
+    "license_beta": ("النسخة التجريبية: تشتغل بدون اشتراك.", "Beta: works without a subscription."),
+    "license_deactivate_ask": (
+        "نلغي تفعيل الاشتراك من هذا الجهاز عشان تقدر تفعّله في جهاز ثاني؟",
+        "Deactivate the subscription on this PC so you can activate it on another?",
+    ),
+    "license_deactivate_offline": (
+        "انحذف من هذا الجهاز، بس ما قدرنا نبلغ السيرفر (الإنترنت). لو رفض في الجهاز الثاني جرب بعدين.",
+        "Removed from this PC, but the server could not be told (internet). If the other PC refuses, try again later.",
+    ),
+    "why_license_no_license": ("ما فيه اشتراك مفعّل (الإعدادات > الاشتراك)", "no active subscription (Settings > Subscription)"),
+    "why_license_invalid": (
+        "الاشتراك منتهي أو موقوف: جدّده ثم فعّل المفتاح",
+        "the subscription ended or is paused: renew it, then activate the key",
+    ),
+    "why_license_limit": (
+        "المفتاح مفعّل على أجهزة بعدد الحد: ألغِ التفعيل من جهاز ثاني أول",
+        "the key is active on as many PCs as allowed: deactivate it on another PC first",
+    ),
+    "why_license_not_found": ("المفتاح غلط: انسخه كامل من الإيميل", "wrong key: copy it whole from the e-mail"),
+    "why_license_inactive": ("المفتاح موقوف (الاشتراك منتهي أو ما انخصم)", "the key is switched off (subscription ended or unpaid)"),
+    "why_license_offline_too_long": (
+        "لازم إنترنت عشان نتأكد من الاشتراك (صار لك أيام بدون)",
+        "internet is needed to check the subscription (it has been days)",
+    ),
+    "why_license_network": (
+        "ما قدرنا نوصل لسيرفر الاشتراكات: تأكد من الإنترنت",
+        "could not reach the subscription server: check the internet",
+    ),
+    "why_license_unknown_product": ("هذا المفتاح لمنتج ثاني مو لـ StreamSafe", "this key is for another product"),
     # --- updates ---
     "update_app": (
         "نسخة جديدة من البرنامج: {version}. نزّلها من الفريق وثبّتها فوق القديمة.",

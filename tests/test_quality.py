@@ -82,8 +82,9 @@ def test_run_args_carry_quality_and_delay(tmp_path):
 def test_plan_gates_the_custom_logo(tmp_path):
     env = {"STREAMSAFE_DATA_DIR": str(tmp_path)}
     assert plan.current(env) == plan.BASIC and not plan.allows("custom_brand", env)
-    (tmp_path / "license.json").write_text(json.dumps({"plan": "pro"}))
-    assert plan.allows("custom_brand", env)
+    (tmp_path / "license.json").write_text(json.dumps({"plan": "pro"}))  # a hand-written file is not a licence
+    assert not plan.allows("custom_brand", env)
+    assert plan.allows("custom_brand", {**env, "STREAMSAFE_PLAN": "pro"})
     assert plan.current({**env, "STREAMSAFE_PLAN": "basic"}) == plan.BASIC
 
 

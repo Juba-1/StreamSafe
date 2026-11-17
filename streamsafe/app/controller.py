@@ -18,6 +18,7 @@ from pathlib import Path
 
 from streamsafe import session_report
 from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, release, updates
+from streamsafe.app import license as lic
 from streamsafe.app import settings as settings_mod
 from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, Settings
 from streamsafe.branding import PRODUCT_NAME
@@ -65,6 +66,9 @@ class Controller:
         self.engine = engine.EngineProcess(self._engine_line, engine.Redactor())
         self.tracker = engine.StatusTracker()
         self.check_result = CheckResult()
+        self.license_status = lic.Status(True) if not release.LICENSE_REQUIRED else lic.Status(False, "no_license")
+        self._license_at = 0.0  # monotonic time of the last licence check
+        self.license_stopped = False  # protection was stopped because the subscription is no longer valid
         self.use_nvidia = False  # decided by the last check: engines ready AND the NVIDIA libraries in place
         self.last_exit: int | None = None
         self.update: updates.Update | None = None
@@ -126,7 +130,43 @@ class Controller:
             out.append("why_heads_placeholder" if why == "placeholder" else "why_heads")
         if self.check_result.verdict == "fail":
             out.append("why_check")
+        if release.LICENSE_REQUIRED and not self.license_status.ok:
+            out.append("why_license_" + (self.license_status.reason or "invalid"))
         return out
+
+    # --- the subscription --------------------------------------------------------------------------------------
+    def check_license(self, post: lic.Post | None = None) -> lic.Status:
+        """Ask Dodo (network: call it off the window's thread). Without LICENSE_REQUIRED every copy may run."""
+        if not release.LICENSE_REQUIRED:
+            self.license_status = lic.Status(True, plan=lic.load(self.env).plan if lic.load(self.env) else "basic")
+        else:
+            self.license_status = lic.check(self.env, post or lic.http_post)
+        self._license_at = time.monotonic()
+        return self.license_status
+
+    def activate_license(self, key: str, post: lic.Post | None = None) -> lic.Status:
+        self.license_status = lic.activate(key, self.env, post or lic.http_post)
+        self._license_at = time.monotonic()
+        return self.license_status
+
+    def deactivate_license(self, post: lic.Post | None = None) -> bool:
+        done = lic.deactivate(self.env, post or lic.http_post)
+        self.license_status = lic.Status(not release.LICENSE_REQUIRED, "no_license")
+        return done
+
+    def _recheck_license_while_running(self) -> None:
+        """Every few hours while protection runs: a subscription that ended stops it (the viewers get the normal
+        end of stream, never an unprotected picture)."""
+        if not release.LICENSE_REQUIRED or time.monotonic() - self._license_at < release.LICENSE_RECHECK_HOURS * 3600:
+            return
+        self._license_at = time.monotonic()
+
+        def work() -> None:
+            if not self.check_license().ok and self.engine.running:
+                self.license_stopped = True
+                self.stop()
+
+        threading.Thread(target=work, name="license-check", daemon=True).start()
 
     # --- the system check -----------------------------------------------------------------------------------
     def tool_env(self, nvidia: bool | None = None) -> dict[str, str]:
@@ -374,9 +414,12 @@ class Controller:
 
     def start(self, key: str) -> None:
         """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start."""
+        if release.LICENSE_REQUIRED:
+            self.check_license()  # every start asks Dodo (a lapsed subscription does not start)
         why = self.blockers(key)
         if why:
             raise RuntimeError(why[0])
+        self.license_stopped = False
         s = self.settings
         self.free_port()
         target = self.target(key) if s.output == OUTPUT_RTMP else ingest.Target("", "")
@@ -400,6 +443,8 @@ class Controller:
 
     def status(self) -> str:
         running = self.engine.running
+        if running:
+            self._recheck_license_while_running()
         if not running and self.engine.exit_code is not None and not self.engine.stop_requested:
             self.last_exit = self.engine.exit_code
         if not running and self.engine.exit_code is not None:

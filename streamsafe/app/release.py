@@ -49,6 +49,18 @@ TRANSLATE_FILES: dict[str, tuple[str, int]] = {
 UPDATE_MANIFEST_URL = ""
 UPDATE_PUBLIC_KEYS: tuple[str, ...] = ()  # hex, 32 bytes each; more than one allows changing the key
 
+# --- subscriptions (Dodo Payments licence keys, app/license.py) ------------------------------------------------
+# The app talks only to Dodo's PUBLIC licence endpoints (activate / validate / deactivate: no API key, no secret in
+# the app). LICENSE_REQUIRED False: the beta runs without a key (normal plan). Ali turns it on once the two
+# products exist and their ids are filled in below.
+LICENSE_REQUIRED = False
+DODO_MODE = "test"  # "test" while trying it, "live" for real customers
+DODO_BASE = {"test": "https://test.dodopayments.com", "live": "https://live.dodopayments.com"}
+PRODUCT_PLANS: dict[str, str] = {}  # Dodo product id -> "basic" / "pro", e.g. {"pdt_...": "basic", "pdt_...": "pro"}
+BUY_URL = ""  # the page where a streamer subscribes (the product's checkout link or our site)
+LICENSE_GRACE_DAYS = 3  # no internet: a key that was valid keeps working this long
+LICENSE_RECHECK_HOURS = 6  # while protection runs, the key is checked again this often
+
 # --- beta ---------------------------------------------------------------------------------------------------
 BETA_DAYS = 30  # a build stops starting streams this many days after it was built (``build_info.EXPIRES``)
 
