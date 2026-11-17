@@ -226,3 +226,7 @@ ol.steps p { color: var(--muted); font-size: 15px; }
 .period .save { margin-inline-start: 6px; }
 .price s { font: 400 22px var(--body); opacity: 0.55; margin-inline-end: 6px; }
 .price .save { font-size: 14px; margin-inline-start: 8px; }
+/* plan buttons follow the monthly / yearly switch */
+#pricing a.btn.y { display: none; }
+#pricing:has(#py:checked) a.btn.y { display: inline-flex; }
+#pricing:has(#py:checked) a.btn.m { display: none; }

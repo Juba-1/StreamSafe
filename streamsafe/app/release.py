@@ -56,8 +56,14 @@ UPDATE_PUBLIC_KEYS: tuple[str, ...] = ()  # hex, 32 bytes each; more than one al
 LICENSE_REQUIRED = False
 DODO_MODE = "test"  # "test" while trying it, "live" for real customers
 DODO_BASE = {"test": "https://test.dodopayments.com", "live": "https://live.dodopayments.com"}
-PRODUCT_PLANS: dict[str, str] = {}  # Dodo product id -> "basic" / "pro", e.g. {"pdt_...": "basic", "pdt_...": "pro"}
-BUY_URL = ""  # the page where a streamer subscribes (the product's checkout link or our site)
+# Dodo product id -> plan. TEST-mode products (17 Nov 2026); live mode gets new ids after verification.
+PRODUCT_PLANS: dict[str, str] = {
+    "pdt_0Ns8bH6iyuBWR4ByTJk5V": "basic",  # Basic monthly 49 SAR
+    "pdt_0Ns8udAcfdHoVMGkSgqJH": "basic",  # Basic yearly 470 SAR
+    "pdt_0Ns8wMhWzDtbNeUffyLjs": "pro",  # Pro monthly 99 SAR
+    "pdt_0Ns8wbYzBAuDWpHK6G7z8": "pro",  # Pro yearly 950 SAR
+}
+BUY_URL = "https://streamsafe-sa.vercel.app/#pricing"  # where a streamer subscribes
 LICENSE_GRACE_DAYS = 3  # no internet: a key that was valid keeps working this long
 LICENSE_RECHECK_HOURS = 6  # while protection runs, the key is checked again this often
 

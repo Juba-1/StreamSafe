@@ -15,7 +15,26 @@ YEAR_OFF = 0.20  # yearly plan: 20% less than 12 months
 OFF = round(YEAR_OFF * 100)
 BASIC_Y, PRO_Y = int(BASIC * 12 * (1 - YEAR_OFF)), int(PRO * 12 * (1 - YEAR_OFF))  # 470, 950
 TRIAL_DAYS = 3
-BUY_URL = "#pricing"  # becomes the Dodo checkout link once the products exist
+BUY_URL = "#pricing"  # header and hero buttons scroll to the plans
+SITE = "https://streamsafe-sa.vercel.app"
+DODO_CHECKOUT = "https://test.checkout.dodopayments.com/buy"  # TEST MODE; becomes https://checkout.dodopayments.com/buy after verification
+PRODUCTS = {  # Dodo product ids (test mode)
+    ("basic", "m"): "pdt_0Ns8bH6iyuBWR4ByTJk5V",
+    ("basic", "y"): "pdt_0Ns8udAcfdHoVMGkSgqJH",
+    ("pro", "m"): "pdt_0Ns8wMhWzDtbNeUffyLjs",
+    ("pro", "y"): "pdt_0Ns8wbYzBAuDWpHK6G7z8",
+}
+
+
+def checkout(plan, period):
+    return f"{DODO_CHECKOUT}/{PRODUCTS[plan, period]}?quantity=1&redirect_url={SITE}/thanks.html"
+
+
+def plan_button(plan):
+    en, ar = "Start free trial", "ابدأ التجربة"
+    return "".join(f'<a class="btn btn-main {p}" href="{checkout(plan, p)}">{b(en, ar, "span")}</a>' for p in ("m", "y"))
+
+
 HAS_VIDEO = (ROOT / "media" / "demo.mp4").is_file()
 FONTS = "https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600&family=Reem+Kufi:wght@500;600&display=swap"
 
@@ -311,7 +330,7 @@ HOME = f"""
         f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span class="m">{BASIC} <small>ريال / شهريًا</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {BASIC * 12 - BASIC_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
     )
 }
-<a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة", "span")}</a>
+{plan_button("basic")}
 </div>
 <div class="plan pro">
 {
@@ -320,7 +339,7 @@ HOME = f"""
         f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span class="m">{PRO} <small>ريال / شهريًا</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {PRO * 12 - PRO_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
     )
 }
-<a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة", "span")}</a>
+{plan_button("pro")}
 </div>
 </div>
 {
@@ -342,10 +361,10 @@ HOME = f"""
 
 FAQ = [
     (
-        "Can it get me banned?",
-        "No tool can promise that, and we don't. StreamSafe is built to cover more rather than less and covers the whole screen when it is unsure. You still decide what you play and remain responsible for your stream.",
-        "هل ممكن يسبب لي حظر؟",
-        "ما فيه برنامج يقدر يضمن هذا ولا نقول إننا نضمنه. StreamSafe مصمم يغطي أكثر لا أقل، ويغطي الشاشة كاملة إذا ما كان متأكد. ويبقى قرار اللعب ومسؤولية البث عليك.",
+        "Why do streamers use StreamSafe?",
+        "So they can stream GTA 6 without worrying about what shows up next. StreamSafe watches every frame before your viewers do and covers revealing outfits and scenes on its own, so your stream stays family-friendly and you can focus on playing and talking to your chat.",
+        "ليش الستريمرز يستخدمون StreamSafe؟",
+        "عشان يبثون GTA 6 وهم مرتاحين من اللي ممكن يطلع فجأة. StreamSafe يشوف كل لقطة قبل المشاهدين ويغطي اللبس والمشاهد غير اللائقة بنفسه، فيبقى بثك مناسب للعائلة وتركز أنت على اللعب والسوالف مع الشات.",
     ),
     (
         "I play on PlayStation. Does it work?",
@@ -564,6 +583,33 @@ CONTACT = doc(
 """,
 )
 
+THANKS = doc(
+    "Welcome to StreamSafe",
+    "أهلًا بك في StreamSafe",
+    f"""
+<div class="box"><p><strong>Your free trial has started.</strong> The email from Dodo Payments has your licence key and the download link for the app (check spam too).</p></div>
+<h2>1. Download the app</h2>
+<p>Open the email and press the download button for StreamSafe for Windows. The same download is on the purchase page that opened after checkout.</p>
+<p>Windows 10 or 11 (64-bit). If Windows SmartScreen warns you, choose "More info" then "Run anyway".</p>
+<h2>2. Activate</h2>
+<p>Open StreamSafe, go to Settings, then Subscription, paste your licence key and press Activate.</p>
+<h2>3. Connect and go live</h2>
+<p>Pick your platform, paste your stream key, put the address StreamSafe shows into OBS, press Start, then Start Streaming in OBS.</p>
+<p>Need help? Email <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
+""",
+    f"""
+<div class="box"><p><strong>بدأت تجربتك المجانية.</strong> وصلك إيميل من Dodo Payments فيه مفتاح الاشتراك ورابط تحميل البرنامج (شيك على البريد المزعج كمان).</p></div>
+<h2>1. حمّل البرنامج</h2>
+<p>افتح الإيميل واضغط زر التحميل لبرنامج StreamSafe لويندوز. ونفس التحميل موجود في صفحة الشراء اللي فتحت لك بعد الدفع.</p>
+<p>ويندوز 10 أو 11 (64 بت). إذا طلع لك تحذير SmartScreen اختر "More info" وبعدها "Run anyway".</p>
+<h2>2. فعّل الاشتراك</h2>
+<p>افتح StreamSafe وروح الإعدادات ثم الاشتراك، والصق المفتاح واضغط تفعيل.</p>
+<h2>3. اربط وابدأ البث</h2>
+<p>اختر منصتك والصق مفتاح البث، وحط العنوان اللي يعطيك البرنامج في OBS، واضغط تشغيل وبعدها ابدأ البث في OBS.</p>
+<p>تحتاج مساعدة؟ راسلنا على <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
+""",
+)
+
 DESC = "StreamSafe covers revealing characters and scenes in your GTA 6 live stream a couple of seconds before viewers see them. Windows app for OBS, Twitch, Kick and YouTube."
 PAGES = {
     "index.html": ("StreamSafe: keep your GTA 6 stream clean", HOME),
@@ -571,6 +617,7 @@ PAGES = {
     "privacy.html": ("Privacy Policy | StreamSafe", PRIVACY),
     "refund.html": ("Trial, Cancellation & Refunds | StreamSafe", REFUND),
     "contact.html": ("Contact | StreamSafe", CONTACT),
+    "thanks.html": ("Welcome | StreamSafe", THANKS),
 }
 
 if __name__ == "__main__":
