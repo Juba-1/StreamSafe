@@ -153,8 +153,14 @@ TEXT: dict[str, tuple[str, str]] = {
     "bad_delay": ("التأخير لازم يكون بين 0.5 و 10 ثواني.", "The delay must be between 0.5 and 10 seconds."),
     "bad_key": ("اكتب مفتاح البث (بدون مسافات).", "Enter the stream key (no spaces)."),
     # --- run ---
-    "pass_on": ("برو مفعّل بمفتاح الداعمين لين {date} (باسم: {who}). شكراً لدعمك ♥", "Pro is on with a supporter key until {date} (for: {who}). Thank you for your support ♥"),
-    "pass_ended": ("مفتاح الداعمين انتهى في {date}. رجع البرنامج للخطة العادية، والحماية شغالة كاملة.", "The supporter key ended on {date}. The app is back on the normal plan; protection works fully."),
+    "pass_on": (
+        "برو مفعّل بمفتاح الداعمين لين {date} (باسم: {who}). شكراً لدعمك ♥",
+        "Pro is on with a supporter key until {date} (for: {who}). Thank you for your support ♥",
+    ),
+    "pass_ended": (
+        "مفتاح الداعمين انتهى في {date}. رجع البرنامج للخطة العادية، والحماية شغالة كاملة.",
+        "The supporter key ended on {date}. The app is back on the normal plan; protection works fully.",
+    ),
     "pass_invalid": ("المفتاح هذا غير صحيح. انسخه كامل من الرسالة بدون نقص.", "This key isn't valid. Copy it whole from the message."),
     "pass_expired": ("المفتاح هذا انتهت مدته.", "This key has already ended."),
     "pass_other_device": (

@@ -58,14 +58,14 @@ def support_box():
         return ""
     en = (
         "<p><strong>♥ Enjoying StreamSafe?</strong> It's free for the GTA 6 launch. If you'd like to help us keep improving it, "
-        f'even a coffee means a lot to us.</p><p><strong>Want Pro?</strong> (your own or a sponsor\'s logo on the covers) Support us with $5 or more '
-        f'and put your device code in the message (StreamSafe shows it in Advanced, under Subscription and Pro key): '
+        f"even a coffee means a lot to us.</p><p><strong>Want Pro?</strong> (your own or a sponsor's logo on the covers) Support us with $5 or more "
+        f"and put your device code in the message (StreamSafe shows it in Advanced, under Subscription and Pro key): "
         f'we email you a Pro key for your PC that works for 30 days.</p><a class="btn btn-main" href="{SUPPORT_URL}">Support us on Ko-fi</a>'
     )
     ar = (
         "<p><strong>♥ عاجبك StreamSafe؟</strong> البرنامج مجاني وقت إطلاق GTA 6. لو حاب تساعدنا نكمل ونطوّره، "
-        f'دعمك ولو بقهوة يفرق معنا كثير.</p><p><strong>تبي Pro؟</strong> (شعارك أو شعار الراعي على الغطاء) ادعمنا بـ 5 دولار أو أكثر '
-        f'واكتب في رسالتك «رمز جهازك» (تلقاه في البرنامج: إعدادات متقدمة ثم الاشتراك ومفتاح Pro)، '
+        f"دعمك ولو بقهوة يفرق معنا كثير.</p><p><strong>تبي Pro؟</strong> (شعارك أو شعار الراعي على الغطاء) ادعمنا بـ 5 دولار أو أكثر "
+        f"واكتب في رسالتك «رمز جهازك» (تلقاه في البرنامج: إعدادات متقدمة ثم الاشتراك ومفتاح Pro)، "
         f'ونرسل لك على إيميلك مفتاح Pro لجهازك يشتغل 30 يوم.</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعمنا على Ko-fi</a>'
     )
     return f'<div class="support">{b(en, ar)}</div>'

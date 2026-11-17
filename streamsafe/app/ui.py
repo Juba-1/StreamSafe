@@ -424,8 +424,9 @@ class App(tk.Tk):
             sup.pack(fill="x", pady=(0, 10))
             tk.Label(sup, text=self.tr("support_title"), font=(FONT, 12, "bold"), bg=BLUSH, fg=INK).pack(anchor=self.side)
             self.label(sup, self.tr("support_text"), bg=BLUSH, wraplength=520).pack(anchor=self.side, pady=(2, 8))
-            kofi = Tile(sup, self.tr("support_button"), self.tr("support_sub"), DUSK, "#1a0716",
-                        lambda: webbrowser.open(release.SUPPORT_URL))
+            kofi = Tile(
+                sup, self.tr("support_button"), self.tr("support_sub"), DUSK, "#1a0716", lambda: webbrowser.open(release.SUPPORT_URL)
+            )
             kofi._title.configure(font=(FONT, 12, "bold"))
             kofi.configure(padx=14, pady=6)
             kofi.pack(anchor=self.side)
@@ -657,6 +658,7 @@ class App(tk.Tk):
 
     def show_license(self) -> None:
         from streamsafe.app import license as lic
+
         held = lic.load(self.ctrl.env)
         st = self.ctrl.license_status
         sp = passkey.load(self.ctrl.env)
