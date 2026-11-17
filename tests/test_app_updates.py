@@ -55,7 +55,7 @@ def test_build_stamp_of_a_source_copy_never_expires():
 
 
 def test_beta_length_default():
-    assert release.BETA_DAYS == 30
+    assert release.BETA_DAYS == 0  # paid builds never end (17 Nov 2026)
 
 
 # --- signed manifest ------------------------------------------------------------------------------------------

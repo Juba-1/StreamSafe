@@ -24,7 +24,12 @@ def current(env: Mapping[str, str] | None = None) -> str:
     from streamsafe.app import license
 
     lic = license.load(env)  # written only by license.activate (the product the key was bought for)
-    return lic.plan if lic is not None and lic.plan in _ORDER else BASIC
+    if lic is not None and lic.plan in _ORDER:
+        return lic.plan
+    from streamsafe.app import passkey
+
+    held = passkey.active(env)  # a supporter's pass: Pro until its last day, then back to normal
+    return held.plan if held is not None and held.plan in _ORDER else BASIC
 
 
 def allows(feature: str, env: Mapping[str, str] | None = None) -> bool:

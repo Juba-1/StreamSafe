@@ -510,8 +510,9 @@ class App(tk.Tk):
         lf = self.buttons(
             c, (self.tr("license_activate"), self.on_activate_license), (self.tr("license_deactivate"), self.on_deactivate_license)
         )
-        if release.BUY_URL:
-            ttk.Button(lf, text=self.tr("license_buy"), command=lambda: webbrowser.open(release.BUY_URL)).pack(side=side, padx=4)
+        buy = release.SUPPORT_URL or release.BUY_URL  # launch period: the Pro key comes with support on Ko-fi
+        if buy:
+            ttk.Button(lf, text=self.tr("license_buy"), command=lambda: webbrowser.open(buy)).pack(side=side, padx=4)
         self.show_license()
 
         # the logo on the cover (Pro)
@@ -649,10 +650,17 @@ class App(tk.Tk):
 
     def show_license(self) -> None:
         from streamsafe.app import license as lic
+        from streamsafe.app import passkey
 
         held = lic.load(self.ctrl.env)
         st = self.ctrl.license_status
-        if held is not None:
+        sp, sp_on = passkey.load(self.ctrl.env), passkey.active(self.ctrl.env)
+        if held is None and sp is not None:  # a supporter's pass: Pro until its last day
+            if sp_on is not None:
+                text, color = self.tr("pass_on", date=sp.expires.isoformat(), who=sp.who or "-"), "#1b7f3b"
+            else:
+                text, color = self.tr("pass_ended", date=sp.expires.isoformat()), "#b26a00"
+        elif held is not None:
             plan_name = self.tr("plan_" + held.plan)
             text = self.tr("license_on", plan=plan_name, key=lic.masked(held.key)) + (self.tr("license_grace") if st.grace else "")
             color = "#1b7f3b"
@@ -667,6 +675,11 @@ class App(tk.Tk):
         key = str(self._vars["license_key"].get())
 
         def work() -> str:
+            from streamsafe.app import passkey
+
+            if passkey.is_pass(key):  # a supporter's pass: checked here, no network
+                why = passkey.activate(key, self.ctrl.env)
+                return {"invalid": self.tr("pass_invalid"), "expired": self.tr("pass_expired")}.get(why, "")
             st = self.ctrl.activate_license(key)
             return "" if st.ok else self.tr("why_license_" + (st.reason or "invalid"))
 
@@ -684,6 +697,12 @@ class App(tk.Tk):
             return
 
         def work() -> str:
+            from streamsafe.app import license as lic
+            from streamsafe.app import passkey
+
+            passkey.forget(self.ctrl.env)
+            if lic.load(self.ctrl.env) is None:
+                return ""
             return "" if self.ctrl.deactivate_license() else self.tr("license_deactivate_offline")
 
         def done(err: str) -> None:

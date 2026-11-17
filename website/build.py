@@ -58,11 +58,13 @@ def support_box():
         return ""
     en = (
         "<p><strong>♥ Enjoying StreamSafe?</strong> It's free for the GTA 6 launch. If you'd like to help us keep improving it, "
-        f'even a coffee means a lot to us.</p><a class="btn btn-main" href="{SUPPORT_URL}">Support us on Ko-fi</a>'
+        f'even a coffee means a lot to us.</p><p><strong>Want Pro?</strong> (your own or a sponsor\'s logo on the covers) Support us with $10 or more '
+        f'and write “Pro” in your message: we email you a Pro key that works for 30 days.</p><a class="btn btn-main" href="{SUPPORT_URL}">Support us on Ko-fi</a>'
     )
     ar = (
         "<p><strong>♥ عاجبك StreamSafe؟</strong> البرنامج مجاني وقت إطلاق GTA 6. لو حاب تساعدنا نكمل ونطوّره، "
-        f'دعمك ولو بقهوة يفرق معنا كثير.</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعمنا على Ko-fi</a>'
+        f'دعمك ولو بقهوة يفرق معنا كثير.</p><p><strong>تبي Pro؟</strong> (شعارك أو شعار الراعي على الغطاء) ادعمنا بـ 10 دولار أو أكثر '
+        f'واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro يشتغل 30 يوم.</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعمنا على Ko-fi</a>'
     )
     return f'<div class="support">{b(en, ar)}</div>'
 

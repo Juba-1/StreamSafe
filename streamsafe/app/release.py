@@ -64,7 +64,10 @@ PRODUCT_PLANS: dict[str, str] = {
     "pdt_0Ns8wbYzBAuDWpHK6G7z8": "pro",  # Pro yearly 950 SAR
 }
 BUY_URL = "https://streamsafe-sa.vercel.app/#pricing"  # where a streamer subscribes
-SUPPORT_URL = "https://ko-fi.com/streamsafe"  # launch period: Ali's support page (Ko-fi / PayPal.me); the Home tab shows a small support box when set
+# launch period: Ali's support page; the Home tab shows a support card when set
+SUPPORT_URL = "https://ko-fi.com/streamsafe"
+# supporter passes (app/passkey.py): a key that turns Pro on for a fixed time. Made by tools/make_pass.py.
+PASS_PUBLIC_KEYS: tuple[str, ...] = ("92cb956f0820177cd1ac1e268b503653c659878630db39baa4578e25aa6c0bdb",)
 LICENSE_GRACE_DAYS = 3  # no internet: a key that was valid keeps working this long
 LICENSE_RECHECK_HOURS = 6  # while protection runs, the key is checked again this often
 

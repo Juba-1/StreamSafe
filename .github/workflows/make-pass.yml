@@ -1,0 +1,33 @@
+name: make-pass
+
+# By hand (also from the phone: Actions > make-pass > Run workflow): a temporary Pro key for a supporter.
+# Needs the repo secret PASS_SIGNING_KEY (C:\StreamSafe\secrets\pass_signing_key.txt, the PRIVATE line).
+# The key appears in the run's summary page.
+on:
+  workflow_dispatch:
+    inputs:
+      who:
+        description: "Supporter name or email (shown in their app)"
+        required: true
+      days:
+        description: "Days it works"
+        default: "30"
+
+permissions:
+  contents: read
+
+jobs:
+  pass:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q cryptography
+      - env:
+          PASS_SIGNING_KEY: ${{ secrets.PASS_SIGNING_KEY }}
+          WHO: ${{ inputs.who }}
+          DAYS: ${{ inputs.days }}
+        run: |
+          out=$(python tools/make_pass.py --who "$WHO" --days "$DAYS")
+          { echo "### Pro key"; echo; echo '```'; echo "$out" | head -1; echo '```'; echo; echo "$out" | tail -1; } >> "$GITHUB_STEP_SUMMARY"
+          echo "made (see the summary)"

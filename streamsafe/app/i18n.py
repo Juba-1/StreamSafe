@@ -150,6 +150,10 @@ TEXT: dict[str, tuple[str, str]] = {
     "bad_delay": ("التأخير لازم يكون بين 0.5 و 10 ثواني.", "The delay must be between 0.5 and 10 seconds."),
     "bad_key": ("اكتب مفتاح البث (بدون مسافات).", "Enter the stream key (no spaces)."),
     # --- run ---
+    "pass_on": ("برو مفعّل بمفتاح الداعمين لين {date} (باسم: {who}). شكراً لدعمك ♥", "Pro is on with a supporter key until {date} (for: {who}). Thank you for your support ♥"),
+    "pass_ended": ("مفتاح الداعمين انتهى في {date}. رجع البرنامج للخطة العادية، والحماية شغالة كاملة.", "The supporter key ended on {date}. The app is back on the normal plan; protection works fully."),
+    "pass_invalid": ("المفتاح هذا غير صحيح. انسخه كامل من الرسالة بدون نقص.", "This key isn't valid. Copy it whole from the message."),
+    "pass_expired": ("المفتاح هذا انتهت مدته.", "This key has already ended."),
     "support_title": ("♥  عاجبك StreamSafe؟", "♥  Enjoying StreamSafe?"),
     "support_text": (
         "البرنامج مجاني وقت إطلاق GTA 6. لو حاب تساعدنا نكمل ونطوّره، دعمك ولو بقهوة يفرق معنا كثير.",
@@ -368,8 +372,8 @@ TEXT: dict[str, tuple[str, str]] = {
         "Automatic = 2 s with the NVIDIA fast mode, 3 s otherwise. Weaker PCs: 3 s is better.",
     ),
     "brand_pro_only": (
-        "الغطاء يحمل شعار StreamSafe. تغيير الشعار لشعارك أو شعار الراعي متاح في اشتراك Pro.",
-        "The covers carry the StreamSafe logo. Putting your own or a sponsor's logo there comes with the Pro plan.",
+        "الغطاء يحمل شعار StreamSafe. تغيير الشعار لشعارك أو شعار الراعي متاح في Pro: ادعمنا على Ko-fi ويوصلك مفتاح Pro لمدة شهر.",
+        "The covers carry the StreamSafe logo. Your own or a sponsor's logo comes with Pro: support us on Ko-fi and get a one-month Pro key.",
     ),
     "brand_ours": ("شعار StreamSafe", "The StreamSafe logo"),
     "sent_bigger": (
@@ -390,11 +394,11 @@ TEXT: dict[str, tuple[str, str]] = {
         "من تروفو: Creator Studio > Stream Key. الصق المفتاح بس.",
         "On Trovo: Creator Studio > Stream Key. Paste the key only.",
     ),
-    "sec_license": ("الاشتراك", "Subscription"),
-    "license_key": ("مفتاح الاشتراك", "Subscription key"),
+    "sec_license": ("الاشتراك ومفتاح Pro", "Subscription and Pro key"),
+    "license_key": ("المفتاح", "Key"),
     "license_activate": ("تفعيل", "Activate"),
     "license_deactivate": ("إلغاء التفعيل من هذا الجهاز", "Deactivate on this PC"),
-    "license_buy": ("اشترك", "Subscribe"),
+    "license_buy": ("ادعمنا على Ko-fi", "Support us on Ko-fi"),
     "plan_basic": ("العادي", "Standard"),
     "plan_pro": ("Pro", "Pro"),
     "license_on": ("✓ الاشتراك مفعّل: {plan} (المفتاح {key})", "✓ Subscription active: {plan} (key {key})"),
@@ -406,7 +410,10 @@ TEXT: dict[str, tuple[str, str]] = {
         "تحتاج اشتراك عشان تشغّل الحماية: الصق المفتاح اللي وصلك على الإيميل واضغط «تفعيل».",
         "Protection needs a subscription: paste the key from your e-mail and press «Activate».",
     ),
-    "license_beta": ("النسخة التجريبية: تشتغل بدون اشتراك.", "Beta: works without a subscription."),
+    "license_beta": (
+        "البرنامج مجاني وقت الإطلاق والحماية كاملة. تبي Pro (شعارك أو شعار الراعي على الغطاء)؟ ادعمنا على Ko-fi ويوصلك مفتاح Pro لمدة شهر، الصقه هنا واضغط تفعيل.",
+        "Free during the launch, with full protection. Want Pro (your or a sponsor's logo on the covers)? Support us on Ko-fi and get a one-month Pro key; paste it here and press Activate.",
+    ),
     "license_deactivate_ask": (
         "نلغي تفعيل الاشتراك من هذا الجهاز عشان تقدر تفعّله في جهاز ثاني؟",
         "Deactivate the subscription on this PC so you can activate it on another?",
