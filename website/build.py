@@ -57,12 +57,12 @@ def support_box():
     if not SUPPORT_URL:
         return ""
     en = (
-        "<p><strong>Enjoying StreamSafe for free?</strong> It costs us real money to build and run. If you would like to help, "
-        f'you can support us here. Thank you!</p><a class="btn btn-main" href="{SUPPORT_URL}">Support StreamSafe</a>'
+        "<p><strong>♥ Enjoying StreamSafe?</strong> It's free for the GTA 6 launch. If you'd like to help us keep improving it, "
+        f'even a coffee means a lot to us.</p><a class="btn btn-main" href="{SUPPORT_URL}">Support us on Ko-fi</a>'
     )
     ar = (
-        "<p><strong>عاجبك StreamSafe وهو مجاني؟</strong> تطويره وتشغيله يكلفنا. إذا حاب تساعدنا نكمل، "
-        f'تقدر تدعمنا من هنا. شكرًا لك!</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعم StreamSafe</a>'
+        "<p><strong>♥ عاجبك StreamSafe؟</strong> البرنامج مجاني وقت إطلاق GTA 6. لو حاب تساعدنا نكمل ونطوّره، "
+        f'دعمك ولو بقهوة يفرق معنا كثير.</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعمنا على Ko-fi</a>'
     )
     return f'<div class="support">{b(en, ar)}</div>'
 
@@ -301,26 +301,26 @@ HOME = f"""
 <ol class="steps">
 <li>{
     b(
-        "<h3>Install</h3><p>Download the Windows app and enter the licence key from your email.</p>",
-        "<h3>ثبّت</h3><p>حمّل برنامج ويندوز وحط مفتاح الاشتراك اللي يوصلك على الإيميل.</p>",
+        "<h3>Download and install</h3><p>Run StreamSafe-Setup.exe. If Windows shows “Windows protected your PC”, click More info, then Run anyway (the app is new, so Windows doesn't know it yet).</p>",
+        "<h3>حمّل وثبّت</h3><p>شغّل StreamSafe-Setup.exe. لو طلعت لك رسالة «Windows protected your PC» اضغط More info وبعدها Run anyway (البرنامج جديد وويندوز للحين ما يعرفه).</p>",
     )
 }</li>
 <li>{
     b(
-        "<h3>Pick your platform</h3><p>Choose Twitch, Kick, YouTube or another, and paste your stream key. Typos in the address are fixed for you.</p>",
-        "<h3>اختر منصتك</h3><p>اختر Twitch أو Kick أو YouTube أو غيرها، والصق مفتاح البث. أخطاء الرابط الشائعة يصلحها البرنامج.</p>",
+        "<h3>First run: one download</h3><p>Open StreamSafe and press Download models. It happens once; after that the app opens ready.</p>",
+        "<h3>أول مرة: تنزيل واحد</h3><p>افتح StreamSafe واضغط «نزّل النماذج». مرة وحدة بس، وبعدها البرنامج يفتح جاهز.</p>",
     )
 }</li>
 <li>{
     b(
-        "<h3>Point OBS at StreamSafe</h3><p>The app shows one address to paste into OBS. Press Test connection to check everything before you go live.</p>",
-        "<h3>وجّه OBS للبرنامج</h3><p>البرنامج يعطيك عنوان واحد تحطه في OBS. اضغط اختبار الاتصال عشان تتأكد قبل ما تبدأ.</p>",
+        "<h3>Your platform and key</h3><p>Pick Twitch, Kick, YouTube or another, paste your stream key, and press Test connection.</p>",
+        "<h3>منصتك ومفتاحك</h3><p>اختر Twitch أو Kick أو YouTube أو غيرها، والصق مفتاح البث، واضغط «اختبر الاتصال».</p>",
     )
 }</li>
 <li>{
     b(
-        "<h3>Go live</h3><p>Press Start in StreamSafe, then Start Streaming in OBS. Your game, camera and mic stay in sync.</p>",
-        "<h3>ابدأ البث</h3><p>اضغط تشغيل في StreamSafe وبعدها ابدأ البث في OBS. اللعبة والكاميرا والمايك يبقون متزامنين.</p>",
+        "<h3>OBS, then go live</h3><p>In OBS: Settings, Stream, Service Custom, and paste the address StreamSafe shows. Press Start protection, then Start Streaming in OBS.</p>",
+        "<h3>OBS وابدأ</h3><p>في OBS: الإعدادات ثم البث ثم الخدمة «مخصص»، والصق العنوان اللي يعطيك إياه StreamSafe. اضغط «ابدأ الحماية» وبعدها Start Streaming في OBS.</p>",
     )
 }</li>
 </ol>
