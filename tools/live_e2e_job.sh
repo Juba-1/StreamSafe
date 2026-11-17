@@ -62,7 +62,7 @@ echo "== A: raw push to the address WITHOUT /app (what Kick's dashboard shows), 
 NOAPP=$(python3 -c "import os; u=os.environ['STREAM_URL']; print(u.replace(':443/app/','/').replace('/app/','/'))")
 timeout 25 ffmpeg -hide_banner -loglevel error -nostats -progress pipe:1 -re -f lavfi -i "color=black:size=1280x720:rate=30" -f lavfi -i anullsrc=r=48000:cl=stereo \
   -t 12 -c:v libx264 -preset veryfast -b:v 2500k -g 60 -c:a aac -f flv "$NOAPP" > $R/a_noapp.txt 2>&1; echo "A_EXIT $?"
-grep -E "^total_size" $R/a_noapp.txt | tail -1; grep -v -E "^(frame|fps|stream_|bitrate|total_size|out_time|dup_|drop_|speed|progress)=" $R/a_noapp.txt | tail -3
+grep -E "^total_size" $R/a_noapp.txt | tail -1; grep -v -E "^(frame|fps|stream_|bitrate|total_size|out_time|dup_|drop_|speed|progress)=" $R/a_noapp.txt | tail -3 | sed "s|rtmps\?://[^ ]*|<address>|g"
 sleep 20  # let the platform end that session
 
 echo "== B: the app's Test connection on the full address"
