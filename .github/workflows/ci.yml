@@ -1,10 +1,15 @@
 name: ci
 
-# Every push: lint, the full test suite on Linux and on Windows, and a DirectML smoke test on Windows.
+# Lint, the full test suite on Linux and on Windows, and a DirectML smoke test on Windows.
 # The Windows runner has no GPU; DirectML runs on Microsoft's software adapter (correctness, not speed).
+# Runs on main, on pull requests and by hand only: the repo is private, so every run uses the account's monthly
+# Actions minutes (Windows counts double). Work branches are tested locally before pushing; website-only changes skip it.
 on:
   push:
+    branches: [main]
+    paths-ignore: ["website/**", "docs/**", "*.md"]
   pull_request:
+    paths-ignore: ["website/**", "docs/**", "*.md"]
   workflow_dispatch:
 
 permissions:
