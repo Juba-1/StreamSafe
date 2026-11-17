@@ -41,8 +41,8 @@ CTA_BIG = (
 
 PRICING_HEAD = (
     (
-        "<h2>Free during the GTA 6 launch</h2><p>StreamSafe is free to download and use while GTA 6 launches. These are the plans after the launch period; we will tell you well before anything changes.</p>",
-        "<h2>مجاني وقت إطلاق GTA 6</h2><p>StreamSafe مجاني تحمّله وتستخدمه وقت إطلاق اللعبة. هذي الباقات بعد فترة الإطلاق، ونبلغك قبل أي تغيير بوقت كافي.</p>",
+        "<h2>Free during the GTA 6 launch</h2><p>StreamSafe is free to download and use while GTA 6 launches. Want your own logo on the covers? Pro comes with a small support.</p>",
+        "<h2>مجاني وقت إطلاق GTA 6</h2><p>StreamSafe مجاني تحمّله وتستخدمه وقت إطلاق اللعبة. وتبي شعارك على الغطاء؟ خذ Pro بدعم بسيط.</p>",
     )
     if LAUNCH_FREE
     else (
@@ -58,13 +58,11 @@ def support_box():
         return ""
     en = (
         "<p><strong>♥ Enjoying StreamSafe?</strong> It's free for the GTA 6 launch. If you'd like to help us keep improving it, "
-        f"even a coffee means a lot to us.</p><p><strong>Want Pro?</strong> (your own or a sponsor's logo on the covers) Support us with $5 or more "
-        f'and write “Pro” in your message: we email you a Pro key that works for 30 days.</p><a class="btn btn-main" href="{SUPPORT_URL}">Support us on Ko-fi</a>'
+        f'even a coffee means a lot to us.</p><a class="btn btn-main" href="{SUPPORT_URL}">Support us on Ko-fi</a>'
     )
     ar = (
         "<p><strong>♥ عاجبك StreamSafe؟</strong> البرنامج مجاني وقت إطلاق GTA 6. لو حاب تساعدنا نكمل ونطوّره، "
-        f"دعمك ولو بقهوة يفرق معنا كثير.</p><p><strong>تبي Pro؟</strong> (شعارك أو شعار الراعي على الغطاء) ادعمنا بـ 5 دولار أو أكثر "
-        f'واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro يشتغل 30 يوم.</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعمنا على Ko-fi</a>'
+        f'دعمك ولو بقهوة يفرق معنا كثير.</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعمنا على Ko-fi</a>'
     )
     return f'<div class="support">{b(en, ar)}</div>'
 
@@ -187,6 +185,71 @@ SCREEN = (
 <img src="/media/store.webp" alt="" width="960" height="540">"""
 )
 
+
+# the plans: free during the launch (download + Pro through Ko-fi), or the paid plans with the trial
+PAID_PLANS = f"""<div class="period" role="radiogroup">
+<input type="radio" name="period" id="pm" checked><label for="pm">{b("Monthly", "شهري", "span")}</label>
+<input type="radio" name="period" id="py"><label for="py">{
+    b(f"Yearly <em class='save'>−{OFF}%</em>", f"سنوي <em class='save'>خصم {OFF}%</em>", "span")
+}</label>
+</div>
+<div class="plans">
+<div class="plan">
+{
+    b(
+        f'<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price"><span class="m">{BASIC} <small>SAR / month</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>SAR / year</small> <em class="save">{OFF}% off</em></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{BASIC * 12 - BASIC_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
+        f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span class="m">{BASIC} <small>ريال / شهريًا</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {BASIC * 12 - BASIC_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
+    )
+}
+{plan_button("basic")}
+</div>
+<div class="plan pro">
+{
+    b(
+        f'<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span class="m">{PRO} <small>SAR / month</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>SAR / year</small> <em class="save">{OFF}% off</em></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{PRO * 12 - PRO_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen and the cloth</li><li>Priority support by email</li><li>One PC</li></ul>',
+        f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span class="m">{PRO} <small>ريال / شهريًا</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {PRO * 12 - PRO_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
+    )
+}
+{plan_button("pro")}
+</div>
+</div>
+{
+    b(
+        f"<p><strong>Card needed to start</strong>The trial asks for a payment card. Nothing is charged during the {TRIAL_DAYS} days.</p><p><strong>Then monthly</strong>On day {TRIAL_DAYS + 1} your plan starts and renews every month until you cancel.</p><p><strong>Cancel any time</strong>From the link in your email. One free trial per person, card and PC.</p>",
+        f"<p><strong>تحتاج بطاقة للبدء</strong>التجربة تطلب بطاقة دفع، وما ينخصم شيء خلال الـ {TRIAL_DAYS} أيام.</p><p><strong>بعدها شهري</strong>في اليوم {TRIAL_DAYS + 1} يبدأ اشتراكك ويتجدد كل شهر لين تلغيه.</p><p><strong>تلغي متى ما تبي</strong>من الرابط اللي في إيميلك. تجربة مجانية وحدة لكل شخص وبطاقة وجهاز.</p>",
+        "div",
+        "trial",
+    )
+    if not LAUNCH_FREE
+    else ""
+}
+"""
+
+FREE_PLANS = f"""<div class="plans">
+<div class="plan">
+{
+    b(
+        '<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price"><span>Free <small>during the launch</small></span></p><p class="per">Later {BASIC} SAR / month. We tell you well before anything changes.</p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li></ul>'.replace(
+            "{BASIC}", str(BASIC)
+        ),
+        '<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span>مجاني <small>وقت الإطلاق</small></span></p><p class="per">بعدها {BASIC} ريال شهريًا، ونبلغك قبل أي تغيير بوقت كافي.</p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li></ul>'.replace(
+            "{BASIC}", str(BASIC)
+        ),
+    )
+}
+<a class="btn btn-main" href="{DOWNLOAD_URL}">{b("Download free now", "حمّله مجانًا الحين", "span")}</a>
+</div>
+<div class="plan pro">
+{
+    b(
+        '<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span>$5+ <small>support</small></span></p><p class="per">Support us on Ko-fi and write “Pro” in your message: we email you a Pro key for 30 days.</p><ul><li>Everything in Basic</li><li>Your own or a sponsor’s logo on the cover screen and the cloth</li><li>Priority support by email</li></ul>',
+        '<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span>5 <small>دولار أو أكثر، دعم</small></span></p><p class="per">ادعمنا على Ko-fi واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro لمدة 30 يوم.</p><ul><li>كل مزايا الأساسية</li><li>شعارك أو شعار الراعي على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li></ul>',
+    )
+}
+<a class="btn btn-main" href="{SUPPORT_URL}">{b("Get Pro on Ko-fi", "خذ Pro من Ko-fi", "span")}</a>
+</div>
+</div>
+"""
 
 HOME = f"""
 <section class="hero"><div class="wrap">
@@ -361,42 +424,7 @@ HOME = f"""
         PRICING_HEAD[1],
     )
 }</div>
-<div class="period" role="radiogroup">
-<input type="radio" name="period" id="pm" checked><label for="pm">{b("Monthly", "شهري", "span")}</label>
-<input type="radio" name="period" id="py"><label for="py">{
-    b(f"Yearly <em class='save'>−{OFF}%</em>", f"سنوي <em class='save'>خصم {OFF}%</em>", "span")
-}</label>
-</div>
-<div class="plans">
-<div class="plan">
-{
-    b(
-        f'<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price"><span class="m">{BASIC} <small>SAR / month</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>SAR / year</small> <em class="save">{OFF}% off</em></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{BASIC * 12 - BASIC_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
-        f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span class="m">{BASIC} <small>ريال / شهريًا</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {BASIC * 12 - BASIC_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
-    )
-}
-{plan_button("basic")}
-</div>
-<div class="plan pro">
-{
-    b(
-        f'<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span class="m">{PRO} <small>SAR / month</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>SAR / year</small> <em class="save">{OFF}% off</em></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{PRO * 12 - PRO_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen and the cloth</li><li>Priority support by email</li><li>One PC</li></ul>',
-        f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span class="m">{PRO} <small>ريال / شهريًا</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {PRO * 12 - PRO_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
-    )
-}
-{plan_button("pro")}
-</div>
-</div>
-{
-    b(
-        f"<p><strong>Card needed to start</strong>The trial asks for a payment card. Nothing is charged during the {TRIAL_DAYS} days.</p><p><strong>Then monthly</strong>On day {TRIAL_DAYS + 1} your plan starts and renews every month until you cancel.</p><p><strong>Cancel any time</strong>From the link in your email. One free trial per person, card and PC.</p>",
-        f"<p><strong>تحتاج بطاقة للبدء</strong>التجربة تطلب بطاقة دفع، وما ينخصم شيء خلال الـ {TRIAL_DAYS} أيام.</p><p><strong>بعدها شهري</strong>في اليوم {TRIAL_DAYS + 1} يبدأ اشتراكك ويتجدد كل شهر لين تلغيه.</p><p><strong>تلغي متى ما تبي</strong>من الرابط اللي في إيميلك. تجربة مجانية وحدة لكل شخص وبطاقة وجهاز.</p>",
-        "div",
-        "trial",
-    )
-    if not LAUNCH_FREE
-    else ""
-}
+{FREE_PLANS if LAUNCH_FREE else PAID_PLANS}
 {support_box()}
 {
     b(
@@ -445,6 +473,13 @@ FAQ = [
         "الكاميرا والمايك يمرون مع اللعب عشان يبقون متزامنين. كل شيء يتعالج على جهازك وما يوصلنا أبدًا.",
     ),
     (
+        "How do I get Pro?",
+        "Support us on Ko-fi with $5 or more and write “Pro” in your message. We email you a Pro key that works for 30 days: open StreamSafe, Advanced, Subscription and Pro key, paste it and press Activate.",
+        "كيف آخذ Pro؟",
+        "ادعمنا على Ko-fi بـ 5 دولار أو أكثر واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro يشتغل 30 يوم. افتح StreamSafe ثم «إعدادات متقدمة» ثم «الاشتراك ومفتاح Pro»، والصق المفتاح واضغط «تفعيل».",
+    )
+    if LAUNCH_FREE
+    else (
         "How do the trial and cancelling work?",
         f"You start the {TRIAL_DAYS}-day trial with a payment card. If you cancel before it ends, you are not charged. If you don't, your plan starts on day {TRIAL_DAYS + 1}. You can cancel any time from the link in your email.",
         "كيف تشتغل التجربة والإلغاء؟",
