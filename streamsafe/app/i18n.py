@@ -163,18 +163,9 @@ TEXT: dict[str, tuple[str, str]] = {
     ),
     "pass_invalid": ("المفتاح هذا غير صحيح. انسخه كامل من الرسالة بدون نقص.", "This key isn't valid. Copy it whole from the message."),
     "pass_expired": ("المفتاح هذا انتهت مدته.", "This key has already ended."),
-    "pass_other_device": (
-        "المفتاح هذا مسوّى لجهاز ثاني. كل مفتاح يشتغل على جهاز واحد بس: أرسل لنا «رمز جهازك» اللي تحت ونسوي لك مفتاح لهذا الجهاز.",
-        "This key was made for another PC. Each key works on one PC only: send us the device code below and we'll make one for this PC.",
-    ),
     "pass_clock": (
         "ساعة الجهاز ورا التاريخ الصحيح، فوقّفنا Pro. صحّح التاريخ والوقت في ويندوز وافتح البرنامج من جديد.",
         "The PC clock is behind the real date, so Pro is off. Fix the date and time in Windows and open the app again.",
-    ),
-    "pass_device": ("رمز جهازك: {code}", "Your device code: {code}"),
-    "pass_device_hint": (
-        "لمفتاح Pro: أرسل هذا الرمز مع دعمك على Ko-fi (في الرسالة). المفتاح يشتغل على هذا الجهاز بس.",
-        "For a Pro key: send this code with your support on Ko-fi (in the message). The key works on this PC only.",
     ),
     "support_title": ("♥  عاجبك StreamSafe؟", "♥  Enjoying StreamSafe?"),
     "support_text": (
@@ -433,8 +424,8 @@ TEXT: dict[str, tuple[str, str]] = {
         "Protection needs a subscription: paste the key from your e-mail and press «Activate».",
     ),
     "license_beta": (
-        "البرنامج مجاني وقت الإطلاق والحماية كاملة. تبي Pro (شعارك أو شعار الراعي على الغطاء)؟ ادعمنا على Ko-fi واكتب «رمز جهازك» اللي تحت في الرسالة، ويوصلك على إيميلك مفتاح Pro لمدة شهر. الصقه هنا واضغط تفعيل.",
-        "Free during the launch, with full protection. Want Pro (your or a sponsor's logo on the covers)? Support us on Ko-fi with your device code (below) in the message, and we email you a one-month Pro key. Paste it here and press Activate.",
+        "البرنامج مجاني وقت الإطلاق والحماية كاملة. تبي Pro (شعارك أو شعار الراعي على الغطاء)؟ ادعمنا على Ko-fi واكتب «Pro» في الرسالة، ويوصلك على إيميلك مفتاح Pro لمدة شهر. الصقه هنا واضغط تفعيل.",
+        "Free during the launch, with full protection. Want Pro (your or a sponsor's logo on the covers)? Support us on Ko-fi and write “Pro” in the message, and we email you a one-month Pro key. Paste it here and press Activate.",
     ),
     "license_deactivate_ask": (
         "نلغي تفعيل الاشتراك من هذا الجهاز عشان تقدر تفعّله في جهاز ثاني؟",

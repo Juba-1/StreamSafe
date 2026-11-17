@@ -509,12 +509,6 @@ class App(tk.Tk):
         self.license_label = self.label(c, "", font=(FONT, 10, "bold"), wraplength=520)
         self.pack_row(self.license_label, fill="x")
         self.field(c, self.tr("license_key"), self._vars["license_key"], show="•")
-        code = passkey.device_code()
-        fr = tk.Frame(c, bg=SAND, padx=10, pady=6)
-        ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda: self.copy(code)).pack(side=side)
-        tk.Label(fr, text=self.tr("pass_device", code=code), bg=SAND, fg=INK, font=(FONT, 10, "bold")).pack(side=side, padx=10)
-        self.pack_row(fr, fill="x", pady=4)
-        self.small(c, self.tr("pass_device_hint"))
         lf = self.buttons(
             c, (self.tr("license_activate"), self.on_activate_license), (self.tr("license_deactivate"), self.on_deactivate_license)
         )
@@ -683,7 +677,6 @@ class App(tk.Tk):
         """Why a supporter's key gives no Pro, in words."""
         return {
             "invalid": self.tr("pass_invalid"),
-            "other_device": self.tr("pass_other_device"),
             "clock": self.tr("pass_clock"),
             "expired": self.tr("pass_ended", date=date) if date else self.tr("pass_expired"),
         }.get(why, self.tr("pass_invalid"))

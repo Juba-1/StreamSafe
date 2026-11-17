@@ -1,4 +1,4 @@
-"""Supporter Pro pass: one PC, one month, no way back with the clock or a copied file."""
+"""Supporter Pro pass: one month, then off for good; the clock cannot bring it back."""
 
 import base64
 import datetime as dt
@@ -16,7 +16,6 @@ from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption,
 
 from streamsafe.app import passkey, plan, release
 
-MINE, OTHER = "pc-ali", "pc-friend"
 D = dt.date
 
 
@@ -28,13 +27,12 @@ def b64(b):
 def k(monkeypatch):
     key = Ed25519PrivateKey.generate()
     monkeypatch.setattr(release, "PASS_PUBLIC_KEYS", (key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex(),))
-    monkeypatch.setattr(passkey, "machine_id", lambda: MINE)
     monkeypatch.setattr(passkey, "internet_today", lambda *a, **kw: None)  # no network in tests
     return key
 
 
-def make(key, last="2026-12-17", mid=MINE, who="ali"):
-    note = json.dumps({"p": "pro", "e": last, "d": passkey.device_code(mid), "w": who, "i": "abc"}).encode()
+def make(key, last="2026-12-17", who="ali"):
+    note = json.dumps({"p": "pro", "e": last, "w": who, "i": "abc"}).encode()
     return f"SSP-{b64(note)}.{b64(key.sign(note))}"
 
 
@@ -60,12 +58,6 @@ def test_pro_follows_the_pass(k, env, monkeypatch):
     assert plan.current(env) == "pro" and plan.allows("custom_brand", env)
     monkeypatch.setattr(passkey, "_local_today", lambda: D(2027, 1, 1))
     assert plan.current(env) == "basic"
-
-
-def test_one_pc_only(k, env):
-    assert passkey.activate(make(k, mid=OTHER), env, today=day(2026, 11, 17)) == "other_device"
-    assert passkey.activate(make(k), env, today=day(2026, 11, 17)) == ""
-    assert passkey.why_off(env, today=day(2026, 11, 18), mid=OTHER) == "other_device"  # pass.json copied to another PC
 
 
 def test_cannot_be_used_again_after_it_ends(k, env):
@@ -110,17 +102,12 @@ def test_pasted_with_spaces_and_line_breaks(k, env):
     assert passkey.activate(key[:20] + "\n " + key[20:40] + " " + key[40:], env, today=day(2026, 11, 17)) == ""
 
 
-def test_device_code_shape():
-    c = passkey.device_code("x")
-    assert len(c) == 9 and c[4] == "-" and c == passkey.device_code("x") != passkey.device_code("y")
-
-
 def test_make_pass_tool_round_trip(k, env, monkeypatch, tmp_path):
     """The real tool makes a key the app accepts."""
     tool = Path(__file__).resolve().parents[1] / "tools" / "make_pass.py"
     priv = k.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()).hex()
     out = subprocess.run(
-        [sys.executable, str(tool), "--device", passkey.device_code(MINE).lower(), "--who", "Sara", "--days", "30"],
+        [sys.executable, str(tool), "--who", "Sara", "--days", "30"],
         env={**os.environ, "PASS_SIGNING_KEY": priv},
         capture_output=True,
         text=True,
@@ -129,6 +116,3 @@ def test_make_pass_tool_round_trip(k, env, monkeypatch, tmp_path):
     assert passkey.activate(out[0], env) == ""
     p = passkey.active(env)
     assert p is not None and p.who == "Sara" and p.expires == dt.date.today() + dt.timedelta(days=30)
-    bad_env = {**os.environ, "PASS_SIGNING_KEY": priv}
-    bad = subprocess.run([sys.executable, str(tool), "--device", "123", "--who", "x"], env=bad_env, capture_output=True)
-    assert bad.returncode != 0

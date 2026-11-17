@@ -6,11 +6,9 @@ without a server:
 
     SSP-<base64url of the JSON note>.<base64url of the ed25519 signature of that note>
 
-The note: {"p": "pro", "e": "YYYY-MM-DD" (last day it works), "d": "device code", "w": "who", "i": "short id"}.
+The note: {"p": "pro", "e": "YYYY-MM-DD" (last day it works), "w": "who", "i": "short id"}.
 
 Rules the key cannot get around without breaking the signature:
-- one PC: the note carries the device code the supporter's app shows (from Windows' machine id); on another PC it
-  is refused, and a copied ``pass.json`` does not work there either;
 - one time: after its last day it is refused for good (also when pasted again);
 - the clock: the latest date the app has seen (its own clock, and the internet's clock whenever it can ask) is
   kept; a PC clock set back before that date turns the pass off instead of making it last longer.
@@ -24,10 +22,8 @@ import base64
 import contextlib
 import datetime as dt
 import email.utils
-import hashlib
 import json
 import urllib.request
-import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -42,33 +38,9 @@ Today = Callable[[], dt.date]
 class Pass:
     plan: str
     expires: dt.date  # the last day it works
-    device: str  # the device code it was made for
     who: str
     pid: str
     key: str
-
-
-# --- this PC -------------------------------------------------------------------------------------------------
-def machine_id() -> str:
-    """Windows' own id of this installation (stays the same across app updates and reinstalls)."""
-    with contextlib.suppress(Exception):
-        import winreg  # type: ignore[import-not-found]
-
-        flags = winreg.KEY_READ | winreg.KEY_WOW64_64KEY
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography", 0, flags) as k:
-            return str(winreg.QueryValueEx(k, "MachineGuid")[0])
-    return f"node-{uuid.getnode():012x}"
-
-
-def clean_code(code: str) -> str:
-    return "".join(ch for ch in code.upper() if ch.isalnum())
-
-
-def device_code(mid: str | None = None) -> str:
-    """What the supporter sends with their support: 8 letters/digits, shown as XXXX-XXXX."""
-    h = hashlib.sha256(("streamsafe-device:" + (mid if mid is not None else machine_id())).encode()).digest()
-    s = base64.b32encode(h).decode()[:8]
-    return f"{s[:4]}-{s[4:]}"
 
 
 # --- the key -------------------------------------------------------------------------------------------------
@@ -91,7 +63,7 @@ def parse(key: str) -> Pass | None:
         if not any(ed25519.verify(bytes.fromhex(k), note, signature) for k in release.PASS_PUBLIC_KEYS):
             return None
         d = json.loads(note.decode("utf-8"))
-        return Pass(str(d["p"]), dt.date.fromisoformat(str(d["e"])), clean_code(str(d["d"])), str(d.get("w", "")), str(d.get("i", "")), key)
+        return Pass(str(d["p"]), dt.date.fromisoformat(str(d["e"])), str(d.get("w", "")), str(d.get("i", "")), key)
     except (ValueError, KeyError, TypeError):
         return None
 
@@ -130,15 +102,13 @@ def load(env: Mapping[str, str] | None = None) -> Pass | None:
     return parse(str(_read(env).get("key", "")))
 
 
-def why_off(env: Mapping[str, str] | None = None, today: Today | None = None, mid: str | None = None) -> str:
-    """ "" while the saved pass gives Pro, else why not: none / other_device / clock / expired.
+def why_off(env: Mapping[str, str] | None = None, today: Today | None = None) -> str:
+    """ "" while the saved pass gives Pro, else why not: none / clock / expired.
     Also moves the latest date seen forward (never back)."""
     d = _read(env)
     p = parse(str(d.get("key", "")))
     if p is None:
         return "none"
-    if p.device != clean_code(device_code(mid)):
-        return "other_device"
     now, seen = (today or _local_today)(), _seen(d)
     if seen is not None and now < seen - dt.timedelta(days=1):  # the PC clock was set back (one day of slack: time zones)
         return "clock"
@@ -149,24 +119,21 @@ def why_off(env: Mapping[str, str] | None = None, today: Today | None = None, mi
     return "expired" if max(now, seen or now) > p.expires else ""
 
 
-def active(env: Mapping[str, str] | None = None, today: Today | None = None, mid: str | None = None) -> Pass | None:
-    return load(env) if why_off(env, today, mid) == "" else None
+def active(env: Mapping[str, str] | None = None, today: Today | None = None) -> Pass | None:
+    return load(env) if why_off(env, today) == "" else None
 
 
 def activate(
     key: str,
     env: Mapping[str, str] | None = None,
     today: Today | None = None,
-    mid: str | None = None,
     net: Callable[[], dt.date | None] | None = None,
 ) -> str:
-    """Saves a good pass for this PC. Returns "" or the reason: invalid / other_device / expired / clock.
+    """Saves a good pass. Returns "" or the reason: invalid / expired / clock.
     Network (call it off the window's thread): the internet's date counts too, when it can be had."""
     p = parse(key)
     if p is None:
         return "invalid"
-    if p.device != clean_code(device_code(mid)):
-        return "other_device"
     d = _read(env)
     now, seen = (today or _local_today)(), _seen(d)
     if seen is not None and now < seen - dt.timedelta(days=1):
