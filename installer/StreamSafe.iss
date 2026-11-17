@@ -57,6 +57,7 @@ OutputBaseFilename={#OutName}
 Compression=lzma2/normal
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\marketing\icon.ico
 UninstallDisplayIcon={app}\{#GuiExe}.exe
 UninstallDisplayName={#AppName}
 AppMutex={#AppName}-window
@@ -84,6 +85,8 @@ Source: "..\obs\streamsafe_guard.lua"; DestDir: "{app}\obs"; Flags: ignoreversio
 ; StreamSafe's own logo on the covers (paths.bundled_brand_dir)
 Source: "..\marketing\logo.png"; DestDir: "{app}\brand"; Flags: ignoreversion
 Source: "..\marketing\logo_rgba.png"; DestDir: "{app}\brand"; Flags: ignoreversion
+Source: "..\marketing\icon.ico"; DestDir: "{app}\brand"; Flags: ignoreversion
+Source: "..\marketing\icon_small.png"; DestDir: "{app}\brand"; Flags: ignoreversion
 Source: "licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\NOTICE.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
 ; the risk heads (ours; not downloaded). A test build carries the PLACEHOLDER marker among them.

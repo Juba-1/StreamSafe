@@ -41,6 +41,7 @@ def program(name, console):
         console=console,
         upx=False,
         version=os.path.join(BUILD, f"version_{name}.txt"),
+        icon=os.path.join(ROOT, "marketing", "icon.ico"),  # our logo on the exe, taskbar and shortcuts
     )
 
 

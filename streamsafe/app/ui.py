@@ -67,6 +67,7 @@ class App(tk.Tk):
         self.ctrl = ctrl or controller.Controller(log=lambda line: self.post(lambda: self._log(line)))
         self.lang = self.ctrl.settings.lang
         self.title(PRODUCT_NAME)
+        self._set_icon()
         self.geometry("680x760")
         self.minsize(600, 640)
         self.configure(bg="#eef0f3")
@@ -112,6 +113,16 @@ class App(tk.Tk):
         return "e" if self.rtl else "w"
 
     # --- building -----------------------------------------------------------------------------------------
+    def _set_icon(self) -> None:
+        """Our logo in the title bar and taskbar (the exe itself gets it from the build)."""
+        brand = paths.bundled_brand_dir()
+        with contextlib.suppress(tk.TclError, OSError):
+            if sys.platform == "win32" and (brand / "icon.ico").is_file():
+                self.iconbitmap(default=str(brand / "icon.ico"))
+            elif (brand / "icon_small.png").is_file():
+                self._icon_img = tk.PhotoImage(file=str(brand / "icon_small.png"))
+                self.iconphoto(True, self._icon_img)
+
     def build(self) -> None:
         for child in self.winfo_children():
             child.destroy()
