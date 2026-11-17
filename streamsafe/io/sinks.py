@@ -73,6 +73,42 @@ class PlatformRefused(ConnectionError):  # noqa: N818 - a refusal, not an error
         self.reason = reason
 
 
+def auto_kbps(size: tuple[int, int], fps: float, network: bool) -> int:
+    """A video bitrate that does not make the picture worse than what came in.
+
+    Network (to a platform): what the big platforms take at that size - 1080p30 6000, 1080p60 9000, 1440p 16000,
+    4K 30000 kbit/s; the app passes the platform's own figure instead (``app/ingest.py``). A file (recording,
+    a protected copy of a video): about 0.2 bits per pixel and frame, at least 20000 kbit/s - visually the same
+    as the source for game footage, 1080p60 ~25 Mbit/s, 4K60 ~100 Mbit/s."""
+    w, h = size
+    if network:
+        if h <= 720:
+            return 4500 if fps <= 30 else 6000
+        if h <= 1080:
+            return 6000 if fps <= 30 else 9000
+        if h <= 1440:
+            return 16000
+        return 30000
+    return max(20000, round(w * h * fps * 0.2 / 1000))
+
+
+def encoder_flags(encoder: str, live: bool) -> list[str]:
+    """Quality settings of each encoder: the best quality that still keeps up with a live stream. ``live``: a
+    stream to a platform (constant bitrate, low delay); else a recording (variable bitrate, slower = better).
+    ``ENCODER_PLAIN=1`` (the app's encoder test found these settings refused on this PC): none."""
+    if os.environ.get("ENCODER_PLAIN") == "1":
+        return []
+    if encoder == "h264_nvenc":
+        return ["-preset", "p5", "-tune", "hq", "-rc", "cbr" if live else "vbr", "-profile:v", "high", "-spatial-aq", "1"]
+    if encoder == "h264_amf":
+        return ["-quality", "quality", "-rc", "cbr" if live else "vbr_peak", "-profile:v", "high"]
+    if encoder == "h264_qsv":
+        return ["-preset", "slow", "-profile:v", "high"]
+    if encoder == "libx264":
+        return ["-preset", "veryfast", "-tune", "zerolatency"] if live else ["-preset", "fast", "-profile:v", "high"]
+    return []
+
+
 class FFmpegSink:
     """Raw BGR frames (+ their sound) -> FFmpeg -> H.264 (+ AAC) at ``url``. The container follows the URL scheme.
 
@@ -102,7 +138,7 @@ class FFmpegSink:
         size: tuple[int, int],
         fps: float = 30.0,
         encoder: str | None = None,  # None: $ENCODER (the installed app picks the one that works, app/encoders.py) or libx264
-        bitrate: str = "6000k",
+        bitrate: str | None = None,  # None: $VIDEO_KBPS (the app: the platform's figure) or auto_kbps()
         ffmpeg: str = "ffmpeg",
         audio: bool = True,
         audio_bitrate: str = "160k",
@@ -126,10 +162,16 @@ class FFmpegSink:
             cmd += ["-probesize", "32", "-analyzeduration", "0", "-f", "avi", "-i", "pipe:0"]
         else:
             cmd += ["-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}", "-r", str(fps), "-i", "pipe:0"]
-        cmd += ["-c:v", encoder, "-b:v", bitrate, "-maxrate", bitrate, "-bufsize", bitrate,
-                "-g", str(int(2 * fps)), "-pix_fmt", "yuv420p"]  # fmt: skip
-        if encoder == "libx264":
-            cmd += ["-preset", "veryfast", "-tune", "zerolatency"]
+        if bitrate is None:
+            env_kbps = os.environ.get("VIDEO_KBPS", "")
+            bitrate = f"{env_kbps}k" if env_kbps.isdigit() else f"{auto_kbps(size, fps, self.network)}k"
+        self.bitrate = bitrate
+        live = self.network
+        kbps = int(bitrate.rstrip("kK")) if bitrate.rstrip("kK").isdigit() else 6000
+        # live: constant rate (what platforms want); a file: variable, peaks up to 1.5x
+        peak, buf = (kbps, kbps) if live else (round(kbps * 1.5), kbps * 2)
+        cmd += ["-c:v", encoder, *encoder_flags(encoder, live), "-b:v", bitrate, "-maxrate", f"{peak}k", "-bufsize", f"{buf}k",
+                "-g", str(round(2 * fps)), "-pix_fmt", "yuv420p"]  # fmt: skip
         if audio:
             cmd += ["-c:a", "aac", "-b:a", audio_bitrate, "-ar", str(AUDIO_RATE), "-ac", "2"]
         if fmt:
@@ -268,7 +310,8 @@ class RecordSink(FFmpegSink):
     power cut) - and turned into the MP4 that was asked for when the recording ends, without encoding again. If
     that last step cannot be done the .mkv stays and is the recording."""
 
-    def __init__(self, path: str, size: tuple[int, int], fps: float = 30.0, bitrate: str = "12000k", **kw: Any) -> None:
+    def __init__(self, path: str, size: tuple[int, int], fps: float = 30.0, bitrate: str | None = None, **kw: Any) -> None:
+        kw.setdefault("audio_bitrate", "320k")  # a recording keeps the sound as good as it came
         self.path = str(path)
         root, ext = os.path.splitext(self.path)
         self._wants_mp4 = ext.lower() in (".mp4", ".mov", ".m4v")

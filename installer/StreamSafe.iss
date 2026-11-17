@@ -81,6 +81,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 Source: "..\obs\streamsafe_guard.lua"; DestDir: "{app}\obs"; Flags: ignoreversion
+; StreamSafe's own logo on the covers (paths.bundled_brand_dir)
+Source: "..\marketing\logo.png"; DestDir: "{app}\brand"; Flags: ignoreversion
+Source: "..\marketing\logo_rgba.png"; DestDir: "{app}\brand"; Flags: ignoreversion
 Source: "licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\NOTICE.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
 ; the risk heads (ours; not downloaded). A test build carries the PLACEHOLDER marker among them.

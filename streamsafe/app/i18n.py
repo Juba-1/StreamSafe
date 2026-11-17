@@ -127,7 +127,7 @@ TEXT: dict[str, tuple[str, str]] = {
         "هذا الجهاز ما فيه مخزن محمي: المفتاح يبقى فقط طول ما النافذة مفتوحة.",
         "This PC has no protected store: the key stays only while the window is open.",
     ),
-    "delay": ("التأخير (ثانية)", "Delay (seconds)"),
+    "delay": ("التأخير", "Delay"),
     "translate_ar": ("ترجمة النصوص للعربي (تجريبي)", "Translate on-screen text to Arabic (experimental)"),
     "translate_hint": (
         "تُرسم الترجمة على البث فقط (لا تظهر في لعبتك). أول تفعيل ينزّل ملفات (حوالي {mb} ميجا). لو تعذّر شي يكمل البث بدونها.",
@@ -156,9 +156,8 @@ TEXT: dict[str, tuple[str, str]] = {
     "copy": ("انسخ", "Copy"),
     "sec_brand": ("شعارك على شاشة التغطية", "Your logo on the full-screen cover"),
     "brand_hint": (
-        "لما تتغطى الشاشة كاملة يشوف المشاهد شعارك أو شعار الراعي بدل الشاشة السودا. اللبس على الشخصيات يبقى زي ما هو.",
-        "When the whole screen is covered, viewers see your logo or your sponsor's instead of the plain cover. "
-        "The clothing on characters stays as it is.",
+        "لك تحط شعارك أو شعار الراعي على الغطاء بدل شعار StreamSafe: على لبس الشخصيات وعلى الشاشة الكاملة.",
+        "You may put your logo or your sponsor's on the covers instead of StreamSafe's: on the characters' clothing and on the full-screen card.",
     ),
     "brand_pick": ("اختر صورة...", "Choose an image..."),
     "brand_remove": ("إزالة", "Remove"),
@@ -214,8 +213,8 @@ TEXT: dict[str, tuple[str, str]] = {
         "On YouTube: YouTube Studio > Go live > Stream > Stream key. Paste the key only.",
     ),
     "plat_hint_tiktok": (
-        "تيك توك: من LIVE Producer (أو LIVE Center) انسخ «Server URL» و«Stream Key». تيك توك يعطي مفتاح جديد كل بث.",
-        "TikTok: from LIVE Producer (or LIVE Center) copy the Server URL and the Stream Key. TikTok gives a new key for every stream.",
+        "تيك توك: لو عندك LIVE Producer (عادة 1000 متابع وفوق) انسخ «Server URL» و«Stream Key» من livecenter.tiktok.com، ويتغيرون كل بث. ما عندك؟ اختر «نافذة يلتقطها OBS» وخلّ TikTok LIVE Studio يلتقط نافذة «StreamSafe Output».",
+        "TikTok: with LIVE Producer (usually 1000+ followers) copy the Server URL and Stream Key from livecenter.tiktok.com; they change every stream. Without it: choose «A window that OBS captures» and let TikTok LIVE Studio capture the «StreamSafe Output» window.",
     ),
     "plat_hint_facebook": (
         "من فيسبوك: Live Producer > Streaming software > Stream key. الصق المفتاح بس.",
@@ -247,8 +246,8 @@ TEXT: dict[str, tuple[str, str]] = {
     ),
     "obs_guide": ("طريقة ربط OBS خطوة بخطوة", "How to connect OBS, step by step"),
     "obs_guide_text": (
-        "١) في برنامجنا: اختر «من OBS» واضغط «ابدأ الحماية» أول.\n٢) في OBS: الإعدادات > البث > الخدمة: مخصص (Custom).\n٣) السيرفر: {server}  (زر «انسخ» جنبه)\n٤) مفتاح البث في OBS: خلّه فاضي.\n٥) الإعدادات > المخرجات: معدل الإطارات الرئيسية (Keyframe) = 2، والمعدل 6000 أو أقل.\n٦) اضغط «Start Streaming» في OBS. بتشوف في برنامجنا «OBS متصل ✓».\n\nمفتاح منصتك (كيك، تيك توك...) تحطه في برنامجنا مو في OBS. للبلايستيشن: أضف كرت الالتقاط كمصدر في OBS عادي.",
-        "1) In our program: choose «From OBS» and press «Start protection» first.\n2) In OBS: Settings > Stream > Service: Custom.\n3) Server: {server}  (the «Copy» button next to it)\n4) Stream key in OBS: leave it empty.\n5) Settings > Output: Keyframe interval = 2, bitrate 6000 or less.\n6) Press «Start Streaming» in OBS. Our program then shows «OBS connected ✓».\n\nYour platform's key (Kick, TikTok...) goes into our program, not into OBS. For PlayStation: add the capture card as a source in OBS as usual.",
+        "١) في برنامجنا: اختر «من OBS» واضغط «ابدأ الحماية» أول.\n٢) في OBS: الإعدادات > البث > الخدمة: مخصص (Custom).\n٣) السيرفر: {server}  (زر «انسخ» جنبه)\n٤) مفتاح البث في OBS: خلّه فاضي.\n٥) الإعدادات > المخرجات: المعدل (Bitrate) عالي: 20000 إلى 40000 (الإرسال داخل جهازك، ما يمر على الإنترنت، فالعالي ما يضر ويحفظ الجودة)، ومعدل الإطارات الرئيسية (Keyframe) = 2.\n٦) الإعدادات > الفيديو: الدقة ومعدل الإطارات نفس اللي اخترتها في «جودة الصورة» عندنا.\n٧) اضغط «Start Streaming» في OBS. بتشوف في برنامجنا «OBS متصل ✓».\n\nمفتاح منصتك (كيك، تيك توك...) تحطه في برنامجنا مو في OBS، ونحن نرسل للمنصة بالمعدل المناسب لها. للبلايستيشن: أضف كرت الالتقاط كمصدر في OBS عادي.",
+        "1) In our program: choose «From OBS» and press «Start protection» first.\n2) In OBS: Settings > Stream > Service: Custom.\n3) Server: {server}  (the «Copy» button next to it)\n4) Stream key in OBS: leave it empty.\n5) Settings > Output: a HIGH bitrate, 20000 to 40000 (this link stays inside your PC, not on the internet: high costs nothing and keeps the quality), Keyframe interval = 2.\n6) Settings > Video: the same resolution and frame rate as «Picture quality» here.\n7) Press «Start Streaming» in OBS. Our program then shows «OBS connected ✓».\n\nYour platform's key (Kick, TikTok...) goes into our program, not into OBS; we send to the platform at the bitrate it takes. For PlayStation: add the capture card as a source in OBS as usual.",
     ),
     "copy_server": ("انسخ عنوان OBS", "Copy the OBS address"),
     "lk_obs_wait": (
@@ -327,6 +326,41 @@ TEXT: dict[str, tuple[str, str]] = {
     "nvidia_needed": (
         "كرتك إنفيديا بس الوضع السريع مو مفعل، فالبرنامج بيشتغل أبطأ وممكن تكثر الشاشة الكاملة وتقطيع الغطاء. نفعّله الحين؟ (تنزيل حوالي {gb} جيجا وتجهيز حوالي 4 دقايق، مرة وحدة بس). «لا» يبدأ بالوضع البطيء.",
         "Your card is NVIDIA but the fast mode is off, so protection runs slower: more full-screen covers and choppier clothing. Turn it on now? (about {gb} GB download and about 4 minutes of preparation, once). «No» starts in the slow mode.",
+    ),
+    "sec_quality": ("٣) جودة الصورة", "3) Picture quality"),
+    "resolution": ("الدقة", "Resolution"),
+    "fps": ("الإطارات بالثانية", "Frames per second"),
+    "quality_hint": (
+        "خلّها نفس إعدادات OBS بالضبط عشان ما تقل الجودة أبداً. الفيديو المسجّل من قبل يحتفظ بدقته وإطاراته الأصلية. كيك وتويتش وتيك توك وفيسبوك ياخذون لين 1080p.",
+        "Make these exactly the same as OBS so the quality never drops. A recorded video keeps its own resolution and frame rate. Kick, Twitch, TikTok and Facebook take up to 1080p.",
+    ),
+    "delay_auto": ("تلقائي", "Automatic"),
+    "delay_hint": (
+        "تلقائي = ثانيتين مع الوضع السريع لإنفيديا، و3 ثواني لغيره. الأجهزة الأضعف: 3 ثواني أحسن.",
+        "Automatic = 2 s with the NVIDIA fast mode, 3 s otherwise. Weaker PCs: 3 s is better.",
+    ),
+    "brand_pro_only": (
+        "الغطاء يحمل شعار StreamSafe. تغيير الشعار لشعارك أو شعار الراعي متاح في اشتراك Pro.",
+        "The covers carry the StreamSafe logo. Putting your own or a sponsor's logo there comes with the Pro plan.",
+    ),
+    "brand_ours": ("شعار StreamSafe", "The StreamSafe logo"),
+    "sent_bigger": (
+        "⚠ OBS يرسل {sent} والحماية على {ours}: غيّر «جودة الصورة» لنفس OBS عشان ما تقل الجودة.",
+        "⚠ OBS sends {sent} and protection runs at {ours}: set «Picture quality» to the same as OBS so nothing is lost.",
+    ),
+    "sent_low_bitrate": (
+        "⚠ OBS يرسل بمعدل {kbps} فقط: ارفعه في OBS إلى 20000 أو أكثر (الإرسال داخل جهازك) عشان تبقى الصورة نظيفة.",
+        "⚠ OBS sends only {kbps} kbit/s: raise it in OBS to 20000 or more (this link stays in your PC) to keep the picture clean.",
+    ),
+    "plat_x": ("إكس X (تويتر)", "X (Twitter)"),
+    "plat_trovo": ("تروفو Trovo", "Trovo"),
+    "plat_hint_x": (
+        "من X: Media Studio > Producer > Sources: انسخ RTMP URL والمفتاح.",
+        "On X: Media Studio > Producer > Sources: copy the RTMP URL and the key.",
+    ),
+    "plat_hint_trovo": (
+        "من تروفو: Creator Studio > Stream Key. الصق المفتاح بس.",
+        "On Trovo: Creator Studio > Stream Key. Paste the key only.",
     ),
     # --- updates ---
     "update_app": (

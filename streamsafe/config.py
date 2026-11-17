@@ -241,6 +241,21 @@ class Config:
             cfg.set(name, value)
         return cfg
 
+    def at_fps(self, fps: float) -> Config:
+        """The same protection at another frame rate. The rules counted in frames were tuned at 30 fps (10
+        decisions/s, a slate after 0.3 s without one, look-ahead 2 s): at 60 fps each is doubled so it means the
+        same time - the decision rate and the GPU work stay the same, only more frames are drawn."""
+        fps = float(max(15.0, min(fps, 60.0)))
+        k = fps / 30.0
+        r, rd = self.runtime, self.render
+        r.fps = fps
+        r.step_every = max(1, round(3 * k))
+        rd.max_gap = max(1, round(18 * k))
+        rd.max_span = max(1, round(9 * k))
+        rd.hold = max(1, round(2 * k))
+        rd.lookahead_frames = max(1, round(60 * k))
+        return self
+
     def set(self, name: str, value: Any) -> None:
         for section, field_name in _flat_fields(self):
             if field_name == name:

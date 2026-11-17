@@ -7,7 +7,7 @@ import pytest
 
 tk = pytest.importorskip("tkinter")
 
-from streamsafe.app import controller, engine, heads, i18n, modelpack, updates  # noqa: E402
+from streamsafe.app import controller, engine, heads, i18n, ingest, modelpack, updates  # noqa: E402
 from tests.appfix import FakeProtector  # noqa: E402
 
 
@@ -167,7 +167,7 @@ def test_platform_choice_fills_its_server(app):
     assert app._vars["rtmp_url"].get() == "rtmps://a.rtmps.youtube.com:443/live2"
     app._vars["platform"].set(app.tr("plat_twitch"))
     app.on_platform()  # a preset is replaced by the next preset
-    assert app._vars["rtmp_url"].get() == "rtmps://live.twitch.tv:443/app"
+    assert app._vars["rtmp_url"].get() == ingest.PRESETS["twitch"]
     app._vars["platform"].set(app.tr("plat_tiktok"))
     app.on_platform()
     assert app._vars["rtmp_url"].get() == "" and "LIVE Producer" in clean(app.platform_hint.cget("text"))
@@ -183,3 +183,30 @@ def test_link_panel_says_what_obs_and_the_platform_do(app, monkeypatch):
     app.ctrl.link.take({"event": "platform_lost", "reason": "broken", "retry_s": 4})
     app.show_link()
     assert "OBS" in clean(app.lk_in.cget("text")) and "4" in clean(app.lk_out.cget("text"))
+
+
+def test_quality_and_delay_fields(app):
+    app._vars["resolution"].set("1440p")
+    app._vars["fps"].set("30")
+    app._vars["delay"].set(app.tr("delay_auto"))
+    app.collect()
+    st = app.ctrl.settings
+    assert (st.resolution, st.fps, st.delay) == ("1440p", 30, 0.0)
+    app._vars["delay"].set("3")
+    app.collect()
+    assert app.ctrl.settings.delay == 3.0
+
+
+def test_obs_sending_more_than_we_keep_is_said(app):
+    app.ctrl.settings.resolution, app.ctrl.settings.fps = "1080p", 30
+    app.ctrl.link.sent = (2560, 1440, 60.0, 30000)
+    assert "1440p60" in clean(app.format_warning())
+    app.ctrl.link.sent = (1920, 1080, 30.0, 4000)
+    assert "4000" in clean(app.format_warning())
+    app.ctrl.link.sent = (1920, 1080, 30.0, 25000)
+    assert app.format_warning() == ""
+
+
+def test_logo_is_ours_on_the_normal_plan(app):
+    t = " ".join(texts(app.sets))
+    assert clean(i18n.t("ar", "brand_pro_only")) in t

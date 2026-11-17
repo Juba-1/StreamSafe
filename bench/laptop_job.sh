@@ -82,7 +82,7 @@ run() {
   if [ "$load" != 0 ]; then python -m bench.gpu_load --duty 0.$load --after $after > $R/${name}_load.log 2>&1 & lp=$!; sleep 4; fi
   nvidia-smi --query-gpu=utilization.gpu,memory.used,temperature.gpu --format=csv,noheader,nounits -l 1 > $R/${name}_util.csv & local sp=$!
   (cd $dir && env -u HF_TOKEN "${vars[@]}" "$@" timeout $((secs + 600)) python -u -m streamsafe --input "$clip" --mode realtime --size 1920x1080 \
-     --secs $secs --diag /workspace/d/${name}_diag.json --stats $R/${name}_st.json --no-report > $R/${name}_run.log 2>&1); echo "RUN_EXIT $?"
+     --secs $secs ${EXTRA:-} --diag /workspace/d/${name}_diag.json --stats $R/${name}_st.json --no-report > $R/${name}_run.log 2>&1); echo "RUN_EXIT $?"
   kill $sp $lp 2>/dev/null; wait $sp $lp 2>/dev/null
   grep -E "STREAMSAFE_(SLOW|DEVICE)|Traceback|Error" $R/${name}_run.log | head -5
   ln -sf /workspace/d/${name}_diag.json $R/${name}_diag.json
@@ -112,6 +112,17 @@ if has crowd; then  # 8 to 15 people in view all the time
   run cr_trt_new_L70  "$CROWD" 60 trt  new 70
   run cr_trt_new_L90  "$CROWD" 60 trt  new 90
   run cr_cuda_new_L90 "$CROWD" 60 cuda new 90
+  up
+fi
+if has fps60; then  # the live picture at 60 frames per second (OBS at 60): same protection, twice the frames
+  EXTRA="--fps 60"
+  for L in 0 70 90; do
+    run t1_trt_new60_L$L  "$T1" 91 trt  new $L
+    run t1_cuda_new60_L$L "$T1" 91 cuda new $L
+  done
+  run cr_cuda_new60_L70 "$CROWD" 60 cuda new 70
+  run cr_trt_new60_L90  "$CROWD" 60 trt  new 90
+  EXTRA=""
   up
 fi
 if has long; then  # 10.5 minutes of every clip we hold, one after the other, under a heavy game

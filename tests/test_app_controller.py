@@ -183,10 +183,17 @@ def test_streamer_logo_is_kept_as_a_copy_and_goes_on_the_full_screen_cover(ctrl,
     img = cv2.imdecode(np.fromfile(kept, np.uint8), cv2.IMREAD_UNCHANGED)
     assert max(img.shape[:2]) == ctrl.BRAND_MAX  # shrunk
     src.unlink()  # the original may move: the copy is used
+    from streamsafe.app import paths
+
+    ours = str(paths.bundled_brand_dir() / "logo.png")
+    # the normal plan: StreamSafe's logo on the covers, whatever the streamer picked
     env = engine.engine_env({}, False, data_env=ctrl.env, brand_image=kept)
-    assert env["SCENE_IMAGE"] == env["SLATE_IMAGE"] == kept and env["SCENE_TEXT"] == env["SLATE_TEXT"] == ""
+    assert env["SCENE_IMAGE"] == env["SLATE_IMAGE"] == ours and env["LOGO"].endswith("logo_rgba.png")
+    # Pro: the streamer's own logo on the card and on the clothing
+    env = engine.engine_env({}, False, data_env={**ctrl.env, "STREAMSAFE_PLAN": "pro"}, brand_image=kept)
+    assert env["SCENE_IMAGE"] == env["SLATE_IMAGE"] == env["LOGO"] == kept and env["SCENE_TEXT"] == env["SLATE_TEXT"] == ""
     bad = tmp_path / "not_an_image.png"
     bad.write_text("hello")
     assert ctrl.set_brand_image(str(bad)) == "brand_bad" and ctrl.settings.brand_image == kept
     assert ctrl.set_brand_image("") == "" and ctrl.settings.brand_image == ""
-    assert "SCENE_IMAGE" not in engine.engine_env({"SCENE_IMAGE": "old"}, False, data_env=ctrl.env)
+    assert engine.engine_env({"SCENE_IMAGE": "old"}, False, data_env=ctrl.env)["SCENE_IMAGE"] == ours  # never a stale value

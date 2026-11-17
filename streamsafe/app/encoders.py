@@ -33,11 +33,12 @@ def listed(ffmpeg: str, run: Run = subprocess.run) -> set[str]:
     return {parts[1] for line in out.splitlines() if len(parts := line.split()) >= 2 and parts[1] in CANDIDATES}
 
 
-def works(ffmpeg: str, encoder: str, run: Run = subprocess.run) -> bool:
-    """Does ``encoder`` really encode 10 frames of the size and pixel format the stream uses, on this PC?"""
+def works(ffmpeg: str, encoder: str, run: Run = subprocess.run, flags: Sequence[str] = ()) -> bool:
+    """Does ``encoder`` really encode 10 frames of the size and pixel format the stream uses, on this PC (with
+    the quality ``flags`` the stream uses)?"""
     cmd = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=30",
-        "-frames:v", "10", "-c:v", encoder, "-pix_fmt", "yuv420p", "-f", "null", "-",
+        "-frames:v", "10", "-c:v", encoder, *flags, "-b:v", "6000k", "-pix_fmt", "yuv420p", "-f", "null", "-",
     ]  # fmt: skip
     try:
         return run(cmd, capture_output=True, timeout=TIMEOUT_S, creationflags=_flags()).returncode == 0
@@ -72,3 +73,9 @@ def choose_into(env: MutableMapping[str, str], args: Sequence[str], run: Run = s
     if not encoder:
         raise SystemExit("NO_ENCODER no H.264 encoder works on this PC (NVENC, AMF, Quick Sync, Media Foundation). Nothing was streamed.")
     env["ENCODER"] = encoder
+    from streamsafe.io.sinks import encoder_flags
+
+    # the quality settings are tried too: an older driver may refuse one of them -> the encoder's own defaults
+    env.pop("ENCODER_PLAIN", None)
+    if not all(works(ffmpeg, encoder, run, encoder_flags(encoder, live)) for live in (True, False)):
+        env["ENCODER_PLAIN"] = "1"

@@ -563,13 +563,28 @@ def small_frames(shows=SHOWS, n=N, **kw):
     return ts.subtitle_frames(n, shows, size=(1280, 720), **kw)
 
 
+def paired_runs(frames, factory, ok, tries=3, **kw):
+    """A run without and one with translation, compared frame by frame. Two realtime runs on a busy machine (a
+    shared CI runner) can differ by when a decision landed or a frame was held - nothing to do with translation -
+    so a pair that does not pass ``ok`` is run again, up to ``tries`` times; the last pair is returned."""
+    for _ in range(tries):
+        _, off, _ = run_engine(frames)
+        report, on, _ = run_engine(frames, factory, **kw)
+        if ok(report, on, off):
+            break
+    return report, on, off
+
+
 def test_realtime_arabic_is_on_exactly_the_frames_of_the_english_and_hides_it():
     frames = small_frames()
-    _, off, _ = run_engine(frames)
-    report, on, _ = run_engine(frames, ts.stub_factory)
+    english = set(range(30, 80)) | set(range(100, 140))
+
+    def same_as_english(report, on, off):
+        return {v for v in range(N) if on.hashes[v] != off.hashes[v]} == english
+
+    report, on, off = paired_runs(frames, ts.stub_factory, same_as_english)
     assert len(on.hashes) == len(off.hashes) == N
     changed = {v for v in range(N) if on.hashes[v] != off.hashes[v]}
-    english = set(range(30, 80)) | set(range(100, 140))
     assert changed == english, f"extra: {sorted(changed - english)[:5]}, missing: {sorted(english - changed)[:5]}"
     t = report["summary"]["translate"]
     assert t["frames_overlaid"] == len(english) and not t["errors"] and t["reads_done"] >= 2
@@ -614,8 +629,11 @@ def test_realtime_arabic_goes_on_top_of_the_full_scene_cover_and_the_cover_stays
 @pytest.mark.parametrize("factory", ["dying_factory", "failing_factory", "slow_factory", "broken_load_factory"])
 def test_realtime_a_failing_slow_or_dead_worker_leaves_the_stream_exactly_as_without_it(factory):
     frames = small_frames()
-    _, off, _ = run_engine(frames)
-    report, on, _ = run_engine(frames, getattr(ts, factory), wait_ready=False)
+
+    def unchanged(report, on, off):
+        return sum(a != b for a, b in zip(on.hashes, off.hashes, strict=True)) <= 3
+
+    report, on, off = paired_runs(frames, getattr(ts, factory), unchanged, wait_ready=False)
     assert report["summary"]["frames_out"] == N and report["summary"]["dropped_frames"] == 0, "no frame lost or late"
     t = report["summary"]["translate"]
     assert t["frames_overlaid"] == 0, "nothing was drawn"

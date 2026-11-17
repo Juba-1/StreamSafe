@@ -26,8 +26,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from streamsafe.app import heads, paths, runtime_select
-from streamsafe.app.settings import INPUT_FILE, INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, Settings
+from streamsafe.app import heads, paths, plan, runtime_select
+from streamsafe.app.settings import INPUT_FILE, INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, RESOLUTIONS, Settings
 from streamsafe.branding import PRODUCT_NAME
 
 OUTPUT_ENV = "STREAMSAFE_OUTPUT_URL"
@@ -55,8 +55,22 @@ def output_url(rtmp_url: str, key: str, platform: str = "custom") -> str:
     return "" if target.problems else target.url
 
 
-def run_args(settings: Settings, reports: Path, record_file: str = "") -> list[str]:
-    """Arguments of ``run`` for these settings. Never holds the stream key."""
+AUTO_DELAY_FAST, AUTO_DELAY_SLOW = 2.0, 3.0
+
+
+def delay_for(settings: Settings, fast: bool) -> float:
+    """The stream delay. Automatic (0): 2 s on the fast NVIDIA mode, 3 s otherwise - the delay is not what makes
+    the analysis keep up (the decision rate does), but the frames waiting in it are what the look-ahead covers
+    when a person turns out risky: a slower PC decides a little later, one more second keeps those frames covered."""
+    return settings.delay if settings.delay > 0 else (AUTO_DELAY_FAST if fast else AUTO_DELAY_SLOW)
+
+
+def run_args(settings: Settings, reports: Path, record_file: str = "", fast: bool = True) -> list[str]:
+    """Arguments of ``run`` for these settings. Never holds the stream key.
+
+    Quality: a live picture runs at the chosen resolution and frame rate (``settings.resolution`` / ``fps``, the
+    same as OBS sends); a recorded video keeps its own size and rate. The stream's bitrate is the platform's own
+    figure for that size (``ingest.bitrate_for``); a recording's is set by the engine for its size."""
     if settings.input == INPUT_SRT:
         source = f"srt://127.0.0.1:{settings.srt_port}?mode=listener"
     elif settings.input == INPUT_FILE:
@@ -67,7 +81,19 @@ def run_args(settings: Settings, reports: Path, record_file: str = "") -> list[s
     sink = (
         f"env:{OUTPUT_ENV}" if settings.output == OUTPUT_RTMP else f"record:{record_file}" if settings.output == OUTPUT_RECORD else "window"
     )
-    return ["run", "--input", source, "--output", sink, "--delay", f"{settings.delay:g}", "--report-dir", str(reports)]
+    args = ["run", "--input", source, "--output", sink, "--delay", f"{delay_for(settings, fast):g}", "--report-dir", str(reports)]
+    if settings.input == INPUT_FILE:
+        args += ["--fps", "auto"]
+    else:
+        w, h = RESOLUTIONS.get(settings.resolution, RESOLUTIONS["1080p"])
+        if settings.output == OUTPUT_RTMP and settings.platform not in ("youtube", "custom") and h > 1080:
+            w, h = RESOLUTIONS["1080p"]  # every other platform takes at most 1080p: more is scaled down by it anyway
+        args += ["--size", f"{w}x{h}", "--fps", str(settings.fps)]
+        if settings.output == OUTPUT_RTMP:
+            from streamsafe.app import ingest
+
+            args += ["--bitrate", str(ingest.bitrate_for(settings.platform, h, settings.fps))]
+    return args
 
 
 @dataclass
@@ -75,6 +101,7 @@ class LinkState:
     """What the engine last said about its two links (``io/link.py``), for the window."""
 
     input: str = ""  # "" / waiting / connected / disconnected / failed
+    sent: tuple = ()  # (width, height, fps, kbps) of what OBS sends, when FFmpeg said it
     platform: str = ""  # "" / connecting / connected / lost / failed
     port: int = 0
     reason: str = ""  # the last platform / input problem, a word of io/link.py
@@ -91,6 +118,13 @@ class LinkState:
             self.port = int(event.get("port") or 0)
         elif name == "obs_connected":
             self.input = "connected"
+        elif name == "obs_format":  # what OBS sends: the window warns when the protection runs smaller / slower
+            self.sent = (
+                int(event.get("width") or 0),
+                int(event.get("height") or 0),
+                float(event.get("fps") or 0),
+                int(event.get("kbps") or 0),
+            )
         elif name == "obs_disconnected":
             self.input = "disconnected"
         elif name == "input_failed":
@@ -145,10 +179,18 @@ def engine_env(
     env.pop("TRANSLATE_DIR", None)
     if translate:  # the engine itself checks the pack and carries on without translation when it is not usable
         env.update({"TRANSLATE_AR": "1", "TRANSLATE_DIR": str(paths.translate_dir(where))})
-    for name in ("SCENE_IMAGE", "SLATE_IMAGE", "SCENE_TEXT", "SLATE_TEXT"):
+    for name in ("SCENE_IMAGE", "SLATE_IMAGE", "SCENE_TEXT", "SLATE_TEXT", "LOGO"):
         env.pop(name, None)
-    if brand_image and Path(brand_image).is_file():  # the streamer's logo alone on the full-screen cover
-        env.update({"SCENE_IMAGE": brand_image, "SLATE_IMAGE": brand_image, "SCENE_TEXT": "", "SLATE_TEXT": ""})
+    # the covers carry OUR logo (the clothing's chest and the full-screen card). A Pro subscription may put the
+    # streamer's / sponsor's logo there instead (plan.py); everyone else sees StreamSafe's.
+    ours_card, ours_chest = paths.bundled_brand_dir() / "logo.png", paths.bundled_brand_dir() / "logo_rgba.png"
+    own = brand_image if brand_image and Path(brand_image).is_file() and plan.allows("custom_brand", where) else ""
+    card = own or (str(ours_card) if ours_card.is_file() else "")
+    chest = own or (str(ours_chest) if ours_chest.is_file() else "")
+    if card:
+        env.update({"SCENE_IMAGE": card, "SLATE_IMAGE": card, "SCENE_TEXT": "", "SLATE_TEXT": ""})
+    if chest:
+        env["LOGO"] = chest
     if url:
         env[OUTPUT_ENV] = url
     return env

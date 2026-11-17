@@ -394,7 +394,9 @@ class Controller:
         self.link = engine.LinkState()
         self._report_line, self._closed_out = "", False
         record = self.record_file() if s.output == OUTPUT_RECORD else ""
-        self.engine.start(engine.exe_command(engine.run_args(s, paths.reports_dir(self.env), record)), env, self._new_log())
+        self.engine.start(
+            engine.exe_command(engine.run_args(s, paths.reports_dir(self.env), record, fast=self.use_nvidia)), env, self._new_log()
+        )
 
     def status(self) -> str:
         running = self.engine.running

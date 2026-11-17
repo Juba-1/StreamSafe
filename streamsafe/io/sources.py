@@ -111,6 +111,31 @@ class _LatestFrames:
             yield frame
 
 
+_VIDEO_STREAM = re.compile(r"Stream #\d+:\d+.*?: Video: .*?(\d{3,5})x(\d{3,5})")
+_FPS = re.compile(r"([\d.]+) (?:fps|tbr)")
+_KBPS = re.compile(r"(\d+) kb/s")
+# FFmpeg's informational lines (stream description, metadata): not reasons of a failure
+_INFO_LINE = re.compile(
+    r"^\s*(Input #|Output #|Stream #|Metadata:|Duration:|Program |Stream mapping|Press \[q\]|\w+\s*:\s"
+    r"|\[\w+ @ [0-9a-fx]+\] (?!.*(?:rror|ail|efused|in use)))"
+)
+
+
+def sender_format(line: str) -> dict[str, float] | None:
+    """What a sender (OBS) sends, from FFmpeg's description of the incoming video stream; None for other lines."""
+    m = _VIDEO_STREAM.search(line)
+    if not m:
+        return None
+    out: dict[str, float] = {"width": int(m.group(1)), "height": int(m.group(2))}
+    rate = _FPS.search(line)
+    if rate:
+        out["fps"] = float(rate.group(1))
+    kbps = _KBPS.search(line)
+    if kbps:
+        out["kbps"] = int(kbps.group(1))
+    return out
+
+
 class FFmpegSource:
     """Decodes any FFmpeg input to raw BGR frames (and its sound to PCM) through a pipe.
 
@@ -161,7 +186,10 @@ class FFmpegSource:
         w, h = self.size
         # no "-fflags nobuffer": with FFmpeg 6.1 it decodes nothing from mp4 files or SRT/mpegts (tested).
         # "fps=" makes any input rate (OBS virtual camera at 60 fps) the engine's rate
-        cmd = [exe or ffmpeg, "-hide_banner", "-loglevel", "error", *input_args, "-i", url]
+        # a listener logs at "info": FFmpeg then says what OBS sends (size, frame rate, bitrate), passed on as a
+        # STATUS line so the window can warn when the protection runs smaller or slower than OBS sends
+        level = ["-loglevel", "info", "-nostats"] if self._port is not None else ["-loglevel", "error"]
+        cmd = [exe or ffmpeg, "-hide_banner", *level, *input_args, "-i", url]
         if audio:
             # a small interleave window: if the sound stalls, the picture is not held back for it
             cmd += ["-map", "0:v:0", "-map", "0:a:0?",
@@ -205,7 +233,11 @@ class FFmpegSource:
             for raw in stream:
                 line = raw.decode("utf-8", "replace").rstrip() if isinstance(raw, bytes) else str(raw).rstrip()
                 if line:
-                    self._errors.append(line)
+                    sent = sender_format(line)
+                    if sent:
+                        link.status("obs_format", **sent)
+                    if not _INFO_LINE.match(line):
+                        self._errors.append(line)
                     print(f"INPUT {line}", file=sys.stderr, flush=True)
 
     @property

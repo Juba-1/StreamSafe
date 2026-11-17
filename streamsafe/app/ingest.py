@@ -20,28 +20,51 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-KICK, TWITCH, YOUTUBE, TIKTOK, FACEBOOK, CUSTOM = "kick", "twitch", "youtube", "tiktok", "facebook", "custom"
-PLATFORMS = (KICK, TWITCH, YOUTUBE, TIKTOK, FACEBOOK, CUSTOM)
+KICK, TWITCH, YOUTUBE, TIKTOK, FACEBOOK, X, TROVO, CUSTOM = "kick", "twitch", "youtube", "tiktok", "facebook", "x", "trovo", "custom"
+PLATFORMS = (KICK, TWITCH, YOUTUBE, TIKTOK, FACEBOOK, X, TROVO, CUSTOM)
 
-# the server each platform publishes for every streamer ("" = it is different per streamer: paste it)
+# the server each platform publishes for every streamer ("" = it is different per streamer: paste it).
+# Sources: OBS Studio's own service list (plugins/rtmp-services/data/services.json, read 17 Nov 2026) and, for
+# Kick, a live test (runs/live_kick_r1). Twitch has no single address in that list (it picks the nearest of its
+# Amazon IVS ingests); Frankfurt is the nearest listed one to the Gulf.
 PRESETS: dict[str, str] = {
     KICK: "rtmps://fa723fc1b171.global-contribute.live-video.net:443/app",
-    TWITCH: "rtmps://live.twitch.tv:443/app",
+    TWITCH: "rtmp://euc10.contribute.live-video.net/app",
     YOUTUBE: "rtmps://a.rtmps.youtube.com:443/live2",
-    TIKTOK: "",
-    FACEBOOK: "rtmps://live-api-s.facebook.com:443/rtmp",
+    TIKTOK: "",  # LIVE Producer shows a new server and key for every stream
+    FACEBOOK: "rtmps://rtmp-api.facebook.com:443/rtmp",
+    X: "",  # X (Twitter) Media Studio shows the server
+    TROVO: "rtmp://livepush.trovo.live/live",
     CUSTOM: "",
 }
 
-# host ending -> the application its ingest needs
+# host ending -> the application its ingest needs (when a streamer pastes the server without it)
 _KNOWN_APPS = (
-    (".live-video.net", "app"),  # Amazon IVS: Kick
+    (".live-video.net", "app"),  # Amazon IVS: Kick and Twitch
     ("twitch.tv", "app"),
-    (".contribute.live-video.net", "app"),
     ("youtube.com", "live2"),
     ("facebook.com", "rtmp"),
     ("fbcdn.net", "rtmp"),
+    ("pscp.tv", "x"),  # X (Twitter)
+    ("trovo.live", "live"),
+    ("restream.io", "live"),
+    ("steamcontent.com", "app"),
+    ("nimo.tv", "live"),
+    ("bilivideo.com", "live-bvc"),
+    ("vimeo.com", "live"),
 )
+
+# kbit/s a platform takes for 1080p at 30 / 60 fps (what OBS recommends for it, read 17 Nov 2026; Kick: its own
+# page). Other sizes scale from these (bitrate_for).
+_KBPS_1080 = {
+    KICK: (6000, 8000),
+    TWITCH: (6000, 6000),
+    YOUTUBE: (10000, 12000),
+    TIKTOK: (6000, 6000),
+    FACEBOOK: (6000, 9000),
+    X: (9000, 12000),
+    TROVO: (6000, 9000),
+}
 _SCHEMES = ("rtmp://", "rtmps://")
 
 
@@ -134,8 +157,25 @@ def valid_key(key: str) -> bool:
 
 def guess_platform(server: str) -> str:
     host = _split(squeeze(server))[1].lower()
-    for name, words in ((KICK, ("live-video.net", "kick.com")), (TWITCH, ("twitch.tv",)), (YOUTUBE, ("youtube.com",)),
-                        (TIKTOK, ("tiktok",)), (FACEBOOK, ("facebook.com", "fbcdn.net"))):  # fmt: skip
+    for name, words in ((KICK, ("global-contribute.live-video.net", "kick.com")), (TWITCH, ("contribute.live-video.net", "twitch.tv")),
+                        (YOUTUBE, ("youtube.com",)), (TIKTOK, ("tiktok",)), (FACEBOOK, ("facebook.com", "fbcdn.net")),
+                        (X, ("pscp.tv", "x.com")), (TROVO, ("trovo",))):  # fmt: skip
         if any(w in host for w in words):
             return name
     return CUSTOM
+
+
+def bitrate_for(platform: str, height: int, fps: float) -> int:
+    """The video bitrate (kbit/s) to send: the platform's own figure for that size and frame rate - higher than
+    it takes is refused or re-compressed by the platform, lower wastes quality."""
+    from streamsafe.io.sinks import auto_kbps
+
+    if platform not in _KBPS_1080:
+        return auto_kbps((height * 16 // 9, height), fps, True)
+    k30, k60 = _KBPS_1080[platform]
+    base = k60 if fps > 30 else k30
+    if height <= 720:
+        return round(base * 0.65)
+    if height <= 1080 or platform != YOUTUBE:  # only YouTube takes more than 1080p
+        return base
+    return {1440: 24000 if fps <= 30 else 30000}.get(height, 35000 if fps <= 30 else 51000)

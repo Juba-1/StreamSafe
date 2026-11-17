@@ -19,6 +19,7 @@ Examples
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Callable
 
@@ -38,6 +39,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--delay", type=float, help="stream delay in seconds")
     p.add_argument("--secs", type=float, help="stop a file input after this many seconds")
     p.add_argument("--size", help="output frame size WxH (default: the input's own 16:9 size)")
+    p.add_argument("--fps", help="frame rate: a number (15-60) or 'auto' = a video file's own rate (default 30)")
+    p.add_argument("--bitrate", type=int, help="video bitrate of a stream / recording in kbit/s (default: by size and rate)")
     p.add_argument("--head-dir", help="folder with the eye's risk heads")
     p.add_argument("--stats", help="write the run summary JSON here")
     p.add_argument("--diag", help="write every decision and every drawn garment here (JSON)")
@@ -49,6 +52,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def config_from_args(args: argparse.Namespace) -> Config:
     overrides = dict(mode=args.mode, delay=args.delay, secs=args.secs, head_dir=args.head_dir, stats_out=args.stats, diag_out=args.diag)
     return Config.from_env(**{k: v for k, v in overrides.items() if v is not None})
+
+
+def input_fps(spec: str, wanted: str | None) -> float:
+    """The frame rate to run at: a number as given, 'auto' = a video file's own rate (a 60 fps recording stays 60,
+    a 24 fps film stays 24), else 0 = the configured rate."""
+    if not wanted:
+        return 0.0
+    if wanted != "auto":
+        return float(wanted)
+    path = spec[len("file:") :] if spec.startswith("file:") else spec
+    if "://" in path or path.startswith("device:"):
+        return 0.0  # a live input's rate is set by the sender: say it with a number
+    import cv2
+
+    cap = cv2.VideoCapture(path)
+    rate = cap.get(cv2.CAP_PROP_FPS) if cap.isOpened() else 0.0
+    cap.release()
+    return round(float(rate), 3) if 10.0 <= rate <= 240.0 else 0.0
 
 
 INPUT_FAILED_EXIT = 7  # the input could not be opened (the SRT port is busy, no such device)
@@ -74,6 +95,11 @@ def main(
     start checks there (graphics card, encoder), so the SRT listener is already up while they run."""
     args = parse_args(argv)
     cfg = config_from_args(args)
+    fps = input_fps(args.input, args.fps)
+    if fps and fps != cfg.runtime.fps:
+        cfg.at_fps(fps)
+    if args.bitrate:
+        os.environ["VIDEO_KBPS"] = str(args.bitrate)
     size = tuple(int(v) for v in args.size.lower().split("x")) if args.size else None
     secrets = [link.Secrets(spec) for spec in args.output]
     source, sink, report = None, None, None

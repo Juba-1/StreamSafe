@@ -21,7 +21,7 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk
 
-from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, paths, release, updates
+from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, paths, plan, release, updates
 from streamsafe.app import settings as cfg
 from streamsafe.branding import PRODUCT_NAME
 
@@ -258,7 +258,9 @@ class App(tk.Tk):
         v("record_dir", tk.StringVar, st.record_dir)
         v("key", tk.StringVar, self.ctrl.stored_key() if "key" not in self._vars else self._vars["key"].get())
         v("remember", tk.BooleanVar, st.remember_key)
-        v("delay", tk.StringVar, f"{st.delay:g}")
+        v("delay", tk.StringVar, "").set(self.tr("delay_auto") if st.delay <= 0 else f"{st.delay:g}")
+        v("resolution", tk.StringVar, "").set(st.resolution)
+        v("fps", tk.StringVar, "").set(str(st.fps))
         v("translate", tk.BooleanVar, st.translate_ar)
         side = "right" if self.rtl else "left"
 
@@ -344,8 +346,19 @@ class App(tk.Tk):
         small(self.tr("window_hint"))
         ttk.Separator(s).pack(fill="x", pady=10)
 
-        # 3. the rest
-        field(s, self.tr("delay"), v("delay", tk.StringVar, ""), 8)
+        # 3. picture quality: the same as OBS sends, nothing is made smaller or slower on the way
+        self.label(s, self.tr("sec_quality"), font=(FONT, 11, "bold")).pack(fill="x")
+        res = field(s, self.tr("resolution"), v("resolution", tk.StringVar, ""), 10, combo=list(cfg.RESOLUTIONS))
+        res.configure(state="readonly")  # type: ignore[call-arg]
+        rate = field(s, self.tr("fps"), v("fps", tk.StringVar, ""), 10, combo=[str(f) for f in cfg.FPS_CHOICES])
+        rate.configure(state="readonly")  # type: ignore[call-arg]
+        small(self.tr("quality_hint"))
+        delay = field(s, self.tr("delay"), v("delay", tk.StringVar, ""), 10, combo=[self.tr("delay_auto"), "2", "3", "4", "5"])
+        delay.configure(state="readonly")  # type: ignore[call-arg]
+        small(self.tr("delay_hint"))
+        ttk.Separator(s).pack(fill="x", pady=10)
+
+        # 4. the rest
         self.pack_row(
             ttk.Checkbutton(
                 s, text=self.tr("translate_ar"), variable=v("translate", tk.BooleanVar, False), command=self.on_translate_toggle
@@ -354,10 +367,12 @@ class App(tk.Tk):
         self.pack_row(self.label(s, self.tr("translate_hint", mb=release.TRANSLATE_DOWNLOAD_MB), fg="#6b7785", font=(FONT, 9)), fill="x")
         ttk.Separator(s).pack(fill="x", pady=10)
         self.label(s, self.tr("sec_brand"), font=(FONT, 11, "bold")).pack(fill="x")
-        self.pack_row(self.label(s, self.tr("brand_hint"), fg="#6b7785", font=(FONT, 9)), fill="x")
+        pro = plan.allows("custom_brand", self.ctrl.env)
+        self.pack_row(self.label(s, self.tr("brand_hint" if pro else "brand_pro_only"), fg="#6b7785", font=(FONT, 9)), fill="x")
         fr = tk.Frame(s, bg="white")
-        ttk.Button(fr, text=self.tr("brand_pick"), command=self.pick_brand).pack(side=side, padx=4)
-        ttk.Button(fr, text=self.tr("brand_remove"), command=lambda: self.set_brand("")).pack(side=side, padx=4)
+        state = "normal" if pro else "disabled"  # the normal plan: our logo, not changeable
+        ttk.Button(fr, text=self.tr("brand_pick"), command=self.pick_brand, state=state).pack(side=side, padx=4)
+        ttk.Button(fr, text=self.tr("brand_remove"), command=lambda: self.set_brand(""), state=state).pack(side=side, padx=4)
         self.brand_label = self.label(fr, "", fg="#44505e", font=(FONT, 9))
         self.brand_label.pack(side=side, padx=8)
         self.pack_row(fr, fill="x")
@@ -479,8 +494,8 @@ class App(tk.Tk):
         threading.Thread(target=work, name="link-test", daemon=True).start()
 
     def show_brand(self) -> None:
-        path = self.ctrl.settings.brand_image
-        text = self.tr("brand_set", name=os.path.basename(path)) if path else self.tr("brand_none")
+        path = self.ctrl.settings.brand_image if plan.allows("custom_brand", self.ctrl.env) else ""
+        text = self.tr("brand_set", name=os.path.basename(path)) if path else self.tr("brand_ours")
         self.brand_label.configure(text=text)
 
     def pick_brand(self) -> None:
@@ -513,10 +528,13 @@ class App(tk.Tk):
             st.srt_port = int(str(v["srt_port"].get()).strip())
         except ValueError:
             st.srt_port = 0
+        shown = str(v["delay"].get()).strip().replace(",", ".")
         try:
-            st.delay = float(str(v["delay"].get()).strip().replace(",", "."))
+            st.delay = 0.0 if shown in (self.tr("delay_auto"), i18n.t(self.lang, "delay_auto"), "") else float(shown)
         except ValueError:
             st.delay = 0.0
+        st.resolution = str(v["resolution"].get()) if str(v["resolution"].get()) in cfg.RESOLUTIONS else "1080p"
+        st.fps = int(v["fps"].get()) if str(v["fps"].get()) in ("30", "60") else 60
 
     # --- check tab ------------------------------------------------------------------------------------------
     def build_check(self) -> None:
@@ -636,6 +654,7 @@ class App(tk.Tk):
             running,
             lk.input,
             lk.platform,
+            lk.sent,
             lk.reason,
             lk.retry_s,
             lk.record_file,
@@ -665,6 +684,9 @@ class App(tk.Tk):
             text, color = (self.tr("lk_in_ok"), green) if lk.input == "connected" or running else (self.tr("lk_in_wait"), grey)
             if lk.input == "failed":
                 text, color = self.tr("lk_in_failed", why=why), red
+        warn = self.format_warning()
+        if warn and lk.input == "connected":
+            text, color = text + "\n" + warn, amber
         self.lk_in.configure(text=text, fg=color)
         if st.output == cfg.OUTPUT_RTMP:
             text, color = {
@@ -687,6 +709,21 @@ class App(tk.Tk):
         else:
             self.lk_copy.pack_forget()
         self.link_box.pack(fill="x", pady=6, after=self.message)
+
+    def format_warning(self) -> str:
+        """When OBS sends more than the protection keeps (a bigger picture, more frames, or too low a bitrate to
+        start from), say so: the quality is decided by the smallest link of the chain."""
+        sent = self.ctrl.link.sent
+        if not sent:
+            return ""
+        _w, h, fps, kbps = sent
+        st = self.ctrl.settings
+        _, our_h = cfg.RESOLUTIONS.get(st.resolution, (1920, 1080))
+        if h > our_h + 8 or fps > st.fps + 1:
+            return self.tr("sent_bigger", sent=f"{h}p{round(fps) or ''}", ours=f"{our_h}p{st.fps}")
+        if kbps and kbps < 12000:
+            return self.tr("sent_low_bitrate", kbps=kbps)
+        return ""
 
     def update_controls(self) -> None:
         self.show_link()

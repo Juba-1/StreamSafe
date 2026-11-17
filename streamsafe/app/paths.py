@@ -60,6 +60,12 @@ def bundled_heads_dir() -> Path:
     return app_dir() / "heads"
 
 
+def bundled_brand_dir() -> Path:
+    """StreamSafe's own logo for the covers (the installer puts it there; in a source tree: marketing/)."""
+    installed = app_dir() / "brand"
+    return installed if installed.is_dir() else Path(__file__).resolve().parents[2] / "marketing"
+
+
 def reports_dir(env: MutableMapping[str, str] | None = None) -> Path:
     return data_dir(env) / "reports"
 
