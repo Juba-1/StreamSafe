@@ -230,3 +230,6 @@ ol.steps p { color: var(--muted); font-size: 15px; }
 #pricing a.btn.y { display: none; }
 #pricing:has(#py:checked) a.btn.y { display: inline-flex; }
 #pricing:has(#py:checked) a.btn.m { display: none; }
+/* launch period: a friendly support box under the plans */
+.support { max-inline-size: 900px; margin-block-start: 28px; background: #fff; border-radius: var(--radius-l); padding: 24px 28px; display: grid; gap: 14px; color: var(--ink); }
+.support .btn { justify-self: start; }

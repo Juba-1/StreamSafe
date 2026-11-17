@@ -16,6 +16,11 @@ OFF = round(YEAR_OFF * 100)
 BASIC_Y, PRO_Y = int(BASIC * 12 * (1 - YEAR_OFF)), int(PRO * 12 * (1 - YEAR_OFF))  # 470, 950
 TRIAL_DAYS = 3
 BUY_URL = "#pricing"  # header and hero buttons scroll to the plans
+# Launch period: the app is free to download, the plans start later (Dodo checkout once verified).
+LAUNCH_FREE = True
+DOWNLOAD_URL = "https://github.com/Juba-1/streamsafe-download/releases/latest/download/StreamSafe-Setup.exe"
+SUPPORT_URL = ""  # Ali's support page (Ko-fi / PayPal.me); the support box shows only when this is set
+CTA_HREF = DOWNLOAD_URL if LAUNCH_FREE else BUY_URL
 SITE = "https://streamsafe-sa.vercel.app"
 DODO_CHECKOUT = "https://test.checkout.dodopayments.com/buy"  # TEST MODE; becomes https://checkout.dodopayments.com/buy after verification
 PRODUCTS = {  # Dodo product ids (test mode)
@@ -26,11 +31,49 @@ PRODUCTS = {  # Dodo product ids (test mode)
 }
 
 
+CTA_TOP = ("Download free", "حمّله مجانًا") if LAUNCH_FREE else ("Start free trial", "ابدأ التجربة المجانية")
+CTA_BIG = (
+    ("Download free for Windows", "حمّله مجانًا لويندوز")
+    if LAUNCH_FREE
+    else (f"Try it free for {TRIAL_DAYS} days", f"جرّبه مجانًا {TRIAL_DAYS} أيام")
+)
+
+
+PRICING_HEAD = (
+    (
+        "<h2>Free during the GTA 6 launch</h2><p>StreamSafe is free to download and use while GTA 6 launches. These are the plans after the launch period; we will tell you well before anything changes.</p>",
+        "<h2>مجاني وقت إطلاق GTA 6</h2><p>StreamSafe مجاني تحمّله وتستخدمه وقت إطلاق اللعبة. هذي الباقات بعد فترة الإطلاق، ونبلغك قبل أي تغيير بوقت كافي.</p>",
+    )
+    if LAUNCH_FREE
+    else (
+        f"<h2>Pricing</h2><p>Every plan starts with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing. Pay yearly and get {OFF}% off.</p>",
+        f"<h2>الأسعار</h2><p>كل باقة تبدأ بتجربة مجانية {TRIAL_DAYS} أيام. إذا ألغيت قبل ما تخلص ما تدفع شيء. واشترك سنوي ووفّر {OFF}%.</p>",
+    )
+)
+
+
+def support_box():
+    """Launch period: a friendly support box with Ali's support link (only when SUPPORT_URL is set)."""
+    if not SUPPORT_URL:
+        return ""
+    en = (
+        "<p><strong>Enjoying StreamSafe for free?</strong> It costs us real money to build and run. If you would like to help, "
+        f'you can support us here. Thank you!</p><a class="btn btn-main" href="{SUPPORT_URL}">Support StreamSafe</a>'
+    )
+    ar = (
+        "<p><strong>عاجبك StreamSafe وهو مجاني؟</strong> تطويره وتشغيله يكلفنا. إذا حاب تساعدنا نكمل، "
+        f'تقدر تدعمنا من هنا. شكرًا لك!</p><a class="btn btn-main" href="{SUPPORT_URL}">ادعم StreamSafe</a>'
+    )
+    return f'<div class="support">{b(en, ar)}</div>'
+
+
 def checkout(plan, period):
     return f"{DODO_CHECKOUT}/{PRODUCTS[plan, period]}?quantity=1&redirect_url={SITE}/thanks.html"
 
 
 def plan_button(plan):
+    if LAUNCH_FREE:
+        return f'<a class="btn btn-main" href="{DOWNLOAD_URL}">{b("Download free now", "حمّله مجانًا الحين", "span")}</a>'
     en, ar = "Start free trial", "ابدأ التجربة"
     return "".join(f'<a class="btn btn-main {p}" href="{checkout(plan, p)}">{b(en, ar, "span")}</a>' for p in ("m", "y"))
 
@@ -93,7 +136,7 @@ def page(title, desc, body):
 <a class="brand" href="/"><img src="/logo.webp" alt="" width="42" height="42">StreamSafe</a>
 <nav class="nav" data-l="en" aria-label="Main">{ten}</nav><nav class="nav" data-l="ar" aria-label="الرئيسية">{tar}</nav>
 <button class="lang" type="button">{b("العربية", "English", "span")}</button>
-<a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة المجانية", "span")}</a>
+<a class="btn btn-main" href="{CTA_HREF}">{b(*CTA_TOP, "span")}</a>
 </div></header>
 <main id="main">
 {body}
@@ -154,7 +197,7 @@ HOME = f"""
     )
 }
 <div class="ctas">
-<a class="btn btn-main" href="{BUY_URL}">{b(f"Try it free for {TRIAL_DAYS} days", f"جرّبه مجانًا {TRIAL_DAYS} أيام", "span")}</a>
+<a class="btn btn-main" href="{CTA_HREF}">{b(*CTA_BIG, "span")}</a>
 <a class="btn btn-line" href="#see">{b("See real output", "شوف نتيجة حقيقية", "span")}</a>
 </div>
 {
@@ -312,8 +355,8 @@ HOME = f"""
 <section class="band band-sand" id="pricing" style="padding-top:0"><div class="wrap">
 <div class="head">{
     b(
-        f"<h2>Pricing</h2><p>Every plan starts with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing. Pay yearly and get {OFF}% off.</p>",
-        f"<h2>الأسعار</h2><p>كل باقة تبدأ بتجربة مجانية {TRIAL_DAYS} أيام. إذا ألغيت قبل ما تخلص ما تدفع شيء. واشترك سنوي ووفّر {OFF}%.</p>",
+        PRICING_HEAD[0],
+        PRICING_HEAD[1],
     )
 }</div>
 <div class="period" role="radiogroup">
@@ -349,7 +392,10 @@ HOME = f"""
         "div",
         "trial",
     )
+    if not LAUNCH_FREE
+    else ""
 }
+{support_box()}
 {
     b(
         '<p class="source" style="color:#5c4e6e">Prices in Saudi riyals and include tax; your bank may show your local currency. See <a href="/refund.html">Trial, Cancellation &amp; Refunds</a>.</p>',
@@ -429,7 +475,7 @@ HOME += f"""
         "<h2>جاهز قبل يوم الإطلاق</h2><p>GTA 6 ينزل 19 نوفمبر. جهّز StreamSafe مرة وحدة وابث وأنت مرتاح.</p>",
     )
 }
-<a class="btn btn-main" href="{BUY_URL}">{b(f"Try it free for {TRIAL_DAYS} days", f"جرّبه مجانًا {TRIAL_DAYS} أيام", "span")}</a>
+<a class="btn btn-main" href="{CTA_HREF}">{b(*CTA_BIG, "span")}</a>
 </div></section>
 """
 
