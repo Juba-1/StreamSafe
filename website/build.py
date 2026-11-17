@@ -31,8 +31,13 @@ def page(name, title_en, body):
 <header><div class="wrap">
 <a class="brand" href="/"><img src="/logo.webp" alt="StreamSafe logo">StreamSafe</a>
 <nav>
-{both('<a href="/#features">Features</a> <a href="/#how">How it works</a> <a href="/#pricing">Pricing</a> <a href="/contact.html">Contact</a>',
-      '<a href="/#features">المزايا</a> <a href="/#how">طريقة العمل</a> <a href="/#pricing">الأسعار</a> <a href="/contact.html">تواصل معنا</a>', "span")}
+{
+        both(
+            '<a href="/#features">Features</a> <a href="/#how">How it works</a> <a href="/#pricing">Pricing</a> <a href="/contact.html">Contact</a>',
+            '<a href="/#features">المزايا</a> <a href="/#how">طريقة العمل</a> <a href="/#pricing">الأسعار</a> <a href="/contact.html">تواصل معنا</a>',
+            "span",
+        )
+    }
 </nav>
 <button class="lang-btn" type="button" aria-label="Language">{both("العربية", "English", "span")}</button>
 </div></header>
@@ -42,11 +47,21 @@ def page(name, title_en, body):
 <footer><div class="wrap">
 <span>© 2026 StreamSafe · <a href="mailto:{EMAIL}">{EMAIL}</a></span>
 <span class="links">
-{both(f'<a href="/#pricing">Pricing</a> <a href="/terms.html">Terms of Service</a> <a href="/privacy.html">Privacy Policy</a> <a href="/refund.html">Refund &amp; Cancellation</a> <a href="/contact.html">Contact</a>',
-      f'<a href="/#pricing">الأسعار</a> <a href="/terms.html">شروط الاستخدام</a> <a href="/privacy.html">سياسة الخصوصية</a> <a href="/refund.html">الاسترداد والإلغاء</a> <a href="/contact.html">تواصل معنا</a>', "span")}
+{
+        both(
+            '<a href="/#pricing">Pricing</a> <a href="/terms.html">Terms of Service</a> <a href="/privacy.html">Privacy Policy</a> <a href="/refund.html">Refund &amp; Cancellation</a> <a href="/contact.html">Contact</a>',
+            '<a href="/#pricing">الأسعار</a> <a href="/terms.html">شروط الاستخدام</a> <a href="/privacy.html">سياسة الخصوصية</a> <a href="/refund.html">الاسترداد والإلغاء</a> <a href="/contact.html">تواصل معنا</a>',
+            "span",
+        )
+    }
 </span>
-<span style="width:100%">{both("StreamSafe is an independent product. It is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive. Grand Theft Auto and GTA are their trademarks.",
-      "StreamSafe منتج مستقل، وليس تابعًا لشركة Rockstar Games أو Take-Two Interactive ولا معتمدًا منهما. Grand Theft Auto و GTA علامات تجارية مملوكة لهما.", "span")}</span>
+<span style="width:100%">{
+        both(
+            "StreamSafe is an independent product. It is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive. Grand Theft Auto and GTA are their trademarks.",
+            "StreamSafe منتج مستقل، وليس تابعًا لشركة Rockstar Games أو Take-Two Interactive ولا معتمدًا منهما. Grand Theft Auto و GTA علامات تجارية مملوكة لهما.",
+            "span",
+        )
+    }</span>
 </div></footer>
 </body>
 </html>
@@ -56,61 +71,147 @@ def page(name, title_en, body):
 INDEX = f"""
 <div class="hero"><div class="wrap">
 <img src="/logo.webp" alt="StreamSafe">
-{both('<h1>Stream GTA 6 <span class="g">without the awkward moments</span></h1><p class="lead">StreamSafe watches your gameplay a couple of seconds ahead of your viewers and covers revealing characters and scenes automatically, so your stream stays family-friendly and within platform rules.</p>',
-      '<h1>بث GTA 6 <span class="g">بدون لقطات محرجة</span></h1><p class="lead">StreamSafe يشوف اللعب قبل المشاهدين بثانيتين أو ثلاث، ويغطي الشخصيات والمشاهد غير اللائقة تلقائيًا، عشان يبقى بثك نظيف ومناسب لكل العائلة ولقوانين المنصات.</p>')}
-{both('<a class="btn" href="#pricing">See plans</a><a class="btn alt" href="#how">How it works</a>',
-      '<a class="btn" href="#pricing">شوف الباقات</a><a class="btn alt" href="#how">طريقة العمل</a>')}
+{
+    both(
+        '<h1>Stream GTA 6 <span class="g">without the awkward moments</span></h1><p class="lead">StreamSafe watches your gameplay a couple of seconds ahead of your viewers and covers revealing characters and scenes automatically, so your stream stays family-friendly and within platform rules.</p>',
+        '<h1>بث GTA 6 <span class="g">بدون لقطات محرجة</span></h1><p class="lead">StreamSafe يشوف اللعب قبل المشاهدين بثانيتين أو ثلاث، ويغطي الشخصيات والمشاهد غير اللائقة تلقائيًا، عشان يبقى بثك نظيف ومناسب لكل العائلة ولقوانين المنصات.</p>',
+    )
+}
+{
+    both(
+        '<a class="btn" href="#pricing">See plans</a><a class="btn alt" href="#how">How it works</a>',
+        '<a class="btn" href="#pricing">شوف الباقات</a><a class="btn alt" href="#how">طريقة العمل</a>',
+    )
+}
 </div></div>
 
 <section id="features"><div class="wrap">
-{both('<h2>What you get</h2><p class="sub">A Windows app that sits between OBS and your streaming platform.</p>',
-      '<h2>وش تحصل</h2><p class="sub">برنامج ويندوز يشتغل بين OBS ومنصة البث.</p>')}
+{
+    both(
+        '<h2>What you get</h2><p class="sub">A Windows app that sits between OBS and your streaming platform.</p>',
+        '<h2>وش تحصل</h2><p class="sub">برنامج ويندوز يشتغل بين OBS ومنصة البث.</p>',
+    )
+}
 <div class="grid">
-<div class="card"><span class="ico">🛡️</span>{both("<h3>Real-time covering</h3><p>Revealing outfits are covered with a solid cloth layer; full scenes get a branded cover screen. No blur, nothing slips through.</p>",
-  "<h3>تغطية فورية</h3><p>الملابس غير المحتشمة تتغطى بطبقة قماش كاملة، والمشاهد الكاملة تتغطى بشاشة بشعارنا. بدون تمويه، وما يطلع شيء للمشاهدين.</p>")}</div>
-<div class="card"><span class="ico">⏱️</span>{both("<h3>Short safety delay</h3><p>A 2–3 second delay, chosen automatically for your PC, gives the app time to decide before anything reaches viewers. Game, camera and mic stay in sync.</p>",
-  "<h3>تأخير بسيط للأمان</h3><p>تأخير 2 إلى 3 ثواني يختاره البرنامج حسب جهازك، عشان يقرر قبل ما يوصل أي شيء للمشاهدين. اللعبة والكاميرا والمايك يبقون متزامنين.</p>")}</div>
-<div class="card"><span class="ico">📡</span>{both("<h3>All major platforms</h3><p>Twitch, Kick, YouTube, Facebook, X, Trovo and any custom RTMP/RTMPS server. Paste your address and key; we fix common mistakes.</p>",
-  "<h3>كل المنصات المشهورة</h3><p>Twitch و Kick و YouTube و Facebook و X و Trovo وأي سيرفر RTMP/RTMPS. الصق الرابط والمفتاح، والبرنامج يصلح الأخطاء الشائعة.</p>")}</div>
-<div class="card"><span class="ico">🎞️</span>{both("<h3>Full quality</h3><p>Your resolution and frame rate are kept (up to 1440p and 60 fps). Not live? Record a clean, covered video file for YouTube instead.</p>",
-  "<h3>نفس الجودة</h3><p>الدقة وعدد الإطارات تبقى مثل ما هي (لين 1440p و 60 إطار). ما تبث مباشر؟ سجّل فيديو نظيف ومغطى وارفعه على يوتيوب.</p>")}</div>
-<div class="card"><span class="ico">🎮</span>{both("<h3>PC and console</h3><p>Works with PC gameplay and with PlayStation / Xbox through a capture card into OBS.</p>",
-  "<h3>بي سي وبلايستيشن</h3><p>يشتغل مع اللعب على البي سي، ومع البلايستيشن والإكس بوكس عن طريق كارت التصوير وOBS.</p>")}</div>
-<div class="card"><span class="ico">🔒</span>{both("<h3>Runs on your PC</h3><p>Your video is processed locally on your own graphics card. It is never uploaded to us.</p>",
-  "<h3>يشتغل على جهازك</h3><p>الفيديو يتعالج على كرت الشاشة حقك، وما ينرفع لنا أبدًا.</p>")}</div>
+<div class="card"><span class="ico">🛡️</span>{
+    both(
+        "<h3>Real-time covering</h3><p>Revealing outfits are covered with a solid cloth layer; full scenes get a branded cover screen. No blur, nothing slips through.</p>",
+        "<h3>تغطية فورية</h3><p>الملابس غير المحتشمة تتغطى بطبقة قماش كاملة، والمشاهد الكاملة تتغطى بشاشة بشعارنا. بدون تمويه، وما يطلع شيء للمشاهدين.</p>",
+    )
+}</div>
+<div class="card"><span class="ico">⏱️</span>{
+    both(
+        "<h3>Short safety delay</h3><p>A 2–3 second delay, chosen automatically for your PC, gives the app time to decide before anything reaches viewers. Game, camera and mic stay in sync.</p>",
+        "<h3>تأخير بسيط للأمان</h3><p>تأخير 2 إلى 3 ثواني يختاره البرنامج حسب جهازك، عشان يقرر قبل ما يوصل أي شيء للمشاهدين. اللعبة والكاميرا والمايك يبقون متزامنين.</p>",
+    )
+}</div>
+<div class="card"><span class="ico">📡</span>{
+    both(
+        "<h3>All major platforms</h3><p>Twitch, Kick, YouTube, Facebook, X, Trovo and any custom RTMP/RTMPS server. Paste your address and key; we fix common mistakes.</p>",
+        "<h3>كل المنصات المشهورة</h3><p>Twitch و Kick و YouTube و Facebook و X و Trovo وأي سيرفر RTMP/RTMPS. الصق الرابط والمفتاح، والبرنامج يصلح الأخطاء الشائعة.</p>",
+    )
+}</div>
+<div class="card"><span class="ico">🎞️</span>{
+    both(
+        "<h3>Full quality</h3><p>Your resolution and frame rate are kept (up to 1440p and 60 fps). Not live? Record a clean, covered video file for YouTube instead.</p>",
+        "<h3>نفس الجودة</h3><p>الدقة وعدد الإطارات تبقى مثل ما هي (لين 1440p و 60 إطار). ما تبث مباشر؟ سجّل فيديو نظيف ومغطى وارفعه على يوتيوب.</p>",
+    )
+}</div>
+<div class="card"><span class="ico">🎮</span>{
+    both(
+        "<h3>PC and console</h3><p>Works with PC gameplay and with PlayStation / Xbox through a capture card into OBS.</p>",
+        "<h3>بي سي وبلايستيشن</h3><p>يشتغل مع اللعب على البي سي، ومع البلايستيشن والإكس بوكس عن طريق كارت التصوير وOBS.</p>",
+    )
+}</div>
+<div class="card"><span class="ico">🔒</span>{
+    both(
+        "<h3>Runs on your PC</h3><p>Your video is processed locally on your own graphics card. It is never uploaded to us.</p>",
+        "<h3>يشتغل على جهازك</h3><p>الفيديو يتعالج على كرت الشاشة حقك، وما ينرفع لنا أبدًا.</p>",
+    )
+}</div>
 </div></div></section>
 
 <section id="how"><div class="wrap">
-{both('<h2>How it works</h2><p class="sub">Set up once in about five minutes.</p>', '<h2>طريقة العمل</h2><p class="sub">تجهزه مرة وحدة في حوالي خمس دقايق.</p>')}
+{
+    both(
+        '<h2>How it works</h2><p class="sub">Set up once in about five minutes.</p>',
+        '<h2>طريقة العمل</h2><p class="sub">تجهزه مرة وحدة في حوالي خمس دقايق.</p>',
+    )
+}
 <ol class="steps">
-<li>{both("<strong>Install</strong><br>Download StreamSafe for Windows and enter your licence key.", "<strong>ثبّت</strong><br>حمّل StreamSafe على ويندوز وحط مفتاح الاشتراك.")}</li>
-<li>{both("<strong>Connect</strong><br>Pick your platform and paste your stream key. The app shows the address to put in OBS.", "<strong>اربط</strong><br>اختر منصتك والصق مفتاح البث. البرنامج يعطيك العنوان اللي تحطه في OBS.")}</li>
-<li>{both("<strong>Go live</strong><br>Press Start in StreamSafe, then Start Streaming in OBS.", "<strong>ابدأ البث</strong><br>اضغط تشغيل في StreamSafe، وبعدها ابدأ البث في OBS.")}</li>
-<li>{both("<strong>Play</strong><br>StreamSafe covers what needs covering. If anything goes wrong, it covers the whole screen rather than risk it.", "<strong>العب</strong><br>StreamSafe يغطي اللي يحتاج تغطية. ولو صار أي خلل يغطي الشاشة كاملة بدل ما يخاطر.")}</li>
+<li>{
+    both(
+        "<strong>Install</strong><br>Download StreamSafe for Windows and enter your licence key.",
+        "<strong>ثبّت</strong><br>حمّل StreamSafe على ويندوز وحط مفتاح الاشتراك.",
+    )
+}</li>
+<li>{
+    both(
+        "<strong>Connect</strong><br>Pick your platform and paste your stream key. The app shows the address to put in OBS.",
+        "<strong>اربط</strong><br>اختر منصتك والصق مفتاح البث. البرنامج يعطيك العنوان اللي تحطه في OBS.",
+    )
+}</li>
+<li>{
+    both(
+        "<strong>Go live</strong><br>Press Start in StreamSafe, then Start Streaming in OBS.",
+        "<strong>ابدأ البث</strong><br>اضغط تشغيل في StreamSafe، وبعدها ابدأ البث في OBS.",
+    )
+}</li>
+<li>{
+    both(
+        "<strong>Play</strong><br>StreamSafe covers what needs covering. If anything goes wrong, it covers the whole screen rather than risk it.",
+        "<strong>العب</strong><br>StreamSafe يغطي اللي يحتاج تغطية. ولو صار أي خلل يغطي الشاشة كاملة بدل ما يخاطر.",
+    )
+}</li>
 </ol>
-{both('<p class="note">Requirements: Windows 10/11 (64-bit), OBS Studio, NVIDIA GeForce RTX graphics card recommended.</p>',
-      '<p class="note">المتطلبات: ويندوز 10 أو 11 (64 بت)، برنامج OBS Studio، ويُنصح بكرت شاشة NVIDIA GeForce RTX.</p>')}
+{
+    both(
+        '<p class="note">Requirements: Windows 10/11 (64-bit), OBS Studio, NVIDIA GeForce RTX graphics card recommended.</p>',
+        '<p class="note">المتطلبات: ويندوز 10 أو 11 (64 بت)، برنامج OBS Studio، ويُنصح بكرت شاشة NVIDIA GeForce RTX.</p>',
+    )
+}
 </div></section>
 
 <section id="pricing"><div class="wrap">
-{both('<h2>Pricing</h2><p class="sub">Monthly subscription. Cancel any time.</p>', '<h2>الأسعار</h2><p class="sub">اشتراك شهري، تقدر تلغيه في أي وقت.</p>')}
+{
+    both(
+        '<h2>Pricing</h2><p class="sub">Monthly subscription. Cancel any time.</p>',
+        '<h2>الأسعار</h2><p class="sub">اشتراك شهري، تقدر تلغيه في أي وقت.</p>',
+    )
+}
 <div class="price">
 <div class="plan">
-{both(f'<h3>Basic</h3><p class="amount">{BASIC} SAR <small>/ month</small></p><ul><li>Real-time covering for live streams and recordings</li><li>All platforms and custom RTMP</li><li>Automatic 2–3 s delay</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
-      f'<h3>الأساسية</h3><p class="amount">{BASIC} ريال <small>/ شهريًا</small></p><ul><li>تغطية فورية للبث المباشر والتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>تأخير تلقائي 2–3 ثواني</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>')}
+{
+    both(
+        f'<h3>Basic</h3><p class="amount">{BASIC} SAR <small>/ month</small></p><ul><li>Real-time covering for live streams and recordings</li><li>All platforms and custom RTMP</li><li>Automatic 2–3 s delay</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
+        f'<h3>الأساسية</h3><p class="amount">{BASIC} ريال <small>/ شهريًا</small></p><ul><li>تغطية فورية للبث المباشر والتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>تأخير تلقائي 2–3 ثواني</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
+    )
+}
 </div>
 <div class="plan pro">
-{both(f'<h3>Pro</h3><p class="amount">{PRO} SAR <small>/ month</small></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen</li><li>Priority support</li><li>One PC</li></ul>',
-      f'<h3>برو</h3><p class="amount">{PRO} ريال <small>/ شهريًا</small></p><ul><li>كل مزايا الباقة الأساسية</li><li>شعارك الخاص على شاشة التغطية</li><li>دعم بأولوية</li><li>جهاز واحد</li></ul>')}
+{
+    both(
+        f'<h3>Pro</h3><p class="amount">{PRO} SAR <small>/ month</small></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen</li><li>Priority support</li><li>One PC</li></ul>',
+        f'<h3>برو</h3><p class="amount">{PRO} ريال <small>/ شهريًا</small></p><ul><li>كل مزايا الباقة الأساسية</li><li>شعارك الخاص على شاشة التغطية</li><li>دعم بأولوية</li><li>جهاز واحد</li></ul>',
+    )
+}
 </div>
 </div>
-{both('<p class="note">Billed monthly in Saudi riyals (shown in your local currency at checkout where available); renews automatically until cancelled. Taxes may be added at checkout depending on your country. Payments are processed by Dodo Payments, our Merchant of Record. See <a href="/refund.html">Refund &amp; Cancellation</a>.</p>',
-      '<p class="note">الدفع شهري بالريال السعودي (وقد يظهر بعملتك المحلية عند الدفع)، ويتجدد تلقائيًا لين تلغيه. قد تُضاف ضرائب حسب بلدك عند الدفع. المدفوعات تتم عن طريق Dodo Payments بصفتها البائع المسجّل (Merchant of Record). اطلع على <a href="/refund.html">سياسة الاسترداد والإلغاء</a>.</p>')}
+{
+    both(
+        '<p class="note">Billed monthly in Saudi riyals (shown in your local currency at checkout where available); renews automatically until cancelled. Taxes may be added at checkout depending on your country. Payments are processed by Dodo Payments, our Merchant of Record. See <a href="/refund.html">Refund &amp; Cancellation</a>.</p>',
+        '<p class="note">الدفع شهري بالريال السعودي (وقد يظهر بعملتك المحلية عند الدفع)، ويتجدد تلقائيًا لين تلغيه. قد تُضاف ضرائب حسب بلدك عند الدفع. المدفوعات تتم عن طريق Dodo Payments بصفتها البائع المسجّل (Merchant of Record). اطلع على <a href="/refund.html">سياسة الاسترداد والإلغاء</a>.</p>',
+    )
+}
 </div></section>
 
 <section><div class="wrap">
-{both(f'<h2>Questions?</h2><p class="sub">Email us at <a href="mailto:{EMAIL}">{EMAIL}</a>. We usually reply within 2 business days.</p>',
-      f'<h2>عندك سؤال؟</h2><p class="sub">راسلنا على <a href="mailto:{EMAIL}">{EMAIL}</a>، وعادةً نرد خلال يومين عمل.</p>')}
+{
+    both(
+        f'<h2>Questions?</h2><p class="sub">Email us at <a href="mailto:{EMAIL}">{EMAIL}</a>. We usually reply within 2 business days.</p>',
+        f'<h2>عندك سؤال؟</h2><p class="sub">راسلنا على <a href="mailto:{EMAIL}">{EMAIL}</a>، وعادةً نرد خلال يومين عمل.</p>',
+    )
+}
 </div></section>
 """
 
@@ -122,7 +223,10 @@ def doc(title_en, title_ar, en, ar):
 </div>"""
 
 
-TERMS = doc("Terms of Service", "شروط الاستخدام", f"""
+TERMS = doc(
+    "Terms of Service",
+    "شروط الاستخدام",
+    f"""
 <p>These terms apply to the StreamSafe Windows application, its website and its subscriptions ("StreamSafe", "we", "us"). StreamSafe is operated by an independent developer based in Saudi Arabia. By buying a subscription or using the app you agree to these terms.</p>
 <h2>1. The service</h2>
 <p>StreamSafe is software that runs on your own PC. It delays your stream by a few seconds and automatically covers characters and scenes it judges to be revealing in Grand Theft Auto VI gameplay before the video is sent to your streaming platform or saved to a file.</p>
@@ -144,7 +248,8 @@ TERMS = doc("Terms of Service", "شروط الاستخدام", f"""
 <p>StreamSafe is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive. Grand Theft Auto and GTA are their trademarks.</p>
 <h2>10. Changes and contact</h2>
 <p>We may update these terms and will post the new version here. Questions: <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
-""", f"""
+""",
+    f"""
 <p>هذه الشروط تنطبق على برنامج StreamSafe لويندوز وموقعه واشتراكاته ("StreamSafe" أو "نحن"). يدير StreamSafe مطوّر مستقل مقيم في المملكة العربية السعودية. بشرائك اشتراكًا أو استخدامك البرنامج فأنت توافق على هذه الشروط.</p>
 <h2>1. الخدمة</h2>
 <p>StreamSafe برنامج يشتغل على جهازك. يؤخر البث بضع ثوانٍ ويغطي تلقائيًا الشخصيات والمشاهد غير اللائقة في لعبة Grand Theft Auto VI قبل إرسال الفيديو لمنصة البث أو حفظه في ملف.</p>
@@ -166,9 +271,13 @@ TERMS = doc("Terms of Service", "شروط الاستخدام", f"""
 <p>StreamSafe ليس تابعًا لشركة Rockstar Games أو Take-Two Interactive ولا معتمدًا منهما. Grand Theft Auto و GTA علامات تجارية مملوكة لهما.</p>
 <h2>10. التعديلات والتواصل</h2>
 <p>قد نعدّل هذه الشروط وننشر النسخة الجديدة هنا. للأسئلة: <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
-""")
+""",
+)
 
-PRIVACY = doc("Privacy Policy", "سياسة الخصوصية", f"""
+PRIVACY = doc(
+    "Privacy Policy",
+    "سياسة الخصوصية",
+    f"""
 <p>This policy explains what information StreamSafe handles and why.</p>
 <h2>Your video and audio stay on your PC</h2>
 <p>StreamSafe processes your gameplay, camera and microphone locally on your own computer. We never receive, upload, store or watch your video or audio. It goes only to the streaming platform or file you choose.</p>
@@ -185,7 +294,8 @@ PRIVACY = doc("Privacy Policy", "سياسة الخصوصية", f"""
 <p>We don't sell your data, show ads, or use tracking cookies on this website.</p>
 <h2>Retention and your rights</h2>
 <p>We keep subscription records for as long as your subscription is active and as long as the law requires afterwards. You can ask us to access, correct or delete your information at <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
-""", f"""
+""",
+    f"""
 <p>هذه السياسة توضح وش المعلومات اللي يتعامل معها StreamSafe وليش.</p>
 <h2>الفيديو والصوت يبقون على جهازك</h2>
 <p>StreamSafe يعالج اللعب والكاميرا والمايك على جهازك فقط. ما نستلم الفيديو أو الصوت ولا نرفعه ولا نحفظه ولا نشوفه أبدًا، ويروح فقط للمنصة أو الملف اللي تختاره.</p>
@@ -202,9 +312,13 @@ PRIVACY = doc("Privacy Policy", "سياسة الخصوصية", f"""
 <p>ما نبيع بياناتك، وما نعرض إعلانات، وما نستخدم كوكيز تتبع في هذا الموقع.</p>
 <h2>مدة الحفظ وحقوقك</h2>
 <p>نحتفظ بسجلات الاشتراك طول مدة اشتراكك وبعدها بالقدر اللي يطلبه النظام. تقدر تطلب الاطلاع على بياناتك أو تصحيحها أو حذفها على <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
-""")
+""",
+)
 
-REFUND = doc("Refund & Cancellation Policy", "سياسة الاسترداد والإلغاء", f"""
+REFUND = doc(
+    "Refund & Cancellation Policy",
+    "سياسة الاسترداد والإلغاء",
+    f"""
 <h2>Cancel any time</h2>
 <p>You can cancel your subscription at any time from the link in your purchase email (customer portal) or by emailing <a href="mailto:{EMAIL}">{EMAIL}</a>. After cancelling you keep access until the end of the month you already paid for, and you will not be charged again.</p>
 <h2>7-day refund on your first payment</h2>
@@ -213,7 +327,8 @@ REFUND = doc("Refund & Cancellation Policy", "سياسة الاسترداد وا
 <p>Monthly renewals are not refundable once the new month has started, except if you forgot to cancel and email us within 48 hours of the renewal without having used the app since, or where the law requires a refund.</p>
 <h2>How refunds are paid</h2>
 <p>Refunds are issued by Dodo Payments, our Merchant of Record, to the original payment method. They usually appear within 5–10 business days depending on your bank. Your licence key stops working when the refund is issued.</p>
-""", f"""
+""",
+    f"""
 <h2>إلغاء في أي وقت</h2>
 <p>تقدر تلغي اشتراكك في أي وقت من الرابط الموجود في إيميل الشراء (بوابة العميل) أو بمراسلتنا على <a href="mailto:{EMAIL}">{EMAIL}</a>. بعد الإلغاء يبقى اشتراكك شغّال لين نهاية الشهر اللي دفعته، وما ينخصم منك مرة ثانية.</p>
 <h2>استرداد خلال 7 أيام لأول دفعة</h2>
@@ -222,17 +337,23 @@ REFUND = doc("Refund & Cancellation Policy", "سياسة الاسترداد وا
 <p>التجديد الشهري ما يُسترد بعد بداية الشهر الجديد، إلا إذا نسيت تلغي وراسلتنا خلال 48 ساعة من التجديد وما استخدمت البرنامج بعده، أو إذا كان النظام يلزم بالاسترداد.</p>
 <h2>طريقة الاسترداد</h2>
 <p>الاسترداد يتم عن طريق Dodo Payments (البائع المسجّل) إلى نفس وسيلة الدفع، وعادةً يظهر خلال 5 إلى 10 أيام عمل حسب البنك. مفتاح الاشتراك يتوقف بعد الاسترداد.</p>
-""")
+""",
+)
 
-CONTACT = doc("Contact", "تواصل معنا", f"""
+CONTACT = doc(
+    "Contact",
+    "تواصل معنا",
+    f"""
 <p>Email: <a href="mailto:{EMAIL}">{EMAIL}</a></p>
 <p>We reply within 2 business days (Sunday–Thursday, Saudi time). For billing questions, please include the email you used to subscribe. Please never send us your stream key or card details.</p>
 <p>StreamSafe is operated by an independent developer based in Saudi Arabia.</p>
-""", f"""
+""",
+    f"""
 <p>الإيميل: <a href="mailto:{EMAIL}">{EMAIL}</a></p>
 <p>نرد خلال يومين عمل (الأحد إلى الخميس بتوقيت السعودية). لأسئلة الدفع اكتب الإيميل اللي اشتركت فيه. لا ترسل لنا أبدًا مفتاح البث أو بيانات بطاقتك.</p>
 <p>يدير StreamSafe مطوّر مستقل مقيم في المملكة العربية السعودية.</p>
-""")
+""",
+)
 
 PAGES = {
     "index.html": ("StreamSafe – keep your GTA 6 stream clean", INDEX),
