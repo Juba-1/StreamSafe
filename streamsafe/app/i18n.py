@@ -150,11 +150,13 @@ TEXT: dict[str, tuple[str, str]] = {
     "bad_delay": ("التأخير لازم يكون بين 0.5 و 10 ثواني.", "The delay must be between 0.5 and 10 seconds."),
     "bad_key": ("اكتب مفتاح البث (بدون مسافات).", "Enter the stream key (no spaces)."),
     # --- run ---
+    "support_title": ("♥  عاجبك StreamSafe؟", "♥  Enjoying StreamSafe?"),
     "support_text": (
-        "StreamSafe مجاني وقت إطلاق اللعبة. إذا عجبك وحاب تساعدنا نكمل، ادعمنا ولك الشكر.",
-        "StreamSafe is free during the GTA 6 launch. If you like it and want to help us keep going, you can support us. Thank you!",
+        "البرنامج مجاني وقت إطلاق GTA 6. لو حاب تساعدنا نكمل ونطوّره، دعمك ولو بقهوة يفرق معنا كثير.",
+        "It's free for the GTA 6 launch. If you'd like to help us keep improving it, even a coffee means a lot to us.",
     ),
-    "support_button": ("ادعمنا", "Support us"),
+    "support_button": ("ادعمنا على Ko-fi", "Support us on Ko-fi"),
+    "support_sub": ("يفتح صفحة الدعم في المتصفح", "Opens our support page"),
     "start_sub": ("يشغّل التغطية ويبدأ البث", "Covers and starts your stream"),
     "stop_sub": ("يوقف البث بأمان", "Ends the stream safely"),
     "quick_title": ("جهّز بثك في ٣ خطوات", "Set up your stream in 3 steps"),
@@ -225,7 +227,7 @@ TEXT: dict[str, tuple[str, str]] = {
     "plat_youtube": ("يوتيوب YouTube", "YouTube"),
     "plat_tiktok": ("تيك توك TikTok", "TikTok"),
     "plat_facebook": ("فيسبوك Facebook", "Facebook"),
-    "plat_custom": ("منصة ثانية (أكتب العنوان)", "Another platform (type the address)"),
+    "plat_custom": ("منصة ثانية (اكتب العنوان)", "Another platform (type the address)"),
     "plat_hint_kick": (
         "من كيك: لوحة التحكم > الإعدادات > Stream URL & Key. الصق المفتاح بس (والعنوان لو يختلف).",
         "On Kick: Dashboard > Settings > Stream URL & Key. Paste the key (and the URL if yours differs).",

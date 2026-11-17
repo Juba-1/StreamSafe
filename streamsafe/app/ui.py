@@ -47,6 +47,7 @@ STATUS_KEYS = {
 MARK = {"ok": ("●", "#1b7f3b"), "warn": ("▲", "#b26a00"), "fail": ("■", "#b3261e")}
 # The palette of the logo and the website: night indigo, the navy of the cover cloth, dusk pink, warm sand.
 NIGHT, COVER, DUSK, LAGOON = "#120b2b", "#1e2a52", "#ff4fa3", "#0e8ea0"
+BLUSH = "#ffeef6"  # the support card
 SAND, SAND2, CARD, LINE, INK, MUTED = "#f4ede2", "#ebe1d1", "#ffffff", "#e6dccb", "#1b1530", "#6d6380"
 
 
@@ -225,6 +226,25 @@ class App(tk.Tk):
         kw.setdefault("wraplength", 560)
         return tk.Label(parent, text=text, **kw)
 
+    def collapsing(self, parent: tk.Misc, **kw) -> tk.Label:
+        """A message line that takes no room while it is empty (its own holder keeps its place in the window)."""
+        holder = tk.Frame(parent, bg=CARD, height=1)
+        holder.pack(fill="x")
+        lab = self.label(holder, "", **kw)
+        plain = lab.configure
+
+        def configure(cnf=None, **opts):  # type: ignore[no-untyped-def]
+            out = plain(cnf, **opts)
+            if "text" in opts:
+                if opts["text"]:
+                    self.pack_row(lab, fill="x")
+                else:
+                    lab.pack_forget()
+            return out
+
+        lab.configure = lab.config = configure  # type: ignore[method-assign]
+        return lab
+
     def pack_row(self, widget: tk.Widget, **kw) -> None:
         kw.setdefault("anchor", self.side)
         kw.setdefault("pady", 3)
@@ -327,8 +347,7 @@ class App(tk.Tk):
         self.badge.pack(fill="x")
         self.hint = self.label(h, "", fg=MUTED, pady=6)
         self.pack_row(self.hint, fill="x")
-        self.banner = self.label(h, "", fg="#b26a00", font=(FONT, 10, "bold"))
-        self.pack_row(self.banner, fill="x")
+        self.banner = self.collapsing(h, fg="#b26a00", font=(FONT, 10, "bold"))
         self.update_row = tk.Frame(h, bg=CARD)
         self.update_text = self.label(self.update_row, "", fg=LAGOON)
         self.update_btn = ttk.Button(self.update_row, text=self.tr("update_button"), command=self.apply_update)
@@ -339,8 +358,7 @@ class App(tk.Tk):
         self.stop_btn = Tile(row, self.tr("stop"), self.tr("stop_sub"), COVER, "white", self.on_stop)
         for b in (self.start_btn, self.stop_btn):
             b.pack(side=side, padx=(0, 6), expand=True, fill="x")
-        self.message = self.label(h, "", fg="#b3261e", font=(FONT, 10, "bold"))
-        self.pack_row(self.message, fill="x")
+        self.message = self.collapsing(h, fg="#b3261e", font=(FONT, 10, "bold"))
         # the two links while it runs: OBS -> us, us -> the platform (or the recording)
         self.link_box = tk.Frame(h, bg=SAND, padx=12, pady=8)
         self.lk_in = self.label(self.link_box, "", bg=SAND, font=(FONT, 10, "bold"), wraplength=520)
@@ -401,12 +419,15 @@ class App(tk.Tk):
         self.small(s3, self.tr("console_hint"))
 
         if release.SUPPORT_URL:  # launch period: free, with a friendly way to help
-            sup = tk.Frame(h, bg=SAND, padx=12, pady=10)
+            sup = tk.Frame(h, bg=BLUSH, padx=16, pady=12, highlightthickness=1, highlightbackground="#f6b6d6")
             sup.pack(fill="x", pady=(0, 10))
-            ttk.Button(sup, text=self.tr("support_button"), command=lambda: webbrowser.open(release.SUPPORT_URL)).pack(
-                side="left" if self.rtl else "right"
-            )
-            self.label(sup, self.tr("support_text"), bg=SAND, wraplength=420).pack(side=side, fill="x", expand=True)
+            tk.Label(sup, text=self.tr("support_title"), font=(FONT, 12, "bold"), bg=BLUSH, fg=INK).pack(anchor=self.side)
+            self.label(sup, self.tr("support_text"), bg=BLUSH, wraplength=520).pack(anchor=self.side, pady=(2, 8))
+            kofi = Tile(sup, self.tr("support_button"), self.tr("support_sub"), DUSK, "#1a0716",
+                        lambda: webbrowser.open(release.SUPPORT_URL))
+            kofi._title.configure(font=(FONT, 12, "bold"))
+            kofi.configure(padx=14, pady=6)
+            kofi.pack(anchor=self.side)
         foot = tk.Frame(h, bg=CARD)
         foot.pack(fill="x", pady=(4, 0))
         self.report_btn = ttk.Button(foot, text=self.tr("open_report"), command=self.open_report)
@@ -888,7 +909,7 @@ class App(tk.Tk):
             self.lk_copy.pack(anchor=self.side, pady=(4, 0))
         else:
             self.lk_copy.pack_forget()
-        self.link_box.pack(fill="x", pady=6, after=self.message)
+        self.link_box.pack(fill="x", pady=6, after=self.message.master)
 
     def format_warning(self) -> str:
         """When OBS sends more than the protection keeps (a bigger picture, more frames, or too low a bitrate to
