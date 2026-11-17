@@ -1,0 +1,31 @@
+name: site-media
+# Fetches the finished (already covered) promo video from the work store and makes small web copies + a contact sheet.
+on:
+  push:
+    branches: [site-media]
+jobs:
+  media:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - run: pip install -q "huggingface_hub>=0.25" && sudo apt-get install -y -qq ffmpeg >/dev/null
+      - name: download and shrink
+        env:
+          HF_TOKEN: ${{ secrets.HF_HEADS_TOKEN }}
+        run: |
+          python - <<'P'
+          import os
+          from huggingface_hub import hf_hub_download
+          hf_hub_download('juba-1/streamsafe-work', 'runs/promo4/gta6t1_promo.mp4', repo_type='dataset', token=os.environ['HF_TOKEN'], local_dir='in')
+          P
+          mkdir out
+          F=in/runs/promo4/gta6t1_promo.mp4
+          ffprobe -v error -show_entries format=duration:stream=width,height,r_frame_rate -of compact $F | tee out/info.txt
+          ffmpeg -nostdin -loglevel error -i $F -vf scale=1280:-2 -c:v libx264 -preset slow -crf 24 -an -movflags +faststart out/promo720.mp4
+          ffmpeg -nostdin -loglevel error -i $F -vf "fps=1/2,scale=320:-2,tile=6x8" -q:v 4 out/sheet_%02d.jpg
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-media
+          path: out/
+          retention-days: 3
