@@ -19,7 +19,7 @@ BUY_URL = "#pricing"  # header and hero buttons scroll to the plans
 # Launch period: the app is free to download, the plans start later (Dodo checkout once verified).
 LAUNCH_FREE = True
 DOWNLOAD_URL = "https://github.com/Juba-1/streamsafe-download/releases/latest/download/StreamSafe-Setup.exe"
-SUPPORT_URL = ""  # Ali's support page (Ko-fi / PayPal.me); the support box shows only when this is set
+SUPPORT_URL = "https://ko-fi.com/streamsafe"  # Ali's support page (Ko-fi / PayPal.me); the support box shows only when this is set
 CTA_HREF = DOWNLOAD_URL if LAUNCH_FREE else BUY_URL
 SITE = "https://streamsafe-sa.vercel.app"
 DODO_CHECKOUT = "https://test.checkout.dodopayments.com/buy"  # TEST MODE; becomes https://checkout.dodopayments.com/buy after verification
