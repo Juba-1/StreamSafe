@@ -206,3 +206,17 @@ ol.steps p { color: var(--muted); font-size: 15px; }
   .specs div { grid-template-columns: 1fr; gap: 2px; }
 }
 .plan > [data-l] { flex: 1; display: flex; flex-direction: column; }
+
+/* hero video */
+.monitor .screen video { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; }
+.pp { position: absolute; inset-block-end: 12px; inset-inline-end: 12px; background: rgb(0 0 0 / 0.6); color: #fff; border: 1px solid rgb(255 255 255 / 0.3); border-radius: 999px; padding: 6px 14px; font: 500 13px var(--body); cursor: pointer; }
+
+/* monthly / yearly switch: pure CSS through :has() */
+.period { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: #fff; margin-block-end: 24px; box-shadow: 0 1px 0 rgb(27 21 48 / 0.08); }
+.period input { position: absolute; opacity: 0; pointer-events: none; }
+.period label { padding: 9px 18px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: 15px; }
+.period input:checked + label { background: var(--ink); color: #fff; }
+.period input:focus-visible + label { outline: 3px solid var(--lagoon); outline-offset: 2px; }
+#pricing .y { display: none; }
+#pricing:has(#py:checked) .y { display: inline; }
+#pricing:has(#py:checked) .m { display: none; }

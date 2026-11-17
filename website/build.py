@@ -11,6 +11,8 @@ OUT = ROOT / "public"
 EMAIL = "streamsafe1@gmail.com"
 UPDATED_EN, UPDATED_AR = "17 November 2026", "17 نوفمبر 2026"
 BASIC, PRO = 49, 99  # SAR per month
+YEAR_OFF = 0.15  # yearly plan: 15% less than 12 months
+BASIC_Y, PRO_Y = int(BASIC * 12 * (1 - YEAR_OFF)), int(PRO * 12 * (1 - YEAR_OFF))  # 499, 1009
 TRIAL_DAYS = 3
 BUY_URL = "#pricing"  # becomes the Dodo checkout link once the products exist
 HAS_VIDEO = (ROOT / "media" / "demo.mp4").is_file()
@@ -109,12 +111,17 @@ shots_html = "".join(
     for n, en, ar in SHOTS
 )
 
-video_html = (
-    """<div class="reel"><video controls playsinline muted loop loading="lazy" preload="metadata" poster="/media/roof.webp" width="1280" height="720">
-<source src="/media/demo.mp4" type="video/mp4"></video></div>"""
+SCREEN = (
+    """<video id="hero-video" autoplay muted loop playsinline preload="auto" poster="/media/poster.webp" width="1280" height="720"
+ aria-label="GTA 6 trailer after StreamSafe: swimsuits and outfits covered with a navy shirt carrying the StreamSafe logo"><source src="/media/demo.mp4" type="video/mp4"></video>
+<button class="pp" type="button" aria-pressed="false"><span data-l="en">Pause</span><span data-l="ar">إيقاف</span></button>"""
     if HAS_VIDEO
-    else ""
+    else """<img src="/media/roof.webp" alt="GTA 6 trailer scene after StreamSafe: swimsuits covered with a navy shirt carrying the StreamSafe logo" width="960" height="540" fetchpriority="high">
+<img src="/media/night.webp" alt="" width="960" height="540">
+<img src="/media/club.webp" alt="" width="960" height="540">
+<img src="/media/store.webp" alt="" width="960" height="540">"""
 )
+
 
 HOME = f"""
 <section class="hero"><div class="wrap">
@@ -139,10 +146,7 @@ HOME = f"""
 </div>
 <figure class="monitor">
 <div class="screen">
-<img src="/media/roof.webp" alt="GTA 6 trailer scene after StreamSafe: swimsuits covered with a navy shirt carrying the StreamSafe logo" width="960" height="540" fetchpriority="high">
-<img src="/media/night.webp" alt="" width="960" height="540">
-<img src="/media/club.webp" alt="" width="960" height="540">
-<img src="/media/store.webp" alt="" width="960" height="540">
+{SCREEN}
 <div class="live"><b>LIVE</b><span>StreamSafe</span></div>
 </div>
 <div class="lane"><span>{b("Your game", "لعبتك", "span")}</span><span class="bar"><i></i></span><span>{
@@ -166,7 +170,6 @@ HOME = f"""
     )
 }
 </div>
-{video_html}
 <div class="shots">{shots_html}</div>
 {
     b(
@@ -293,12 +296,16 @@ HOME = f"""
         f"<h2>الأسعار</h2><p>كل باقة تبدأ بتجربة مجانية {TRIAL_DAYS} أيام. إذا ألغيت قبل ما تخلص ما تدفع شيء.</p>",
     )
 }</div>
+<div class="period" role="radiogroup">
+<input type="radio" name="period" id="pm" checked><label for="pm">{b("Monthly", "شهري", "span")}</label>
+<input type="radio" name="period" id="py"><label for="py">{b("Yearly, save 15%", "سنوي، وفّر 15%", "span")}</label>
+</div>
 <div class="plans">
 <div class="plan">
 {
     b(
-        f'<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price">{BASIC} <small>SAR / month</small></p><p class="per">after the {TRIAL_DAYS}-day free trial</p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
-        f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price">{BASIC} <small>ريال / شهريًا</small></p><p class="per">بعد التجربة المجانية {TRIAL_DAYS} أيام</p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
+        f'<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price"><span class="m">{BASIC} <small>SAR / month</small></span><span class="y">{BASIC_Y:,} <small>SAR / year</small></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{BASIC * 12 - BASIC_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
+        f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span class="m">{BASIC} <small>ريال / شهريًا</small></span><span class="y">{BASIC_Y:,} <small>ريال / سنويًا</small></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {BASIC * 12 - BASIC_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
     )
 }
 <a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة", "span")}</a>
@@ -306,8 +313,8 @@ HOME = f"""
 <div class="plan pro">
 {
     b(
-        f'<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price">{PRO} <small>SAR / month</small></p><p class="per">after the {TRIAL_DAYS}-day free trial</p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen and the cloth</li><li>Priority support by email</li><li>One PC</li></ul>',
-        f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price">{PRO} <small>ريال / شهريًا</small></p><p class="per">بعد التجربة المجانية {TRIAL_DAYS} أيام</p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
+        f'<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span class="m">{PRO} <small>SAR / month</small></span><span class="y">{PRO_Y:,} <small>SAR / year</small></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{PRO * 12 - PRO_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen and the cloth</li><li>Priority support by email</li><li>One PC</li></ul>',
+        f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span class="m">{PRO} <small>ريال / شهريًا</small></span><span class="y">{PRO_Y:,} <small>ريال / سنويًا</small></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {PRO * 12 - PRO_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
     )
 }
 <a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة", "span")}</a>
@@ -430,7 +437,7 @@ TERMS = doc(
 <h2>3. Free trial</h2>
 <p>New customers get a {TRIAL_DAYS}-day free trial. A payment card is required to start it. If you do not cancel before the trial ends, your subscription starts automatically and the first monthly payment is charged. One trial per person, payment card and PC; we may refuse or end trials that are used to get repeated free access.</p>
 <h2>4. Subscriptions and payment</h2>
-<p>Subscriptions are billed monthly in advance at the price on our <a href="/#pricing">pricing section</a> and renew automatically until cancelled. {MOR_EN} If we change prices, the new price applies from your next billing period and we tell you by email beforehand.</p>
+<p>Subscriptions are billed monthly or yearly in advance, as you choose, at the price on our <a href="/#pricing">pricing section</a> and renew automatically for the same period until cancelled. {MOR_EN} If we change prices, the new price applies from your next billing period and we tell you by email beforehand.</p>
 <h2>5. Licence</h2>
 <p>Each subscription gives you a personal, non-transferable licence key for one PC at a time. You can move it to another PC by deactivating it in the app. You may not share, resell, copy, reverse engineer or redistribute the app or its models, or try to bypass the licence check.</p>
 <h2>6. Cancellation and refunds</h2>
@@ -455,7 +462,7 @@ TERMS = doc(
 <h2>3. التجربة المجانية</h2>
 <p>العملاء الجدد يحصلون على تجربة مجانية {TRIAL_DAYS} أيام، ويلزم إدخال بطاقة دفع لبدئها. إذا ما ألغيت قبل نهاية التجربة يبدأ اشتراكك تلقائيًا وتُخصم أول دفعة شهرية. تجربة واحدة لكل شخص وبطاقة دفع وجهاز، ويحق لنا رفض أو إنهاء التجارب المستخدمة للحصول على استخدام مجاني متكرر.</p>
 <h2>4. الاشتراكات والدفع</h2>
-<p>الاشتراك يُدفع شهريًا مقدمًا بالسعر الظاهر في <a href="/#pricing">قسم الأسعار</a> ويتجدد تلقائيًا لين تلغيه. {MOR_AR} إذا تغيرت الأسعار فالسعر الجديد يطبق من فترة الفوترة التالية ونبلغك بالإيميل قبلها.</p>
+<p>الاشتراك يُدفع مقدمًا شهريًا أو سنويًا حسب اختيارك بالسعر الظاهر في <a href="/#pricing">قسم الأسعار</a> ويتجدد تلقائيًا لنفس المدة لين تلغيه. {MOR_AR} إذا تغيرت الأسعار فالسعر الجديد يطبق من فترة الفوترة التالية ونبلغك بالإيميل قبلها.</p>
 <h2>5. الترخيص</h2>
 <p>كل اشتراك يعطيك مفتاح ترخيص شخصي غير قابل للتحويل لجهاز واحد في نفس الوقت، وتقدر تنقله لجهاز ثاني بإلغاء تفعيله من البرنامج. لا يجوز مشاركة البرنامج أو نماذجه أو بيعها أو نسخها أو الهندسة العكسية لها أو تجاوز فحص الاشتراك.</p>
 <h2>6. الإلغاء والاسترداد</h2>
@@ -520,9 +527,9 @@ REFUND = doc(
 <p>Every plan starts with a {TRIAL_DAYS}-day free trial so you can test StreamSafe on your own PC and setup. A payment card is required to start it. Nothing is charged during the trial.</p>
 <p>If you do not cancel before the trial ends, your subscription starts automatically and the first month is charged. One free trial per person, payment card and PC.</p>
 <h2>Cancel any time</h2>
-<p>Cancel from the link in your purchase email (customer portal) or by emailing <a href="mailto:{EMAIL}">{EMAIL}</a>. Cancel during the trial and you pay nothing. Cancel later and you keep access until the end of the month you already paid for; you will not be charged again.</p>
+<p>Cancel from the link in your purchase email (customer portal) or by emailing <a href="mailto:{EMAIL}">{EMAIL}</a>. Cancel during the trial and you pay nothing. Cancel later and you keep access until the end of the month or year you already paid for; you will not be charged again.</p>
 <h2>Refunds</h2>
-<p>Because the free trial lets you try StreamSafe fully before paying, payments are not refunded once charged, including partial months. We do refund in full when:</p>
+<p>Because the free trial lets you try StreamSafe fully before paying, payments are not refunded once charged, including partial months or years. We do refund in full when:</p>
 <ul><li>you were charged twice or charged by mistake;</li><li>StreamSafe could not work on your PC at all and our support could not fix it within 7 days of the charge;</li><li>the law where you live requires a refund.</li></ul>
 <p>Refunds are paid by Dodo Payments, our Merchant of Record, to the original payment method, usually within 5–10 business days. Your licence key stops working when the refund is issued.</p>
 """,
@@ -531,9 +538,9 @@ REFUND = doc(
 <p>كل باقة تبدأ بتجربة مجانية {TRIAL_DAYS} أيام عشان تجرب StreamSafe على جهازك وإعداداتك. يلزم إدخال بطاقة دفع لبدء التجربة، وما ينخصم شيء خلالها.</p>
 <p>إذا ما ألغيت قبل نهاية التجربة يبدأ اشتراكك تلقائيًا ويُخصم أول شهر. تجربة مجانية وحدة لكل شخص وبطاقة دفع وجهاز.</p>
 <h2>إلغاء في أي وقت</h2>
-<p>تقدر تلغي من الرابط اللي في إيميل الشراء (بوابة العميل) أو بمراسلتنا على <a href="mailto:{EMAIL}">{EMAIL}</a>. إذا ألغيت خلال التجربة ما تدفع شيء، وإذا ألغيت بعدها يبقى اشتراكك شغّال لين نهاية الشهر المدفوع وما ينخصم منك مرة ثانية.</p>
+<p>تقدر تلغي من الرابط اللي في إيميل الشراء (بوابة العميل) أو بمراسلتنا على <a href="mailto:{EMAIL}">{EMAIL}</a>. إذا ألغيت خلال التجربة ما تدفع شيء، وإذا ألغيت بعدها يبقى اشتراكك شغّال لين نهاية الشهر أو السنة المدفوعة وما ينخصم منك مرة ثانية.</p>
 <h2>الاسترداد</h2>
-<p>لأن التجربة المجانية تخليك تجرب StreamSafe كامل قبل الدفع، المبالغ ما تُسترد بعد خصمها، ولا يوجد استرداد لجزء من الشهر. ونرجع المبلغ كامل في الحالات التالية:</p>
+<p>لأن التجربة المجانية تخليك تجرب StreamSafe كامل قبل الدفع، المبالغ ما تُسترد بعد خصمها، ولا يوجد استرداد لجزء من الشهر أو السنة. ونرجع المبلغ كامل في الحالات التالية:</p>
 <ul><li>إذا انخصم منك مرتين أو انخصم بالغلط؛</li><li>إذا StreamSafe ما اشتغل على جهازك أبدًا وما قدر الدعم يحل المشكلة خلال 7 أيام من الخصم؛</li><li>إذا كان النظام في بلدك يلزم بالاسترداد.</li></ul>
 <p>الاسترداد يتم عن طريق Dodo Payments (البائع المسجّل) إلى نفس وسيلة الدفع، وعادةً خلال 5 إلى 10 أيام عمل. مفتاح الاشتراك يتوقف بعد الاسترداد.</p>
 """,
