@@ -60,7 +60,7 @@ def texts(widget):
 def test_arabic_is_the_default_and_laid_out_right_to_left(app):
     assert app.lang == "ar" and clean(app.badge.cget("text")) == "متوقف"
     assert app.hint.cget("anchor") == "e" and app.hint.cget("justify") == "right"
-    assert [clean(app.nb.tab(i, "text")) for i in range(3)] == ["الفحص", "الإعدادات", "الرئيسية"]  # first tab at the right
+    assert [clean(app.nb.tab(i, "text")) for i in range(3)] == ["الفحص", "إعدادات متقدمة", "الرئيسية"]  # first tab at the right
     assert clean(app.nb.tab(app.nb.select(), "text")) == "الرئيسية"
     assert i18n.t("ar", "start") in texts(app.home)
     assert clean(app.banner.cget("text")).startswith("نسخة تجريبية")
@@ -87,9 +87,9 @@ def test_key_is_masked_and_never_saved_to_settings(app):
             yield c
             yield from all_widgets(c)
 
-    entries = [w for w in all_widgets(app.sets) if isinstance(w, tk.Entry)]
+    entries = [w for w in [*all_widgets(app.sets), *all_widgets(app.home)] if isinstance(w, tk.Entry)]
     masked = [e for e in entries if str(e.cget("show")) == "•"]
-    assert len(masked) == 2  # the stream key and the subscription key
+    assert len(masked) == 2  # the stream key (Home) and the subscription key (Advanced)
     app._vars["key"].set("never_in_settings_123")
     app._vars["license_key"].set("licence_never_in_settings_456")
     app.collect()
@@ -148,7 +148,7 @@ def test_status_words_follow_the_engine(app, monkeypatch):
 
 
 def test_settings_offer_every_way_in_and_out(app):
-    t = " ".join(texts(app.sets))
+    t = " ".join(texts(app.sets) + texts(app.home))  # the everyday setup is on Home, the rest under Advanced
     for key in ("in_srt", "in_camera", "in_file", "out_rtmp", "out_record", "out_window", "test_link", "obs_guide"):
         assert clean(i18n.t("ar", key)) in t, key
 

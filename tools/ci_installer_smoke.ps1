@@ -9,7 +9,7 @@ param(
   [Parameter(Mandatory)] [string]$GuiExe,
   [Parameter(Mandatory)] [string]$AppGuid,
   [Parameter(Mandatory)] [string]$Version,
-  [Parameter(Mandatory)] [string]$Expires,
+  [string]$Expires = "",  # empty: a paid build that never expires
   [switch]$RealHeads
 )
 $ErrorActionPreference = "Stop"
@@ -66,7 +66,11 @@ $aboutText = (& $cli about --json | Out-String)
 Write-Host $aboutText
 $about = $aboutText | ConvertFrom-Json
 Check ($about.frozen -eq $true) "runs as the packaged program"
-Check ($about.expires -eq $Expires -and -not $about.expired -and $about.days_left -gt 0) "beta ends $($about.expires), $($about.days_left) days left"
+if ($Expires) {
+  Check ($about.expires -eq $Expires -and -not $about.expired -and $about.days_left -gt 0) "beta ends $($about.expires), $($about.days_left) days left"
+} else {
+  Check (-not $about.expires -and -not $about.expired) "no end date (paid build)"
+}
 Check ($about.ffmpeg -like "$installDir*") "FFmpeg in use is the bundled one: $($about.ffmpeg)"
 $tr = (& $cli translate-selftest | Out-String)
 Write-Host $tr

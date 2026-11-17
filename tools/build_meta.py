@@ -56,13 +56,13 @@ def file_version(base: str, build: int) -> tuple[int, int, int, int]:
     return nums[0], nums[1], nums[2], min(build, 65535)
 
 
-def stamp_build_info(today: dt.date, expires: dt.date, version: str) -> str:
+def stamp_build_info(today: dt.date, expires: dt.date | None, version: str) -> str:
     text = (
         '"""Facts of one build, written by ``tools/build_meta.py`` in the Windows build. From source both are empty:\n'
         'a developer\'s copy has no build date and never expires."""\n\n'
         f'VERSION = "{version}"  # the version with its build number\n'
         f'BUILD_DATE = "{today.isoformat()}"  # "YYYY-MM-DD"\n'
-        f'EXPIRES = "{expires.isoformat()}"  # "YYYY-MM-DD": the first day this beta build no longer starts a stream; "" = never\n'
+        f'EXPIRES = "{expires.isoformat() if expires else ""}"  # "YYYY-MM-DD": first day it no longer starts a stream; "" = never\n'
     )
     (ROOT / "streamsafe" / "app" / "build_info.py").write_text(text, encoding="utf-8")
     return text
@@ -70,14 +70,17 @@ def stamp_build_info(today: dt.date, expires: dt.date, version: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--days", type=int, default=release.BETA_DAYS, help="beta length in days from today")
+    ap.add_argument("--days", type=int, default=release.BETA_DAYS, help="beta length in days from today (0: never expires, the paid build)")
     ap.add_argument("--expires", help="expiry date YYYY-MM-DD (overrides --days)")
     ap.add_argument("--build", type=int, default=0, help="build number (the 4th part of the version)")
     ap.add_argument("--out", default="build")
     args = ap.parse_args(argv)
     today = dt.date.today()
-    expires = dt.date.fromisoformat(args.expires) if args.expires else today + dt.timedelta(days=args.days)
-    if expires <= today:
+    if args.expires:
+        expires: dt.date | None = dt.date.fromisoformat(args.expires)
+    else:
+        expires = today + dt.timedelta(days=args.days) if args.days > 0 else None  # 0: a paid build never expires
+    if expires is not None and expires <= today:
         print("the expiry date must be in the future", file=sys.stderr)
         return 2
     base = project_version()
@@ -95,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         (out / f"version_{exe}.txt").write_text(text, encoding="utf-8")
     facts = {
         "version": version,
-        "expires": expires.isoformat(),
+        "expires": expires.isoformat() if expires else "",
         "product": PRODUCT_NAME,
         "publisher": PUBLISHER,
         "cli_exe": CLI_EXE,

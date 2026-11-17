@@ -45,6 +45,42 @@ STATUS_KEYS = {
     engine.FAILED: ("st_failed", "st_hint_covered"),
 }
 MARK = {"ok": ("●", "#1b7f3b"), "warn": ("▲", "#b26a00"), "fail": ("■", "#b3261e")}
+# The palette of the logo and the website: night indigo, the navy of the cover cloth, dusk pink, warm sand.
+NIGHT, COVER, DUSK, LAGOON = "#120b2b", "#1e2a52", "#ff4fa3", "#0e8ea0"
+SAND, SAND2, CARD, LINE, INK, MUTED = "#f4ede2", "#ebe1d1", "#ffffff", "#e6dccb", "#1b1530", "#6d6380"
+
+
+class Tile(tk.Frame):
+    """A big coloured button with a title and one line under it (like a card). ``state`` follows ttk's
+    ``["disabled"]`` / ``["!disabled"]`` so the rest of the window treats it like any button."""
+
+    def __init__(self, parent: tk.Misc, title: str, sub: str, bg: str, fg: str, command: Callable[[], None]) -> None:
+        super().__init__(parent, bg=bg, padx=16, pady=12, cursor="hand2")
+        self._bg, self._fg, self._command, self._disabled = bg, fg, command, False
+        self._title = tk.Label(self, text=title, font=(FONT, 15, "bold"), bg=bg, fg=fg)
+        self._sub = tk.Label(self, text=sub, font=(FONT, 9), bg=bg, fg=fg)
+        self._title.pack()
+        self._sub.pack()
+        for w in (self, self._title, self._sub):
+            w.bind("<Button-1>", lambda e: self.invoke())
+
+    def invoke(self) -> None:
+        if not self._disabled:
+            self._command()
+
+    def state(self, spec: list[str] | None = None) -> tuple[str, ...]:
+        if spec:
+            self._disabled = "disabled" in spec
+            bg, fg = ("#d9d2c7", "#8f8799") if self._disabled else (self._bg, self._fg)
+            for w in (self, self._title, self._sub):
+                w.configure(bg=bg)
+            for w in (self._title, self._sub):
+                w.configure(fg=fg)
+            self.configure(cursor="arrow" if self._disabled else "hand2")
+        return ("disabled",) if self._disabled else ()
+
+    def instate(self, spec: list[str]) -> bool:
+        return ("disabled" in spec) == self._disabled
 
 
 def single_instance() -> bool:
@@ -68,9 +104,9 @@ class App(tk.Tk):
         self.lang = self.ctrl.settings.lang
         self.title(PRODUCT_NAME)
         self._set_icon()
-        self.geometry("680x760")
-        self.minsize(600, 640)
-        self.configure(bg="#eef0f3")
+        self.geometry("700x820")
+        self.minsize(620, 660)
+        self.configure(bg=SAND)
         self.option_add("*Font", (FONT, 10))
         self._q: queue.Queue[Callable[[], None]] = queue.Queue()
         self._busy = threading.Event()  # a setup / update job is running
@@ -127,34 +163,54 @@ class App(tk.Tk):
         for child in self.winfo_children():
             child.destroy()
         self._pull_vars()
+        self.configure(bg=SAND)
         style = ttk.Style(self)
         with contextlib.suppress(tk.TclError):
-            style.theme_use("vista" if sys.platform == "win32" else "clam")
-        style.configure("Big.TButton", font=(FONT, 12, "bold"), padding=8)
-        style.configure("TRadiobutton", background="white")
-        style.configure("TCheckbutton", background="white")
+            style.theme_use("clam")  # the same flat look on every Windows version; "vista" ignores our colours
+        style.configure(".", background=CARD, foreground=INK, font=(FONT, 10))
+        style.configure("TNotebook", background=SAND, borderwidth=0, tabmargins=(0, 6, 0, 0))
+        style.configure("TNotebook.Tab", background=SAND, foreground=MUTED, padding=(18, 8), font=(FONT, 10, "bold"), borderwidth=0)
+        style.map("TNotebook.Tab", background=[("selected", CARD)], foreground=[("selected", INK)])
+        style.configure("TButton", background=CARD, foreground=INK, bordercolor="#d6c9b4", lightcolor=CARD, darkcolor=CARD, padding=(12, 5))
+        bar = {"background": SAND2, "troughcolor": CARD, "bordercolor": CARD, "arrowcolor": MUTED, "lightcolor": SAND2, "darkcolor": SAND2}
+        style.configure("Vertical.TScrollbar", **bar)
+        style.map("TButton", background=[("active", SAND2), ("disabled", CARD)], foreground=[("disabled", "#b5adbf")])
+        style.configure("TRadiobutton", background=CARD, foreground=INK)
+        style.configure("TCheckbutton", background=CARD, foreground=INK)
+        style.configure("TCombobox", fieldbackground="white", background=CARD, bordercolor=LINE, arrowsize=14, padding=4)
+        style.map("TCombobox", fieldbackground=[("readonly", "white")], foreground=[("readonly", INK)])
+        style.configure("Horizontal.TProgressbar", background=DUSK, troughcolor=SAND2, bordercolor=SAND2)
 
-        top = tk.Frame(self, bg="#eef0f3")
-        top.pack(fill="x", padx=16, pady=(12, 0))
-        lang = ttk.Button(top, text=self.tr("lang_button"), command=self.toggle_lang, width=9)
-        title = tk.Label(top, text=self.tr("title"), font=(FONT, 18, "bold"), bg="#eef0f3", fg="#1d2733")
-        ver = tk.Label(top, text=f"v{updates.current_version()}", font=(FONT, 9), bg="#eef0f3", fg="#6b7785")
-        if self.rtl:
-            lang.pack(side="left")
-            title.pack(side="right")
-            ver.pack(side="right", padx=8)
-        else:
-            lang.pack(side="right")
-            title.pack(side="left")
-            ver.pack(side="left", padx=8)
+        top = tk.Frame(self, bg=NIGHT)
+        top.pack(fill="x")
+        inner = tk.Frame(top, bg=NIGHT)
+        inner.pack(fill="x", padx=16, pady=10)
+        self._logo = None
+        with contextlib.suppress(tk.TclError, OSError):
+            small = paths.bundled_brand_dir() / "icon_small.png"
+            if small.is_file():
+                self._logo = tk.PhotoImage(file=str(small)).subsample(2, 2)  # 64 px -> 32 px
+        logo = tk.Label(inner, image=self._logo, bg=NIGHT) if self._logo else None
+        title = tk.Label(inner, text=PRODUCT_NAME, font=(FONT, 15, "bold"), bg=NIGHT, fg="white")
+        ver = tk.Label(inner, text=f"v{updates.current_version()}", font=(FONT, 9), bg=NIGHT, fg="#9b8fbf")
+        lang = tk.Label(
+            inner, text=self.tr("lang_button"), font=(FONT, 10, "bold"), bg="#2a1f4d", fg="white", padx=12, pady=4, cursor="hand2"
+        )
+        lang.bind("<Button-1>", lambda e: self.toggle_lang())
+        near, far = ("right", "left") if self.rtl else ("left", "right")
+        for w in (logo, title, ver):
+            if w is not None:
+                w.pack(side=near, padx=(0, 8) if near == "left" else (8, 0))
+        lang.pack(side=far)
 
         self.nb = ttk.Notebook(self)
-        self.nb.pack(fill="both", expand=True, padx=16, pady=12)
-        self.home, self.sets, self.chk = (tk.Frame(self.nb, bg="white", padx=14, pady=12) for _ in range(3))
+        self.nb.pack(fill="both", expand=True, padx=14, pady=(10, 14))
+        self.home, self.sets, self.chk = (tk.Frame(self.nb, bg=CARD, padx=16, pady=14) for _ in range(3))
         tabs = [(self.home, "tab_home"), (self.sets, "tab_settings"), (self.chk, "tab_check")]
         for frame, key in tabs[::-1] if self.rtl else tabs:  # Arabic: the first tab at the right
             self.nb.add(frame, text=self.tr(key))
         self.nb.select({"settings": self.sets, "check": self.chk}.get(os.environ.get("STREAMSAFE_TAB", ""), self.home))  # CI screenshots
+        self.prepare_vars()
         self.build_home()
         self.build_settings()
         self.build_check()
@@ -162,7 +218,8 @@ class App(tk.Tk):
         self.show_status(force=True)
 
     def label(self, parent: tk.Misc, text: str = "", **kw) -> tk.Label:
-        kw.setdefault("bg", "white")
+        kw.setdefault("bg", CARD)
+        kw.setdefault("fg", INK)
         kw.setdefault("anchor", self.side)
         kw.setdefault("justify", "right" if self.rtl else "left")
         kw.setdefault("wraplength", 560)
@@ -185,61 +242,181 @@ class App(tk.Tk):
         if "input" in self._vars:
             self.collect()
 
-    # --- home -----------------------------------------------------------------------------------------------
+    def prepare_vars(self) -> None:
+        st, v = self.ctrl.settings, self.var
+        v("input", tk.StringVar, st.input).set(st.input)
+        v("srt_port", tk.StringVar, str(st.srt_port))
+        v("camera", tk.StringVar, st.camera)
+        v("camera_sound", tk.StringVar, st.camera_sound)
+        v("input_file", tk.StringVar, st.input_file)
+        v("output", tk.StringVar, st.output)
+        v("platform", tk.StringVar, "").set(self.tr("plat_" + st.platform))  # the name in this language
+        v("rtmp_url", tk.StringVar, st.rtmp_url)
+        v("record_dir", tk.StringVar, st.record_dir)
+        v("key", tk.StringVar, self.ctrl.stored_key() if "key" not in self._vars else self._vars["key"].get())
+        v("remember", tk.BooleanVar, st.remember_key)
+        v("delay", tk.StringVar, "").set(self.tr("delay_auto") if st.delay <= 0 else f"{st.delay:g}")
+        v("resolution", tk.StringVar, "").set(st.resolution)
+        v("fps", tk.StringVar, "").set(str(st.fps))
+        v("translate", tk.BooleanVar, st.translate_ar)
+        v("license_key", tk.StringVar, "")
+
+    # --- small building blocks -------------------------------------------------------------------------------
+    def card(self, parent: tk.Misc, title: str = "", note: str = "") -> tk.Frame:
+        """A white box with a thin border, a bold title and an optional one-line note under it."""
+        outer = tk.Frame(parent, bg=LINE, padx=1, pady=1)
+        outer.pack(fill="x", pady=(0, 12))
+        box = tk.Frame(outer, bg=CARD, padx=14, pady=12)
+        box.pack(fill="x")
+        if title:
+            self.label(box, title, font=(FONT, 12, "bold")).pack(fill="x")
+        if note:
+            self.label(box, note, fg=MUTED, font=(FONT, 9)).pack(fill="x", pady=(2, 6))
+        return box
+
+    def step(self, parent: tk.Misc, number: int, title: str) -> tk.Frame:
+        """A numbered step: a pink number, a title, and a frame under them for the fields."""
+        row = tk.Frame(parent, bg=CARD)
+        row.pack(fill="x", pady=(10, 2))
+        side = "right" if self.rtl else "left"
+        tk.Label(row, text=str(number), font=(FONT, 10, "bold"), bg=DUSK, fg="white", width=2).pack(side=side)
+        self.label(row, title, font=(FONT, 11, "bold")).pack(side=side, padx=8)
+        body = tk.Frame(parent, bg=CARD)
+        body.pack(fill="x", padx=(0, 30) if self.rtl else (30, 0))
+        return body
+
+    def field(
+        self, parent: tk.Misc, caption: str, var: tk.Variable, width: int = 34, show: str = "", combo: list[str] | None = None
+    ) -> tk.Widget:
+        side = "right" if self.rtl else "left"
+        fr = tk.Frame(parent, bg=CARD)
+        lab = self.label(fr, caption, wraplength=180, width=14 if width >= 20 else 0)
+        if combo is not None:
+            ent: tk.Widget = ttk.Combobox(fr, textvariable=var, values=combo, width=width)
+        else:
+            ent = tk.Entry(
+                fr, textvariable=var, width=width, justify="left", show=show, relief="flat", bd=0, bg="white",
+                highlightthickness=1, highlightbackground=LINE, highlightcolor=DUSK, font=(FONT, 10),
+            )  # fmt: skip
+        lab.pack(side=side, padx=(8, 0) if self.rtl else (0, 8))
+        if width >= 20:
+            ent.pack(side=side, fill="x", expand=True, ipady=4)
+        else:
+            ent.pack(side=side, ipady=3)
+        self.pack_row(fr, fill="x", pady=4)
+        return ent
+
+    def small(self, parent: tk.Misc, text: str) -> tk.Label:
+        lab = self.label(parent, text, fg=MUTED, font=(FONT, 9), wraplength=500)
+        self.pack_row(lab, fill="x", pady=(0, 4))
+        return lab
+
+    def buttons(self, parent: tk.Misc, *items: tuple[str, Callable[[], None]]) -> tk.Frame:
+        side = "right" if self.rtl else "left"
+        fr = tk.Frame(parent, bg=CARD)
+        for text, cmd in items:
+            ttk.Button(fr, text=text, command=cmd).pack(side=side, padx=(6, 0) if self.rtl else (0, 6))
+        self.pack_row(fr, fill="x", pady=4)
+        return fr
+
+    # --- home: status, the two big buttons, and the whole setup in three steps -----------------------------
     def build_home(self) -> None:
-        h = self.home
-        self.badge = tk.Label(h, text="", font=(FONT, 24, "bold"), fg="white", bg=COLORS[engine.STOPPED], pady=14)
+        h = self.scroll_area(self.home)
+        side = "right" if self.rtl else "left"
+        self.badge = tk.Label(h, text="", font=(FONT, 20, "bold"), fg="white", bg=COLORS[engine.STOPPED], pady=12)
         self.badge.pack(fill="x")
-        self.hint = self.label(h, "", fg="#44505e", pady=6)
+        self.hint = self.label(h, "", fg=MUTED, pady=6)
         self.pack_row(self.hint, fill="x")
         self.banner = self.label(h, "", fg="#b26a00", font=(FONT, 10, "bold"))
         self.pack_row(self.banner, fill="x")
-        self.update_row = tk.Frame(h, bg="white")
-        self.update_text = self.label(self.update_row, "", fg="#1f5fbf")
+        self.update_row = tk.Frame(h, bg=CARD)
+        self.update_text = self.label(self.update_row, "", fg=LAGOON)
         self.update_btn = ttk.Button(self.update_row, text=self.tr("update_button"), command=self.apply_update)
-        self.setup_box = tk.LabelFrame(h, text=self.tr("sec_setup"), bg="white", padx=10, pady=8, labelanchor="ne" if self.rtl else "nw")
-        self.setup_text = self.label(self.setup_box, "")
+
+        row = tk.Frame(h, bg=CARD)
+        row.pack(fill="x", pady=(6, 4))
+        self.start_btn = Tile(row, self.tr("start"), self.tr("start_sub"), DUSK, "#1a0716", self.on_start)
+        self.stop_btn = Tile(row, self.tr("stop"), self.tr("stop_sub"), COVER, "white", self.on_stop)
+        for b in (self.start_btn, self.stop_btn):
+            b.pack(side=side, padx=(0, 6), expand=True, fill="x")
+        self.message = self.label(h, "", fg="#b3261e", font=(FONT, 10, "bold"))
+        self.pack_row(self.message, fill="x")
+        # the two links while it runs: OBS -> us, us -> the platform (or the recording)
+        self.link_box = tk.Frame(h, bg=SAND, padx=12, pady=8)
+        self.lk_in = self.label(self.link_box, "", bg=SAND, font=(FONT, 10, "bold"), wraplength=520)
+        self.lk_in.pack(fill="x")
+        self.lk_out = self.label(self.link_box, "", bg=SAND, font=(FONT, 10, "bold"), wraplength=520)
+        self.lk_out.pack(fill="x")
+        self.lk_copy = ttk.Button(self.link_box, text=self.tr("copy_server"), command=lambda: self.copy(self.ctrl.obs_server()))
+        self._link_shown: tuple = ()
+
+        # first run: the models
+        self.setup_box = tk.Frame(h, bg=SAND, padx=12, pady=10)
+        self.setup_text = self.label(self.setup_box, "", bg=SAND)
         self.setup_text.pack(fill="x")
-        btns = tk.Frame(self.setup_box, bg="white")
+        btns = tk.Frame(self.setup_box, bg=SAND)
         btns.pack(fill="x", pady=4)
         self.setup_buttons = [
             ttk.Button(btns, text=self.tr("download_models"), command=lambda: self.install("download")),
             ttk.Button(btns, text=self.tr("choose_zip"), command=lambda: self.install("zip")),
             ttk.Button(btns, text=self.tr("choose_folder"), command=lambda: self.install("folder")),
         ]
-        for b in self.setup_buttons if not self.rtl else self.setup_buttons[::-1]:
-            b.pack(side="right" if self.rtl else "left", padx=3)
+        for b in self.setup_buttons:
+            b.pack(side=side, padx=3)
         self.progress = ttk.Progressbar(self.setup_box, mode="determinate", maximum=100)
-        self.progress_text = self.label(self.setup_box, "", fg="#44505e")
+        self.progress_text = self.label(self.setup_box, "", bg=SAND, fg=MUTED)
         self.cancel_btn = ttk.Button(self.setup_box, text=self.tr("cancel"), command=self._cancel.set)
+        self._setup_anchor = tk.Frame(h, bg=CARD, height=1)  # the models box goes just before the setup steps
+        self._setup_anchor.pack(fill="x")
 
-        row = tk.Frame(h, bg="white")
-        row.pack(fill="x", pady=(14, 4))
-        self.start_btn = ttk.Button(row, text=self.tr("start"), style="Big.TButton", command=self.on_start)
-        self.stop_btn = ttk.Button(row, text=self.tr("stop"), style="Big.TButton", command=self.on_stop)
-        for b in (self.start_btn, self.stop_btn):
-            b.pack(side="right" if self.rtl else "left", padx=4, expand=True, fill="x")
-        self.message = self.label(h, "", fg="#b3261e", font=(FONT, 10, "bold"))
-        self.pack_row(self.message, fill="x")
-        # the two links while it runs: OBS -> us, us -> the platform (or the recording)
-        self.link_box = tk.Frame(h, bg="#f5f7fa", padx=10, pady=6)
-        self.lk_in = self.label(self.link_box, "", bg="#f5f7fa", font=(FONT, 10, "bold"), wraplength=520)
-        self.lk_in.pack(fill="x")
-        self.lk_out = self.label(self.link_box, "", bg="#f5f7fa", font=(FONT, 10, "bold"), wraplength=520)
-        self.lk_out.pack(fill="x")
-        self.lk_copy = ttk.Button(self.link_box, text=self.tr("copy_server"), command=lambda: self.copy(self.ctrl.obs_server()))
-        self._link_shown: tuple = ()
-        self.report_btn = ttk.Button(h, text=self.tr("open_report"), command=self.open_report)
-        self.pack_row(self.report_btn, pady=(10, 2))
-        self.logbox = tk.Label(h, text="", bg="white", fg="#8a94a1", font=(FONT, 8), anchor="w", justify="left", wraplength=580)
-        self.logbox.pack(fill="x", side="bottom")
+        # the whole setup on one card
+        c = self.card(h, self.tr("quick_title"), self.tr("quick_note"))
+        v = self.var
+        s1 = self.step(c, 1, self.tr("step_platform"))
+        names = [self.tr("plat_" + p) for p in ingest.PLATFORMS]
+        plat = self.field(s1, self.tr("platform"), v("platform", tk.StringVar, ""), combo=names)
+        plat.configure(state="readonly")  # type: ignore[call-arg]
+        plat.bind("<<ComboboxSelected>>", lambda e: self.on_platform())
+        self.platform_hint = self.small(s1, "")
+        s2 = self.step(c, 2, self.tr("step_key"))
+        url_entry = self.field(s2, self.tr("rtmp_url"), v("rtmp_url", tk.StringVar, ""))
+        key_entry = self.field(s2, self.tr("stream_key"), v("key", tk.StringVar, ""), show="•")
+        for ent in (url_entry, key_entry):
+            ent.bind("<FocusOut>", lambda e: self.tidy_target(), add="+")
+            ent.bind("<<Paste>>", lambda e: self.after(50, self.tidy_target), add="+")
+        self.pack_row(ttk.Checkbutton(s2, text=self.tr("remember_key"), variable=v("remember", tk.BooleanVar, False)))
+        if not self.ctrl.keys.available:
+            self.small(s2, self.tr("key_no_store"))
+        tf = self.buttons(s2, (self.tr("test_link"), self.on_test_link))
+        self.test_result = self.label(tf, "", font=(FONT, 9, "bold"), wraplength=360)
+        self.test_result.pack(side=side, padx=8)
+        s3 = self.step(c, 3, self.tr("step_obs"))
+        self.small(s3, self.tr("step_obs_note"))
+        fr = tk.Frame(s3, bg=SAND, padx=10, pady=8)
+        self.srt_hint = tk.Label(fr, text="", font=("Consolas", 11, "bold"), bg=SAND, fg=INK)
+        ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda: self.copy(self.obs_server())).pack(side=side)
+        self.srt_hint.pack(side=side, padx=10)
+        self.pack_row(fr, fill="x", pady=4)
+        self.buttons(s3, (self.tr("obs_guide"), self.show_obs_guide))
+        self.small(s3, self.tr("console_hint"))
 
-    # --- settings -------------------------------------------------------------------------------------------
+        foot = tk.Frame(h, bg=CARD)
+        foot.pack(fill="x", pady=(4, 0))
+        self.report_btn = ttk.Button(foot, text=self.tr("open_report"), command=self.open_report)
+        self.report_btn.pack(side=side)
+        self.logbox = tk.Label(h, text="", bg=CARD, fg="#9a93a8", font=(FONT, 8), anchor="w", justify="left", wraplength=580)
+        self.logbox.pack(fill="x", pady=(6, 0))
+        v("input", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
+        v("srt_port", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
+        self.show_srt_hint()
+        self.show_platform_hint()
+
+    # --- settings: everything a normal stream never needs to touch, in plain boxes ------------------------
     def scroll_area(self, tab: tk.Frame) -> tk.Frame:
         """A frame inside ``tab`` that scrolls with the mouse wheel when it is taller than the window."""
-        canvas = tk.Canvas(tab, bg="white", highlightthickness=0)
+        canvas = tk.Canvas(tab, bg=CARD, highlightthickness=0)
         bar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
-        inner = tk.Frame(canvas, bg="white")
+        inner = tk.Frame(canvas, bg=CARD)
         win = canvas.create_window((0, 0), window=inner, anchor="nw")
         canvas.configure(yscrollcommand=bar.set)
         inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -259,165 +436,88 @@ class App(tk.Tk):
         st = self.ctrl.settings
         s = self.settings_body = self.scroll_area(self.sets)
         v = self.var
-        v("input", tk.StringVar, st.input).set(st.input)
-        v("srt_port", tk.StringVar, str(st.srt_port))
-        v("camera", tk.StringVar, st.camera)
-        v("camera_sound", tk.StringVar, st.camera_sound)
-        v("input_file", tk.StringVar, st.input_file)
-        v("output", tk.StringVar, st.output)
-        v("platform", tk.StringVar, "").set(self.tr("plat_" + st.platform))  # the name in this language
-        v("rtmp_url", tk.StringVar, st.rtmp_url)
-        v("record_dir", tk.StringVar, st.record_dir)
-        v("key", tk.StringVar, self.ctrl.stored_key() if "key" not in self._vars else self._vars["key"].get())
-        v("remember", tk.BooleanVar, st.remember_key)
-        v("delay", tk.StringVar, "").set(self.tr("delay_auto") if st.delay <= 0 else f"{st.delay:g}")
-        v("resolution", tk.StringVar, "").set(st.resolution)
-        v("fps", tk.StringVar, "").set(str(st.fps))
-        v("translate", tk.BooleanVar, st.translate_ar)
         side = "right" if self.rtl else "left"
 
-        def field(
-            parent: tk.Misc, caption: str, var: tk.Variable, width: int = 34, show: str = "", combo: list[str] | None = None
-        ) -> tk.Widget:
-            fr = tk.Frame(parent, bg="white")
-            lab = self.label(fr, caption, wraplength=200)
-            if combo is not None:
-                ent: tk.Widget = ttk.Combobox(fr, textvariable=var, values=combo, width=width)
-            else:
-                ent = tk.Entry(fr, textvariable=var, width=width, justify="left", show=show, relief="solid", bd=1)
-            lab.pack(side=side, padx=(8, 0) if self.rtl else (0, 8))
-            if width >= 20:
-                ent.pack(side=side, fill="x", expand=True)
-            else:
-                ent.pack(side=side)
-            self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
-            return ent
+        def choice(parent: tk.Misc, text_key: str, value: str, name: str) -> None:
+            self.pack_row(ttk.Radiobutton(parent, text=self.tr(text_key), value=value, variable=v(name, tk.StringVar, "")), pady=(8, 2))
 
-        def choice(text_key: str, value: str, name: str) -> None:
-            self.pack_row(ttk.Radiobutton(s, text=self.tr(text_key), value=value, variable=v(name, tk.StringVar, "")))
+        # where the picture comes from
+        c = self.card(s, self.tr("sec_in"), self.tr("sec_in_note"))
+        choice(c, "in_srt", cfg.INPUT_SRT, "input")
+        self.field(c, self.tr("srt_port"), v("srt_port", tk.StringVar, ""), 8)
+        choice(c, "in_camera", cfg.INPUT_CAMERA, "input")
+        self.camera_box = self.field(c, self.tr("camera_name"), v("camera", tk.StringVar, ""), combo=[st.camera] if st.camera else [])
+        self.sound_box = self.field(c, self.tr("camera_sound"), v("camera_sound", tk.StringVar, ""), combo=[""])
+        self.buttons(c, (self.tr("refresh_devices"), self.refresh_devices))
+        self.small(c, self.tr("camera_hint"))
+        choice(c, "in_file", cfg.INPUT_FILE, "input")
+        self.field(c, self.tr("input_file"), v("input_file", tk.StringVar, ""))
+        self.buttons(c, (self.tr("pick_file"), self.pick_input_file))
 
-        def small(text: str) -> tk.Label:
-            lab = self.label(s, text, fg="#6b7785", font=(FONT, 9))
-            self.pack_row(lab, fill="x", padx=(0, 22) if self.rtl else (22, 0))
-            return lab
+        # where the protected picture goes
+        c = self.card(s, self.tr("sec_out"), self.tr("sec_out_note"))
+        choice(c, "out_rtmp", cfg.OUTPUT_RTMP, "output")
+        choice(c, "out_record", cfg.OUTPUT_RECORD, "output")
+        self.field(c, self.tr("record_dir"), v("record_dir", tk.StringVar, ""))
+        self.buttons(c, (self.tr("pick_folder"), self.pick_record_dir))
+        self.small(c, self.tr("record_hint", folder=self.ctrl.record_file().rsplit(os.sep, 1)[0]))
+        choice(c, "out_window", cfg.OUTPUT_WINDOW, "output")
+        self.small(c, self.tr("window_hint"))
 
-        def buttons(*items: tuple[str, Callable[[], None]]) -> tk.Frame:
-            fr = tk.Frame(s, bg="white")
-            for text, cmd in items:
-                ttk.Button(fr, text=text, command=cmd).pack(side=side, padx=4)
-            self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
-            return fr
-
-        # 1. where the picture comes from
-        self.label(s, self.tr("sec_in"), font=(FONT, 11, "bold")).pack(fill="x")
-        choice("in_srt", cfg.INPUT_SRT, "input")
-        field(s, self.tr("srt_port"), v("srt_port", tk.StringVar, ""), 8)
-        fr = tk.Frame(s, bg="white")
-        self.srt_hint = self.label(fr, "", fg="#1f5fbf", font=(FONT, 9, "bold"), wraplength=420)
-        ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda: self.copy(self.obs_server())).pack(side=side, padx=4)
-        self.srt_hint.pack(side=side, fill="x", expand=True)
-        self.pack_row(fr, fill="x", padx=(0, 22) if self.rtl else (22, 0))
-        buttons((self.tr("obs_guide"), self.show_obs_guide))
-        choice("in_camera", cfg.INPUT_CAMERA, "input")
-        self.camera_box = field(s, self.tr("camera_name"), v("camera", tk.StringVar, ""), combo=[st.camera] if st.camera else [])
-        self.sound_box = field(s, self.tr("camera_sound"), v("camera_sound", tk.StringVar, ""), combo=[""])
-        buttons((self.tr("refresh_devices"), self.refresh_devices))
-        small(self.tr("camera_hint"))
-        choice("in_file", cfg.INPUT_FILE, "input")
-        field(s, self.tr("input_file"), v("input_file", tk.StringVar, ""))
-        buttons((self.tr("pick_file"), self.pick_input_file))
-        ttk.Separator(s).pack(fill="x", pady=10)
-
-        # 2. where the protected picture goes
-        self.label(s, self.tr("sec_out"), font=(FONT, 11, "bold")).pack(fill="x")
-        choice("out_rtmp", cfg.OUTPUT_RTMP, "output")
-        names = [self.tr("plat_" + p) for p in ingest.PLATFORMS]
-        plat = field(s, self.tr("platform"), v("platform", tk.StringVar, ""), combo=names)
-        plat.configure(state="readonly")  # type: ignore[call-arg]
-        plat.bind("<<ComboboxSelected>>", lambda e: self.on_platform())
-        url_entry = field(s, self.tr("rtmp_url"), v("rtmp_url", tk.StringVar, ""))
-        key_entry = field(s, self.tr("stream_key"), v("key", tk.StringVar, ""), show="•")
-        for ent in (url_entry, key_entry):
-            ent.bind("<FocusOut>", lambda e: self.tidy_target(), add="+")
-            ent.bind("<<Paste>>", lambda e: self.after(50, self.tidy_target), add="+")
-        self.platform_hint = small("")
-        self.pack_row(
-            ttk.Checkbutton(s, text=self.tr("remember_key"), variable=v("remember", tk.BooleanVar, False)),
-            padx=(0, 22) if self.rtl else (22, 0),
-        )
-        if not self.ctrl.keys.available:
-            small(self.tr("key_no_store"))
-        tf = buttons((self.tr("test_link"), self.on_test_link))
-        self.test_result = self.label(tf, "", font=(FONT, 9, "bold"), wraplength=380)
-        self.test_result.pack(side=side, padx=8)
-        choice("out_record", cfg.OUTPUT_RECORD, "output")
-        field(s, self.tr("record_dir"), v("record_dir", tk.StringVar, ""))
-        buttons((self.tr("pick_folder"), self.pick_record_dir))
-        small(self.tr("record_hint", folder=self.ctrl.record_file().rsplit(os.sep, 1)[0]))
-        choice("out_window", cfg.OUTPUT_WINDOW, "output")
-        small(self.tr("window_hint"))
-        ttk.Separator(s).pack(fill="x", pady=10)
-
-        # 3. picture quality: the same as OBS sends, nothing is made smaller or slower on the way
-        self.label(s, self.tr("sec_quality"), font=(FONT, 11, "bold")).pack(fill="x")
-        res = field(s, self.tr("resolution"), v("resolution", tk.StringVar, ""), 10, combo=list(cfg.RESOLUTIONS))
+        # picture quality: the same as OBS sends, nothing is made smaller or slower on the way
+        c = self.card(s, self.tr("sec_quality"), self.tr("quality_hint"))
+        res = self.field(c, self.tr("resolution"), v("resolution", tk.StringVar, ""), 10, combo=list(cfg.RESOLUTIONS))
         res.configure(state="readonly")  # type: ignore[call-arg]
-        rate = field(s, self.tr("fps"), v("fps", tk.StringVar, ""), 10, combo=[str(f) for f in cfg.FPS_CHOICES])
+        rate = self.field(c, self.tr("fps"), v("fps", tk.StringVar, ""), 10, combo=[str(f) for f in cfg.FPS_CHOICES])
         rate.configure(state="readonly")  # type: ignore[call-arg]
-        small(self.tr("quality_hint"))
-        delay = field(s, self.tr("delay"), v("delay", tk.StringVar, ""), 10, combo=[self.tr("delay_auto"), "2", "3", "4", "5"])
+        delay = self.field(c, self.tr("delay"), v("delay", tk.StringVar, ""), 10, combo=[self.tr("delay_auto"), "2", "3", "4", "5"])
         delay.configure(state="readonly")  # type: ignore[call-arg]
-        small(self.tr("delay_hint"))
-        ttk.Separator(s).pack(fill="x", pady=10)
+        self.small(c, self.tr("delay_hint"))
 
-        # 4. the rest
-        self.pack_row(
-            ttk.Checkbutton(
-                s, text=self.tr("translate_ar"), variable=v("translate", tk.BooleanVar, False), command=self.on_translate_toggle
-            )
-        )
-        self.pack_row(self.label(s, self.tr("translate_hint", mb=release.TRANSLATE_DOWNLOAD_MB), fg="#6b7785", font=(FONT, 9)), fill="x")
-        ttk.Separator(s).pack(fill="x", pady=10)
         # the subscription (Dodo licence key)
-        self.label(s, self.tr("sec_license"), font=(FONT, 11, "bold")).pack(fill="x")
-        self.license_label = self.label(s, "", font=(FONT, 10, "bold"), wraplength=520)
+        c = self.card(s, self.tr("sec_license"))
+        self.license_label = self.label(c, "", font=(FONT, 10, "bold"), wraplength=520)
         self.pack_row(self.license_label, fill="x")
-        v("license_key", tk.StringVar, "")
-        field(s, self.tr("license_key"), self._vars["license_key"], show="•")
-        lf = buttons(
-            (self.tr("license_activate"), self.on_activate_license),
-            (self.tr("license_deactivate"), self.on_deactivate_license),
+        self.field(c, self.tr("license_key"), self._vars["license_key"], show="•")
+        lf = self.buttons(
+            c, (self.tr("license_activate"), self.on_activate_license), (self.tr("license_deactivate"), self.on_deactivate_license)
         )
         if release.BUY_URL:
             ttk.Button(lf, text=self.tr("license_buy"), command=lambda: webbrowser.open(release.BUY_URL)).pack(side=side, padx=4)
         self.show_license()
-        ttk.Separator(s).pack(fill="x", pady=10)
-        self.label(s, self.tr("sec_brand"), font=(FONT, 11, "bold")).pack(fill="x")
+
+        # the logo on the cover (Pro)
         pro = plan.allows("custom_brand", self.ctrl.env)
-        self.pack_row(self.label(s, self.tr("brand_hint" if pro else "brand_pro_only"), fg="#6b7785", font=(FONT, 9)), fill="x")
-        fr = tk.Frame(s, bg="white")
+        c = self.card(s, self.tr("sec_brand"), self.tr("brand_hint" if pro else "brand_pro_only"))
+        fr = tk.Frame(c, bg=CARD)
         state = "normal" if pro else "disabled"  # the normal plan: our logo, not changeable
         ttk.Button(fr, text=self.tr("brand_pick"), command=self.pick_brand, state=state).pack(side=side, padx=4)
         ttk.Button(fr, text=self.tr("brand_remove"), command=lambda: self.set_brand(""), state=state).pack(side=side, padx=4)
-        self.brand_label = self.label(fr, "", fg="#44505e", font=(FONT, 9))
+        self.brand_label = self.label(fr, "", fg=MUTED, font=(FONT, 9))
         self.brand_label.pack(side=side, padx=8)
         self.pack_row(fr, fill="x")
         self.show_brand()
-        ttk.Separator(s).pack(fill="x", pady=10)
-        self.label(s, self.tr("open_obs"), font=(FONT, 11, "bold")).pack(fill="x")
-        for key, path in (("obs_state", paths.obs_state_file(self.ctrl.env)), ("obs_script", paths.obs_script())):
-            fr = tk.Frame(s, bg="white")
-            ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda p=str(path): self.copy(p)).pack(
-                side="left" if not self.rtl else "right", padx=4
+
+        # Arabic subtitles for English voice chat
+        c = self.card(s, self.tr("sec_translate"))
+        self.pack_row(
+            ttk.Checkbutton(
+                c, text=self.tr("translate_ar"), variable=v("translate", tk.BooleanVar, False), command=self.on_translate_toggle
             )
-            tk.Label(
-                fr, text=self.tr(key, path=path), bg="white", fg="#44505e", font=(FONT, 8), anchor="w", justify="left", wraplength=470
-            ).pack(side="right" if self.rtl else "left", fill="x", expand=True)
+        )
+        self.small(c, self.tr("translate_hint", mb=release.TRANSLATE_DOWNLOAD_MB))
+
+        # files OBS reads (the panic switch script)
+        c = self.card(s, self.tr("open_obs"))
+        for key, path in (("obs_state", paths.obs_state_file(self.ctrl.env)), ("obs_script", paths.obs_script())):
+            fr = tk.Frame(c, bg=CARD)
+            ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda p=str(path): self.copy(p)).pack(
+                side="right" if self.rtl else "left", padx=4
+            )
+            tk.Label(fr, text=self.tr(key, path=path), bg=CARD, fg=MUTED, font=(FONT, 8), anchor="w", justify="left", wraplength=470).pack(
+                side="left" if self.rtl else "right", fill="x", expand=True
+            )
             self.pack_row(fr, fill="x")
-        v("input", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
-        v("srt_port", tk.StringVar, "").trace_add("write", lambda *_: self.show_srt_hint())
-        self.show_srt_hint()
-        self.show_platform_hint()
 
     # --- the links: OBS, platform, devices, recordings ---------------------------------------------------
     def obs_server(self) -> str:
@@ -584,7 +684,7 @@ class App(tk.Tk):
 
     def show_srt_hint(self) -> None:
         with contextlib.suppress(tk.TclError, AttributeError):  # a trace may fire while the window is being rebuilt
-            self.srt_hint.configure(text=self.tr("srt_hint", server=self.obs_server()))
+            self.srt_hint.configure(text=self.obs_server())
 
     def collect(self) -> None:
         """Window fields -> settings (values that are not valid stay as typed so that ``problems`` reports them)."""
@@ -657,7 +757,7 @@ class App(tk.Tk):
         problem = self.ctrl.models_problem()
         if problem:
             self.setup_text.configure(text=self.tr("models_needed") if "not installed" in problem else self.tr("models_bad", why=problem))
-            self.setup_box.pack(fill="x", pady=8, before=self.start_btn.master)
+            self.setup_box.pack(fill="x", pady=8, before=self._setup_anchor)
         else:
             self.setup_box.pack_forget()
         offer = (

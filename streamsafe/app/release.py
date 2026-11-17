@@ -68,7 +68,9 @@ LICENSE_GRACE_DAYS = 3  # no internet: a key that was valid keeps working this l
 LICENSE_RECHECK_HOURS = 6  # while protection runs, the key is checked again this often
 
 # --- beta ---------------------------------------------------------------------------------------------------
-BETA_DAYS = 30  # a build stops starting streams this many days after it was built (``build_info.EXPIRES``)
+# >0: a beta build stops starting streams this many days after it was built (``build_info.EXPIRES``).
+# 0: never (the paid builds: the subscription decides).
+BETA_DAYS = 0
 
 
 # --- NVIDIA fast mode -----------------------------------------------------------------------------------------

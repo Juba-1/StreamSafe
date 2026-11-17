@@ -368,9 +368,9 @@ FAQ = [
     ),
     (
         "I play on PlayStation. Does it work?",
-        "Yes. Connect the console to a capture card, bring it into OBS as usual, and send OBS to StreamSafe. The app does the rest on your PC.",
+        "Yes. Connect the console to a capture card, add it in OBS as usual, and send OBS to StreamSafe. One thing first: on the console turn off HDCP (PS5: Settings, System, HDMI) or the capture card shows a black screen, and turn off HDR so the colours look right.",
         "ألعب على بلايستيشن، يشتغل معي؟",
-        "إيه. وصّل الجهاز بكارت تصوير، ودخّله في OBS مثل العادة، وخلي OBS يرسل لـ StreamSafe. والباقي يسويه البرنامج على البي سي.",
+        "إيه. وصّل الجهاز بكارت تصوير، ودخّله في OBS مثل العادة، وخلي OBS يرسل لـ StreamSafe. بس قبلها: طفّ HDCP من إعدادات الجهاز (PS5: الإعدادات ← النظام ← HDMI) وإلا الكارت يطلع شاشة سودا، وطفّ HDR عشان الألوان تطلع صح.",
     ),
     (
         "Will my stream look worse?",

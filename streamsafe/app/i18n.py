@@ -14,7 +14,7 @@ TEXT: dict[str, tuple[str, str]] = {
     "title": ("{name}", "{name}"),
     "lang_button": ("English", "عربي"),
     "tab_home": ("الرئيسية", "Home"),
-    "tab_settings": ("الإعدادات", "Settings"),
+    "tab_settings": ("إعدادات متقدمة", "Advanced"),
     "tab_check": ("الفحص", "Check"),
     # --- status badge ---
     "st_stopped": ("متوقف", "Stopped"),
@@ -105,7 +105,8 @@ TEXT: dict[str, tuple[str, str]] = {
         "Fast mode could not be enabled: {why}. The program continues in the normal mode.",
     ),
     # --- settings ---
-    "sec_in": ("١) من وين تجي صورة اللعبة؟", "1) Where does the game picture come from?"),
+    "sec_in": ("مصدر الصورة", "Where the picture comes from"),
+    "sec_in_note": ("الأفضل تخليه على OBS. غيّره بس إذا تعرف وش تسوي.", "Leave it on OBS unless you know you need something else."),
     "in_srt": (
         "من OBS (ألعاب الكمبيوتر، أو البلايستيشن والإكس بوكس عن طريق كرت التقاط داخل OBS) - المستحسن",
         "From OBS (PC games, or PlayStation / Xbox through a capture card inside OBS) - recommended",
@@ -114,7 +115,11 @@ TEXT: dict[str, tuple[str, str]] = {
     "srt_port": ("المنفذ", "Port"),
     "srt_hint": ("سيرفر OBS: {server}", "OBS server: {server}"),
     "camera_name": ("الجهاز", "Device"),
-    "sec_out": ("٢) وين يروح الفيديو المحمي؟", "2) Where does the protected video go?"),
+    "sec_out": ("وين يروح الفيديو المحمي", "Where the protected video goes"),
+    "sec_out_note": (
+        "البث المباشر يستخدم المنصة والمفتاح اللي في الصفحة الرئيسية.",
+        "Live streaming uses the platform and key on the Home tab.",
+    ),
     "out_window": ("نافذة يلتقطها OBS (متقدم)", "A window that OBS captures (advanced)"),
     "out_rtmp": (
         "بث مباشر على منصة (كيك، تيك توك، يوتيوب، تويتش، فيسبوك...)",
@@ -145,6 +150,22 @@ TEXT: dict[str, tuple[str, str]] = {
     "bad_delay": ("التأخير لازم يكون بين 0.5 و 10 ثواني.", "The delay must be between 0.5 and 10 seconds."),
     "bad_key": ("اكتب مفتاح البث (بدون مسافات).", "Enter the stream key (no spaces)."),
     # --- run ---
+    "start_sub": ("يشغّل التغطية ويبدأ البث", "Covers and starts your stream"),
+    "stop_sub": ("يوقف البث بأمان", "Ends the stream safely"),
+    "quick_title": ("جهّز بثك في ٣ خطوات", "Set up your stream in 3 steps"),
+    "quick_note": ("مرة وحدة بس، والبرنامج يتذكرها.", "Only once; StreamSafe remembers it."),
+    "step_platform": ("اختر منصتك", "Pick your platform"),
+    "step_key": ("الصق مفتاح البث", "Paste your stream key"),
+    "step_obs": ("حط هذا العنوان في OBS", "Put this address in OBS"),
+    "step_obs_note": (
+        "في OBS: الإعدادات ← البث ← الخدمة: مخصص (Custom)، والصق العنوان في خانة السيرفر.",
+        "In OBS: Settings → Stream → Service: Custom, then paste it into Server.",
+    ),
+    "console_hint": (
+        "تلعب على بلايستيشن أو إكس بوكس؟ طفّ HDCP وHDR من إعدادات الجهاز، ودخّل كارت التصوير في OBS مثل العادة.",
+        "Playing on PlayStation or Xbox? Turn off HDCP and HDR in the console settings, then add your capture card in OBS as usual.",
+    ),
+    "sec_translate": ("ترجمة صوت اللاعبين", "Translate voice chat"),
     "start": ("ابدأ الحماية", "Start protection"),
     "stop": ("أوقف", "Stop"),
     "stopping": ("جاري الإيقاف وكتابة التقرير...", "Stopping and writing the report..."),
@@ -327,7 +348,7 @@ TEXT: dict[str, tuple[str, str]] = {
         "كرتك إنفيديا بس الوضع السريع مو مفعل، فالبرنامج بيشتغل أبطأ وممكن تكثر الشاشة الكاملة وتقطيع الغطاء. نفعّله الحين؟ (تنزيل حوالي {gb} جيجا وتجهيز حوالي 4 دقايق، مرة وحدة بس). «لا» يبدأ بالوضع البطيء.",
         "Your card is NVIDIA but the fast mode is off, so protection runs slower: more full-screen covers and choppier clothing. Turn it on now? (about {gb} GB download and about 4 minutes of preparation, once). «No» starts in the slow mode.",
     ),
-    "sec_quality": ("٣) جودة الصورة", "3) Picture quality"),
+    "sec_quality": ("الجودة والتأخير", "Quality and delay"),
     "resolution": ("الدقة", "Resolution"),
     "fps": ("الإطارات بالثانية", "Frames per second"),
     "quality_hint": (
