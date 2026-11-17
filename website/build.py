@@ -11,8 +11,9 @@ OUT = ROOT / "public"
 EMAIL = "streamsafe1@gmail.com"
 UPDATED_EN, UPDATED_AR = "17 November 2026", "17 نوفمبر 2026"
 BASIC, PRO = 49, 99  # SAR per month
-YEAR_OFF = 0.15  # yearly plan: 15% less than 12 months
-BASIC_Y, PRO_Y = int(BASIC * 12 * (1 - YEAR_OFF)), int(PRO * 12 * (1 - YEAR_OFF))  # 499, 1009
+YEAR_OFF = 0.20  # yearly plan: 20% less than 12 months
+OFF = round(YEAR_OFF * 100)
+BASIC_Y, PRO_Y = int(BASIC * 12 * (1 - YEAR_OFF)), int(PRO * 12 * (1 - YEAR_OFF))  # 470, 950
 TRIAL_DAYS = 3
 BUY_URL = "#pricing"  # becomes the Dodo checkout link once the products exist
 HAS_VIDEO = (ROOT / "media" / "demo.mp4").is_file()
@@ -292,20 +293,22 @@ HOME = f"""
 <section class="band band-sand" id="pricing" style="padding-top:0"><div class="wrap">
 <div class="head">{
     b(
-        f"<h2>Pricing</h2><p>Every plan starts with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.</p>",
-        f"<h2>الأسعار</h2><p>كل باقة تبدأ بتجربة مجانية {TRIAL_DAYS} أيام. إذا ألغيت قبل ما تخلص ما تدفع شيء.</p>",
+        f"<h2>Pricing</h2><p>Every plan starts with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing. Pay yearly and get {OFF}% off.</p>",
+        f"<h2>الأسعار</h2><p>كل باقة تبدأ بتجربة مجانية {TRIAL_DAYS} أيام. إذا ألغيت قبل ما تخلص ما تدفع شيء. واشترك سنوي ووفّر {OFF}%.</p>",
     )
 }</div>
 <div class="period" role="radiogroup">
 <input type="radio" name="period" id="pm" checked><label for="pm">{b("Monthly", "شهري", "span")}</label>
-<input type="radio" name="period" id="py"><label for="py">{b("Yearly, save 15%", "سنوي، وفّر 15%", "span")}</label>
+<input type="radio" name="period" id="py"><label for="py">{
+    b(f"Yearly <em class='save'>−{OFF}%</em>", f"سنوي <em class='save'>خصم {OFF}%</em>", "span")
+}</label>
 </div>
 <div class="plans">
 <div class="plan">
 {
     b(
-        f'<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price"><span class="m">{BASIC} <small>SAR / month</small></span><span class="y">{BASIC_Y:,} <small>SAR / year</small></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{BASIC * 12 - BASIC_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
-        f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span class="m">{BASIC} <small>ريال / شهريًا</small></span><span class="y">{BASIC_Y:,} <small>ريال / سنويًا</small></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {BASIC * 12 - BASIC_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
+        f'<h3>Basic</h3><p class="tag">Everything you need to stream safely</p><p class="price"><span class="m">{BASIC} <small>SAR / month</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>SAR / year</small> <em class="save">{OFF}% off</em></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{BASIC * 12 - BASIC_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Cloth, full-scene and safety-net covers</li><li>Live streaming and recording</li><li>All platforms and any RTMP server</li><li>Full resolution and frame rate</li><li>StreamSafe cover screen</li><li>One PC</li></ul>',
+        f'<h3>الأساسية</h3><p class="tag">كل اللي تحتاجه عشان تبث بأمان</p><p class="price"><span class="m">{BASIC} <small>ريال / شهريًا</small></span><span class="y"><s>{BASIC * 12:,}</s> {BASIC_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {BASIC * 12 - BASIC_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>تغطية بالقماش وتغطية المشهد وشبكة الأمان</li><li>بث مباشر وتسجيل</li><li>كل المنصات وأي سيرفر RTMP</li><li>نفس الدقة وعدد الإطارات</li><li>شاشة التغطية بشعار StreamSafe</li><li>جهاز واحد</li></ul>',
     )
 }
 <a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة", "span")}</a>
@@ -313,8 +316,8 @@ HOME = f"""
 <div class="plan pro">
 {
     b(
-        f'<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span class="m">{PRO} <small>SAR / month</small></span><span class="y">{PRO_Y:,} <small>SAR / year</small></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{PRO * 12 - PRO_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen and the cloth</li><li>Priority support by email</li><li>One PC</li></ul>',
-        f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span class="m">{PRO} <small>ريال / شهريًا</small></span><span class="y">{PRO_Y:,} <small>ريال / سنويًا</small></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {PRO * 12 - PRO_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
+        f'<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span class="m">{PRO} <small>SAR / month</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>SAR / year</small> <em class="save">{OFF}% off</em></span></p><p class="per"><span class="m">after the {TRIAL_DAYS}-day free trial</span><span class="y">{PRO * 12 - PRO_Y:,} SAR less than 12 monthly payments. Starts after the {TRIAL_DAYS}-day trial</span></p><ul><li>Everything in Basic</li><li>Your own logo on the cover screen and the cloth</li><li>Priority support by email</li><li>One PC</li></ul>',
+        f'<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span class="m">{PRO} <small>ريال / شهريًا</small></span><span class="y"><s>{PRO * 12:,}</s> {PRO_Y:,} <small>ريال / سنويًا</small> <em class="save">خصم {OFF}%</em></span></p><p class="per"><span class="m">بعد التجربة المجانية {TRIAL_DAYS} أيام</span><span class="y">توفر {PRO * 12 - PRO_Y:,} ريال عن 12 دفعة شهرية، ويبدأ بعد التجربة {TRIAL_DAYS} أيام</span></p><ul><li>كل مزايا الأساسية</li><li>شعارك الخاص على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li><li>جهاز واحد</li></ul>',
     )
 }
 <a class="btn btn-main" href="{BUY_URL}">{b("Start free trial", "ابدأ التجربة", "span")}</a>
@@ -330,8 +333,8 @@ HOME = f"""
 }
 {
     b(
-        '<p class="source" style="color:#5c4e6e">Prices in Saudi riyals; your bank may show your local currency. Taxes may be added at checkout depending on your country. See <a href="/refund.html">Trial, Cancellation &amp; Refunds</a>.</p>',
-        '<p class="source" style="color:#5c4e6e">الأسعار بالريال السعودي وقد يظهر المبلغ بعملتك المحلية. قد تُضاف ضرائب حسب بلدك عند الدفع. اطلع على <a href="/refund.html">التجربة والإلغاء والاسترداد</a>.</p>',
+        '<p class="source" style="color:#5c4e6e">Prices in Saudi riyals and include tax; your bank may show your local currency. See <a href="/refund.html">Trial, Cancellation &amp; Refunds</a>.</p>',
+        '<p class="source" style="color:#5c4e6e">الأسعار بالريال السعودي وشاملة الضريبة، وقد يظهر المبلغ بعملتك المحلية. اطلع على <a href="/refund.html">التجربة والإلغاء والاسترداد</a>.</p>',
     )
 }
 </div></section>
