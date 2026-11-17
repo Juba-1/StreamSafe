@@ -187,6 +187,8 @@ class GarmentBuilder:
         sub = cover[y1:y2, x1:x2]
         cloth = np.empty((*sub.shape, 3), np.uint8)
         cloth[:] = np.clip(np.array(self.color, np.float32) * 0.9, 0, 255).astype(np.uint8)
+        if self.logo is not None and sub.shape[0] >= 80:  # the plain cover carries the logo too (only on big ones: cheap)
+            cloth = put_logo(cloth, sub, self.logo)
         return self._layer(sub, cloth, (y1 + origin[0], x1 + origin[1]), tid)
 
     def _dress_layer(self, im: np.ndarray, cover: np.ndarray, origin: tuple[int, int], tid: int) -> Layer:
