@@ -396,6 +396,7 @@ TEXT: dict[str, tuple[str, str]] = {
         "Your card is NVIDIA but the fast mode is off, so protection runs slower: more full-screen covers and choppier clothing. Turn it on now? (about {gb} GB download and about 4 minutes of preparation, once). «No» starts in the slow mode.",
     ),
     "sec_quality": ("الجودة والتأخير", "Quality and delay"),
+    "follow_obs": ("تلقائي: نفس دقة وإطارات OBS (يُنصح فيه)", "Automatic: the same size and frame rate as OBS (recommended)"),
     "resolution": ("الدقة", "Resolution"),
     "fps": ("الإطارات بالثانية", "Frames per second"),
     "quality_hint": (

@@ -36,6 +36,7 @@ class Settings:
     delay: float = 0.0  # seconds; 0 = automatic (engine.delay_for: 2 s on the fast NVIDIA mode, else 3 s)
     resolution: str = "1080p"  # of the live picture (RESOLUTIONS); a recorded video keeps its own
     fps: int = 60  # of the live picture: 30 or 60 (a recorded video keeps its own)
+    follow_obs: bool = True  # live from OBS: resolution and fps follow OBS's own video settings at every start
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
     translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start

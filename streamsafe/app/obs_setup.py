@@ -1,9 +1,10 @@
 """Set OBS up for StreamSafe by itself, so the streamer does not touch OBS's settings.
 
-What it changes in OBS's current profile (a copy of each file is kept once as ``*.before-streamsafe``):
-- Settings > Stream: Custom server = StreamSafe's local address, no key (``service.json``);
-- the bitrate OBS sends to StreamSafe: high (it never leaves the PC), keyframe every 2 s
-  (``basic.ini`` [SimpleOutput], or ``streamEncoder.json`` in Advanced output mode).
+Only what StreamSafe needs, nothing of the streamer's own setup (a copy is kept once as ``*.before-streamsafe``):
+- Settings > Stream: Custom server = StreamSafe's local address, no key (``service.json``). Video size, frame rate,
+  encoder, bitrate, audio and scenes stay as the streamer set them; StreamSafe follows what OBS sends.
+- An OBS with no picture source at all (a fresh one) gets "Display capture" + "Game capture" in its scene, so the
+  stream is not black. A scene that has any source is never touched.
 
 OBS keeps its settings in memory and writes them back when it closes, so the files are only changed while OBS is
 closed. Then StreamSafe opens OBS with ``--startstreaming``: OBS connects to StreamSafe without a click.
@@ -18,12 +19,12 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
 OBS_EXE = "obs64.exe"
 OBS_PATHS = (r"C:\Program Files\obs-studio\bin\64bit\obs64.exe", r"C:\Program Files (x86)\obs-studio\bin\64bit\obs64.exe")
-LOCAL_KBPS = 20000  # OBS -> StreamSafe stays inside the PC: high costs nothing and keeps the picture sharp
 BACKUP = ".before-streamsafe"
 
 
@@ -103,11 +104,74 @@ def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=4), encoding="utf-8")
 
 
+def obs_video(env: Mapping[str, str] | None = None) -> tuple[int, int, float] | None:
+    """What OBS sends: its output width, height and frame rate (Settings > Video), or None if unknown."""
+    root = config_dir(env)
+    prof = profile_dir(root) if root else None
+    if prof is None:
+        return None
+    cp = _ini(prof / "basic.ini")
+    try:
+        w = cp.getint("Video", "OutputCX", fallback=0) or cp.getint("Video", "BaseCX", fallback=0)
+        h = cp.getint("Video", "OutputCY", fallback=0) or cp.getint("Video", "BaseCY", fallback=0)
+        kind = cp.getint("Video", "FPSType", fallback=0)
+        if kind == 1:
+            fps = float(cp.getint("Video", "FPSInt", fallback=30))
+        elif kind == 2:
+            fps = cp.getint("Video", "FPSNum", fallback=30) / max(1, cp.getint("Video", "FPSDen", fallback=1))
+        else:
+            fps = float(cp.get("Video", "FPSCommon", fallback="30") or 30)
+    except (ValueError, configparser.Error):
+        return None
+    if not (w and h):
+        w, h = 1920, 1080  # OBS's own default when it was never changed
+    return w, h, fps
+
+
+def _scene_file(root: Path) -> Path | None:
+    """The scene collection OBS opens with."""
+    scenes = root / "basic" / "scenes"
+    for name in ("user.ini", "global.ini"):
+        f = _ini(root / name).get("Basic", "SceneCollectionFile", fallback="")
+        if f and (scenes / f"{f}.json").is_file():
+            return scenes / f"{f}.json"
+    found = sorted(scenes.glob("*.json")) if scenes.is_dir() else []
+    return found[0] if found else None
+
+
+def _add_capture_if_empty(scene_file: Path) -> bool:
+    """A scene collection with no picture source: add Display capture and Game capture (any full-screen game,
+    on top) to its current scene. True when something was added."""
+    data = json.loads(scene_file.read_text(encoding="utf-8-sig"))
+    sources = data.get("sources", [])
+    if any(src.get("id") != "scene" and src.get("id") != "group" for src in sources):
+        return False  # the streamer has sources: hands off
+    current = data.get("current_scene") or (sources[0]["name"] if sources else "Scene")
+    scene = next((src for src in sources if src.get("id") == "scene" and src.get("name") == current), None)
+    if scene is None:
+        scene = {"id": "scene", "versioned_id": "scene", "name": current, "uuid": str(uuid.uuid4()), "settings": {"items": []}}
+        sources.append(scene)
+        data.setdefault("scene_order", []).append({"name": current})
+        data["current_scene"] = data["current_program_scene"] = current
+    items = scene.setdefault("settings", {}).setdefault("items", [])
+    for n, (kind, name, settings) in enumerate(
+        (("monitor_capture", "Display capture", {}), ("game_capture", "Game capture", {"capture_mode": "any_fullscreen"})), 1
+    ):
+        sid = str(uuid.uuid4())
+        sources.append({"id": kind, "versioned_id": kind, "name": name, "uuid": sid, "settings": settings})
+        items.append({"name": name, "source_uuid": sid, "visible": True, "id": n})
+    scene["settings"]["id_counter"] = len(items)
+    data["sources"] = sources
+    _backup(scene_file)
+    scene_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
+    return True
+
+
 def apply(server: str, env: Mapping[str, str] | None = None, running: Callable[[], bool] = obs_running) -> str:
     """Points OBS at StreamSafe. Returns "" or why not: running / no_obs / error."""
     root = config_dir(env)
     prof = profile_dir(root) if root else None
-    if prof is None:
+    if root is None or prof is None:
         return "no_obs"
     if running():
         return "running"
@@ -119,26 +183,11 @@ def apply(server: str, env: Mapping[str, str] | None = None, running: Callable[[
         settings = dict(old.get("settings", {})) if old.get("type") == "rtmp_custom" else {}
         settings.update({"server": server, "key": "", "use_auth": False, "bwtest": False})
         _write_json(svc, {"type": "rtmp_custom", "settings": settings})
-
-        ini_path = prof / "basic.ini"
-        cp = _ini(ini_path)
-        mode = cp.get("Output", "Mode", fallback="Simple")
-        if mode == "Advanced":
-            enc = prof / "streamEncoder.json"
-            data: dict = {}
-            with contextlib.suppress(OSError, ValueError):
-                data = json.loads(enc.read_text(encoding="utf-8-sig"))
-            data.update({"rate_control": "CBR", "bitrate": max(int(data.get("bitrate", 0) or 0), LOCAL_KBPS), "keyint_sec": 2})
-            _write_json(enc, data)
-        else:
-            if not cp.has_section("SimpleOutput"):
-                cp.add_section("SimpleOutput")
-            now = cp.get("SimpleOutput", "VBitrate", fallback="0")
-            cp.set("SimpleOutput", "VBitrate", str(max(int(now) if now.isdigit() else 0, LOCAL_KBPS)))
-            _backup(ini_path)
-            with ini_path.open("w", encoding="utf-8-sig", newline="\r\n") as f:
-                cp.write(f, space_around_delimiters=False)
-    except (OSError, ValueError, configparser.Error):
+        scene_file = _scene_file(root)
+        if scene_file is not None:
+            with contextlib.suppress(OSError, ValueError, KeyError, TypeError, AttributeError):
+                _add_capture_if_empty(scene_file)
+    except (OSError, ValueError):
         return "error"
     return ""
 

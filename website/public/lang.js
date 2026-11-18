@@ -12,7 +12,7 @@
   }
   set(get());
   document.addEventListener("click", function (e) {
-    if (e.target.closest && e.target.closest(".lang-btn")) set(h.lang === "ar" ? "en" : "ar");
+    if (e.target.closest && e.target.closest(".lang")) set(h.lang === "ar" ? "en" : "ar");
   });
 })();
 // hero video: honour reduced motion and give a pause button (motion longer than 5 s needs one)

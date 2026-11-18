@@ -280,6 +280,7 @@ class App(tk.Tk):
         v("resolution", tk.StringVar, "").set(st.resolution)
         v("fps", tk.StringVar, "").set(str(st.fps))
         v("translate", tk.BooleanVar, st.translate_ar)
+        v("follow_obs", tk.BooleanVar, st.follow_obs)
         v("license_key", tk.StringVar, "")
 
     # --- small building blocks -------------------------------------------------------------------------------
@@ -400,9 +401,9 @@ class App(tk.Tk):
         s2 = self.step(c, 2, self.tr("step_key"))
         url_entry = self.field(s2, self.tr("rtmp_url"), v("rtmp_url", tk.StringVar, ""))
         key_entry = self.field(s2, self.tr("stream_key"), v("key", tk.StringVar, ""), show="•")
-        for ent in (url_entry, key_entry):
-            ent.bind("<FocusOut>", lambda e: self.tidy_target(), add="+")
-            ent.bind("<<Paste>>", lambda e: self.after(50, self.tidy_target), add="+")
+        for ent, typed_server in ((url_entry, True), (key_entry, False)):
+            ent.bind("<FocusOut>", lambda e, t=typed_server: self.tidy_target(t), add="+")
+            ent.bind("<<Paste>>", lambda e, t=typed_server: self.after(50, lambda: self.tidy_target(t)), add="+")
         self.pack_row(ttk.Checkbutton(s2, text=self.tr("remember_key"), variable=v("remember", tk.BooleanVar, False)))
         if not self.ctrl.keys.available:
             self.small(s2, self.tr("key_no_store"))
@@ -500,6 +501,7 @@ class App(tk.Tk):
 
         # picture quality: the same as OBS sends, nothing is made smaller or slower on the way
         c = self.card(s, self.tr("sec_quality"), self.tr("quality_hint"))
+        self.pack_row(ttk.Checkbutton(c, text=self.tr("follow_obs"), variable=v("follow_obs", tk.BooleanVar, True)))
         res = self.field(c, self.tr("resolution"), v("resolution", tk.StringVar, ""), 10, combo=list(cfg.RESOLUTIONS))
         res.configure(state="readonly")  # type: ignore[call-arg]
         rate = self.field(c, self.tr("fps"), v("fps", tk.StringVar, ""), 10, combo=[str(f) for f in cfg.FPS_CHOICES])
@@ -566,20 +568,24 @@ class App(tk.Tk):
         return names.get(shown, "custom")
 
     def on_platform(self) -> None:
-        """A platform picked: its own server goes into the box (a server typed for another platform is replaced)."""
+        """A platform picked: the pick wins. Its own server goes into the box; a server of another platform (or one
+        of ours) is replaced, so a server left from before can never send the stream to the wrong platform."""
         plat, url = self.platform_value(), str(self._vars["rtmp_url"].get()).strip()
         known = {ingest.normalise(u) for u in ingest.PRESETS.values() if u}
-        if not url or ingest.normalise(url) in known:
+        other = ingest.guess_platform(url) not in ("custom", plat)
+        if not url or ingest.normalise(url) in known or other:
             self._vars["rtmp_url"].set(ingest.PRESETS.get(plat, ""))
+        self.ctrl.settings.platform = plat
         self.show_platform_hint()
 
     def show_platform_hint(self) -> None:
         with contextlib.suppress(tk.TclError, AttributeError):
             self.platform_hint.configure(text=self.tr("plat_hint_" + self.platform_value()))
 
-    def tidy_target(self) -> None:
+    def tidy_target(self, typed_server: bool = True) -> None:
         """After a paste or leaving a box: a whole address is split into server and key, spaces go, Kick's server
-        gets its ``/app``, and the platform follows the address."""
+        gets its ``/app``. The platform follows the address only when the streamer gave the address (server box,
+        or a whole address pasted in the key box), never from a server left in the box (a key paste)."""
         url, key = str(self._vars["rtmp_url"].get()), str(self._vars["key"].get())
         if not url.strip() and not key.strip():
             return
@@ -590,7 +596,7 @@ class App(tk.Tk):
         if clean_key != key:
             self._vars["key"].set(clean_key)
         guess = ingest.guess_platform(server)
-        if guess != "custom" and guess != self.platform_value():
+        if (typed_server or server != url) and guess != "custom" and guess != self.platform_value():
             self._vars["platform"].set(self.tr("plat_" + guess))
         self.show_platform_hint()
 
@@ -627,7 +633,7 @@ class App(tk.Tk):
 
     def on_test_link(self) -> None:
         self.collect()
-        self.tidy_target()
+        self.tidy_target(typed_server=False)
         self.collect()
         key = str(self._vars["key"].get()).strip()
         problems = self.ctrl.target(key).problems
@@ -761,6 +767,7 @@ class App(tk.Tk):
         st.platform = self.platform_value()
         st.remember_key = bool(v["remember"].get())
         st.translate_ar = bool(v["translate"].get())
+        st.follow_obs = bool(v["follow_obs"].get())
         try:
             st.srt_port = int(str(v["srt_port"].get()).strip())
         except ValueError:
@@ -1014,6 +1021,9 @@ class App(tk.Tk):
             return
         if not self.ctrl.remember(key):
             self._vars["remember"].set(False)
+        engine.follow_obs(self.ctrl.settings, obs_setup.obs_video())  # the streamer's own OBS quality, nothing to set
+        self._vars["resolution"].set(self.ctrl.settings.resolution)
+        self._vars["fps"].set(str(self.ctrl.settings.fps))
         self.ctrl.save_settings()
         try:
             self.ctrl.start(key)

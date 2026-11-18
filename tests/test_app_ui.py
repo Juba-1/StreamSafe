@@ -162,6 +162,19 @@ def test_pasting_a_kick_address_with_the_key_fills_both_boxes(app):
     assert app.platform_value() == "kick"
 
 
+def test_a_server_left_from_before_never_moves_the_stream_to_another_platform(app):
+    """Field report 18 Nov: Kick picked, a YouTube server left in the box from before -> after pasting the Kick key
+    the platform jumped to YouTube and the stream stopped."""
+    app._vars["rtmp_url"].set("rtmp://a.rtmp.youtube.com/live2")  # not our preset: typed earlier
+    app._vars["platform"].set(app.tr("plat_kick"))
+    app.on_platform()  # the pick wins: Kick's server replaces the YouTube one
+    assert app._vars["rtmp_url"].get() == ingest.PRESETS["kick"]
+    app._vars["rtmp_url"].set("rtmp://a.rtmp.youtube.com/live2")  # even if it is there again
+    app._vars["key"].set("sk_us-west-2_abcDEF123")
+    app.tidy_target(typed_server=False)  # a key paste
+    assert app.platform_value() == "kick"
+
+
 def test_platform_choice_fills_its_server(app):
     app._vars["rtmp_url"].set("")
     app._vars["platform"].set(app.tr("plat_youtube"))

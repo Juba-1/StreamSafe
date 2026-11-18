@@ -65,6 +65,17 @@ def delay_for(settings: Settings, fast: bool) -> float:
     return settings.delay if settings.delay > 0 else (AUTO_DELAY_FAST if fast else AUTO_DELAY_SLOW)
 
 
+def follow_obs(settings: Settings, video: tuple[int, int, float] | None) -> None:
+    """Live from OBS: our picture is OBS's own (the smallest of our sizes that holds it, 30 or 60 fps), so the
+    streamer's quality is kept without setting anything twice."""
+    if not settings.follow_obs or settings.input != INPUT_SRT or video is None:
+        return
+    _w, h, fps = video
+    fits = [name for name, (_rw, rh) in sorted(RESOLUTIONS.items(), key=lambda kv: kv[1][1]) if rh >= h]
+    settings.resolution = fits[0] if fits else "2160p"
+    settings.fps = 60 if fps > 45 else 30
+
+
 def run_args(settings: Settings, reports: Path, record_file: str = "", fast: bool = True) -> list[str]:
     """Arguments of ``run`` for these settings. Never holds the stream key.
 

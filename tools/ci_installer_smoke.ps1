@@ -166,6 +166,8 @@ if ($encText -match '"chosen": "[a-z0-9_]+"') {
     Check ($setup -match '"result": "ok"' -and $setup -match '"set": true' -and $setup -match '"opened": true') "obs-setup: OBS set up and opened"
     $svc = Get-Content (Join-Path $prof "service.json") -Raw; Write-Host $svc
     Check ($svc -match "rtmp_custom" -and $svc -match "srt://127.0.0.1:9000") "OBS's stream settings now point at the program"
+    Check ((Get-Content (Join-Path $prof "basic.ini") -Raw) -match "VBitrate=2500") "the streamer's own video and bitrate settings are untouched"
+    Check (-not ((Get-Content (Join-Path $cfg "basic\scenes\Untitled.json") -Raw) -match "monitor_capture")) "a scene with sources is untouched"
     $end = (Get-Date).AddSeconds(120); $conn = $false
     while ((Get-Date) -lt $end) {
       if ((Get-Content (Join-Path $ro "engine_out.txt") -Raw -ErrorAction SilentlyContinue) -match '"obs_connected"') { $conn = $true; break }
@@ -183,6 +185,35 @@ if ($encText -match '"chosen": "[a-z0-9_]+"') {
     Write-Host ($o -split "`n" | Where-Object { $_ -match "^STATUS" } | Select-Object -First 12 | Out-String)
     Check $conn "real OBS connected to the program by itself (--startstreaming)"
     Check ((Test-Path $flv2) -and (Get-Item $flv2).Length -gt 20000) "the platform received the stream from real OBS ($(if (Test-Path $flv2) { (Get-Item $flv2).Length } else { 0 }) bytes)"
+
+    # a fresh OBS with an empty scene: the program adds Display + Game capture, so the stream shows the screen, not black
+    '{"name":"Untitled","current_scene":"Scene","current_program_scene":"Scene","scene_order":[{"name":"Scene"}],"sources":[{"id":"scene","versioned_id":"scene","name":"Scene","uuid":"0e4f5b2e-1111-4c1a-9a7e-000000000009","settings":{"id_counter":0,"items":[]}}]}' |
+      Out-File (Join-Path $cfg "basic\scenes\Untitled.json") -Encoding ascii
+    $flv3 = Join-Path $ro "platform_empty_scene.flv"
+    $plat = Start-Process $ffmpeg -ArgumentList "-hide_banner","-loglevel","error","-y","-listen","1","-i","rtmp://127.0.0.1:19350/app/test_key_123","-c","copy",$flv3 -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 2
+    $eng = Start-Process $cli -ArgumentList "selftest-stream","--input","srt://127.0.0.1:9000?mode=listener","--output","rtmp://127.0.0.1:19350/app/test_key_123","--delay","1","--size","640x360","--report-dir",$ro `
+      -RedirectStandardOutput (Join-Path $ro "engine2_out.txt") -RedirectStandardError (Join-Path $ro "engine2_err.txt") -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 8
+    $setup2 = (& $cli obs-setup --open | Out-String); Write-Host $setup2
+    Check ((Get-Content (Join-Path $cfg "basic\scenes\Untitled.json") -Raw) -match "monitor_capture") "an empty OBS scene got Display capture + Game capture"
+    $end = (Get-Date).AddSeconds(120); $conn2 = $false
+    while ((Get-Date) -lt $end) {
+      if ((Get-Content (Join-Path $ro "engine2_out.txt") -Raw -ErrorAction SilentlyContinue) -match '"obs_connected"') { $conn2 = $true; break }
+      Start-Sleep -Seconds 1
+    }
+    Start-Sleep -Seconds 12
+    Get-Process obs64 -ErrorAction SilentlyContinue | Stop-Process -Force
+    if (-not $eng.HasExited) { & taskkill /T /F /PID $eng.Id | Out-Null }
+    if (-not $plat.HasExited) { Start-Sleep -Seconds 3; if (-not $plat.HasExited) { & taskkill /T /F /PID $plat.Id | Out-Null } }
+    Start-Sleep -Seconds 2
+    Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($installDir) } | ForEach-Object { Stop-Process -Id $_.Id -Force }
+    Check $conn2 "real OBS (fresh scene) connected by itself"
+    # what OBS sent, before our cover: OBS's own log says the capture sources loaded
+    $obslog = Get-ChildItem (Join-Path $env:APPDATA "obs-studio\logs") | Sort-Object LastWriteTime | Select-Object -Last 1
+    Copy-Item $obslog.FullName (Join-Path $ro "obs_log_empty_scene.txt")
+    $lt = Get-Content $obslog.FullName -Raw
+    Check ($lt -match "Display capture" -and $lt -match "Game capture") "OBS loaded the two capture sources the program added"
   } else {
     Write-Host "::warning::OBS could not be installed on this runner: the real OBS check is skipped"
   }
