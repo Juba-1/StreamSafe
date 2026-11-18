@@ -80,7 +80,7 @@ def test_launch_starts_streaming_from_obs_folder(tmp_path):
     seen = {}
     exe = tmp_path / "bin" / "obs64.exe"
     assert obs_setup.launch(exe, popen=lambda args, **kw: seen.update(args=args, **kw))
-    assert seen["args"] == [str(exe), "--startstreaming"] and seen["cwd"] == str(exe.parent)
+    assert seen["args"] == [str(exe), "--disable-shutdown-check", "--startstreaming"] and seen["cwd"] == str(exe.parent)
 
 
 def test_our_picture_follows_obs_own_video_settings(tmp_path):

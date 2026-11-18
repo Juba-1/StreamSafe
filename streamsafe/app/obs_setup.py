@@ -194,7 +194,8 @@ def apply(server: str, env: Mapping[str, str] | None = None, running: Callable[[
 
 def launch(exe: Path, start_streaming: bool = True, popen: Callable[..., object] = subprocess.Popen) -> bool:
     """Opens OBS (from its own folder, as OBS needs) and lets it start streaming to StreamSafe by itself."""
-    args = [str(exe)] + (["--startstreaming"] if start_streaming else [])
+    # --disable-shutdown-check: after a crash OBS would first ask about Safe Mode and not start streaming
+    args = [str(exe), "--disable-shutdown-check"] + (["--startstreaming"] if start_streaming else [])
     try:
         popen(args, cwd=str(exe.parent), close_fds=True)
     except OSError:
