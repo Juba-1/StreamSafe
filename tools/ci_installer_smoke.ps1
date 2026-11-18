@@ -186,7 +186,9 @@ if ($encText -match '"chosen": "[a-z0-9_]+"') {
     Check $conn "real OBS connected to the program by itself (--startstreaming)"
     Check ((Test-Path $flv2) -and (Get-Item $flv2).Length -gt 20000) "the platform received the stream from real OBS ($(if (Test-Path $flv2) { (Get-Item $flv2).Length } else { 0 }) bytes)"
 
-    # a fresh OBS with an empty scene: the program adds Display + Game capture, so the stream shows the screen, not black
+    # a fresh OBS with an empty scene: the program adds Display + Game capture, so the stream shows the screen, not black.
+    # The test killed OBS: clear OBS's crash marker as a normal close does (else OBS 33 first asks about Safe Mode)
+    Remove-Item (Join-Path $cfg ".sentinel") -Recurse -Force -ErrorAction SilentlyContinue
     '{"name":"Untitled","current_scene":"Scene","current_program_scene":"Scene","scene_order":[{"name":"Scene"}],"sources":[{"id":"scene","versioned_id":"scene","name":"Scene","uuid":"0e4f5b2e-1111-4c1a-9a7e-000000000009","settings":{"id_counter":0,"items":[]}}]}' |
       Out-File (Join-Path $cfg "basic\scenes\Untitled.json") -Encoding ascii
     $flv3 = Join-Path $ro "platform_empty_scene.flv"
