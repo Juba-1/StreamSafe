@@ -138,6 +138,51 @@ if ($encText -match '"chosen": "[a-z0-9_]+"') {
   Write-Host "::warning::no H.264 encoder on this runner: the live path smoke is skipped"
 }
 
+Step "real OBS: the program sets OBS up by itself, opens it, and OBS streams to the program without a click"
+if ($encText -match '"chosen": "[a-z0-9_]+"') {
+  $ro = Join-Path $OutDir "real_obs"; New-Item -ItemType Directory -Force $ro | Out-Null
+  & choco install obs-studio -y --no-progress *> (Join-Path $ro "choco.txt")
+  $obsExe = "C:\Program Files\obs-studio\bin\64bit\obs64.exe"
+  if (Test-Path $obsExe) {
+    # a streamer's OBS after its first run: one profile (Twitch selected, a key in it), a scene, small video for the runner
+    $cfg = Join-Path $env:APPDATA "obs-studio"; $prof = Join-Path $cfg "basic\profiles\Untitled"
+    New-Item -ItemType Directory -Force $prof, (Join-Path $cfg "basic\scenes") | Out-Null
+    $glob = "[General]`r`nFirstRun=false`r`nLastVersion=520093696`r`n`r`n[Basic]`r`nProfile=Untitled`r`nProfileDir=Untitled`r`nSceneCollection=Untitled`r`nSceneCollectionFile=Untitled`r`nConfigOnNewProfile=false`r`n"
+    $glob | Out-File (Join-Path $cfg "global.ini") -Encoding utf8; $glob | Out-File (Join-Path $cfg "user.ini") -Encoding utf8
+    "[General]`r`nName=Untitled`r`n`r`n[Video]`r`nBaseCX=640`r`nBaseCY=360`r`nOutputCX=640`r`nOutputCY=360`r`nFPSType=0`r`nFPSCommon=30`r`n`r`n[Output]`r`nMode=Simple`r`n`r`n[SimpleOutput]`r`nVBitrate=2500`r`nStreamEncoder=x264`r`n" | Out-File (Join-Path $prof "basic.ini") -Encoding utf8
+    '{"type":"rtmp_common","settings":{"service":"Twitch","server":"auto","key":"live_123"}}' | Out-File (Join-Path $prof "service.json") -Encoding ascii
+    $flv2 = Join-Path $ro "platform.flv"
+    $plat = Start-Process $ffmpeg -ArgumentList "-hide_banner","-loglevel","error","-y","-listen","1","-i","rtmp://127.0.0.1:19350/app/test_key_123","-c","copy",$flv2 -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 2
+    $eng = Start-Process $cli -ArgumentList "selftest-stream","--input","srt://127.0.0.1:9000?mode=listener","--output","rtmp://127.0.0.1:19350/app/test_key_123","--delay","1","--size","640x360","--report-dir",$ro `
+      -RedirectStandardOutput (Join-Path $ro "engine_out.txt") -RedirectStandardError (Join-Path $ro "engine_err.txt") -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 8
+    $setup = (& $cli obs-setup --open | Out-String); Write-Host $setup
+    Check ($setup -match '"result": "ok"' -and $setup -match '"set": true' -and $setup -match '"opened": true') "obs-setup: OBS set up and opened"
+    $svc = Get-Content (Join-Path $prof "service.json") -Raw; Write-Host $svc
+    Check ($svc -match "rtmp_custom" -and $svc -match "srt://127.0.0.1:9000") "OBS's stream settings now point at the program"
+    $end = (Get-Date).AddSeconds(120); $conn = $false
+    while ((Get-Date) -lt $end) {
+      if ((Get-Content (Join-Path $ro "engine_out.txt") -Raw -ErrorAction SilentlyContinue) -match '"obs_connected"') { $conn = $true; break }
+      Start-Sleep -Seconds 1
+    }
+    Start-Sleep -Seconds 10
+    try { Add-Type -AssemblyName System.Drawing; $bmp = New-Object System.Drawing.Bitmap 1280, 800; $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen(0, 0, 0, 0, $bmp.Size); $bmp.Save((Join-Path $ro "screen.png")) } catch { Write-Host "no screenshot: $_" }
+    Get-Process obs64 -ErrorAction SilentlyContinue | Stop-Process -Force
+    if (-not $eng.HasExited) { & taskkill /T /F /PID $eng.Id | Out-Null }
+    if (-not $plat.HasExited) { Start-Sleep -Seconds 3; if (-not $plat.HasExited) { & taskkill /T /F /PID $plat.Id | Out-Null } }
+    Start-Sleep -Seconds 2
+    Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($installDir) } | ForEach-Object { Stop-Process -Id $_.Id -Force }
+    Copy-Item (Join-Path $env:APPDATA "obs-studio\logs") (Join-Path $ro "obs_logs") -Recurse -ErrorAction SilentlyContinue
+    $o = Get-Content (Join-Path $ro "engine_out.txt") -Raw -ErrorAction SilentlyContinue
+    Write-Host ($o -split "`n" | Where-Object { $_ -match "^STATUS" } | Select-Object -First 12 | Out-String)
+    Check $conn "real OBS connected to the program by itself (--startstreaming)"
+    Check ((Test-Path $flv2) -and (Get-Item $flv2).Length -gt 20000) "the platform received the stream from real OBS ($(if (Test-Path $flv2) { (Get-Item $flv2).Length } else { 0 }) bytes)"
+  } else {
+    Write-Host "::warning::OBS could not be installed on this runner: the real OBS check is skipped"
+  }
+}
+
 Step "the engine refuses to stream with test heads (fail closed)"
 if (-not $RealHeads) {
   $out = (& $cli run --input "device:none" --output window | Out-String)

@@ -180,10 +180,30 @@ TEXT: dict[str, tuple[str, str]] = {
     "quick_note": ("مرة وحدة بس، والبرنامج يتذكرها.", "Only once; StreamSafe remembers it."),
     "step_platform": ("اختر منصتك", "Pick your platform"),
     "step_key": ("الصق مفتاح البث", "Paste your stream key"),
-    "step_obs": ("حط هذا العنوان في OBS", "Put this address in OBS"),
+    "step_obs": ("OBS: نجهّزه لك", "OBS: we set it up for you"),
     "step_obs_note": (
-        "في OBS: الإعدادات ← البث ← الخدمة: مخصص (Custom)، والصق العنوان في خانة السيرفر.",
-        "In OBS: Settings → Stream → Service: Custom, then paste it into Server.",
+        "سكّر OBS واضغط الزر مرة وحدة. بعدها كل ما تضغط «ابدأ الحماية» نفتح OBS ويبدأ يرسل لنا لحاله.",
+        "Close OBS and press the button once. After that, every «Start protection» opens OBS and it starts sending to us by itself.",
+    ),
+    "obs_auto_btn": ("اضبط OBS تلقائياً", "Set up OBS for me"),
+    "obs_auto_done": ("تم ✓ OBS جاهز، ما تحتاج تغيّر فيه شي.", "Done ✓ OBS is ready; nothing to change in it."),
+    "obs_auto_running": (
+        "OBS مفتوح: سكّره أول (نعدّل إعداداته وهو مقفل)، وبعدها اضغط «اضبط OBS تلقائياً» أو «ابدأ الحماية» مرة ثانية.",
+        "OBS is open: close it first (we change its settings while it is closed), then press «Set up OBS for me» or «Start protection» again.",
+    ),
+    "obs_auto_no_obs": (
+        "ما لقينا OBS على جهازك. نزّله من obsproject.com وافتحه مرة وحدة وسكّره، وبعدها ارجع هنا.",
+        "OBS isn't on this PC. Get it from obsproject.com, open it once and close it, then come back here.",
+    ),
+    "obs_auto_error": (
+        "ما قدرنا نعدّل إعدادات OBS. استخدم العنوان تحت وطريقة الربط خطوة بخطوة.",
+        "We couldn't change OBS's settings. Use the address below and the step-by-step guide.",
+    ),
+    "obs_opening": ("نفتح OBS، ويبدأ يرسل لـ StreamSafe لحاله...", "Opening OBS; it starts sending to StreamSafe by itself..."),
+    "obs_press_start": ("OBS مفتوح وجاهز: اضغط Start Streaming فيه.", "OBS is open and ready: press Start Streaming in it."),
+    "obs_manual": (
+        "أو بنفسك: في OBS الخدمة «مخصص» والسيرفر هذا العنوان، والمفتاح فاضي.",
+        "Or by hand: in OBS, Service «Custom», this address as Server, key empty.",
     ),
     "console_hint": (
         "تلعب على بلايستيشن أو إكس بوكس؟ طفّ HDCP وHDR من إعدادات الجهاز، ودخّل كارت التصوير في OBS مثل العادة.",

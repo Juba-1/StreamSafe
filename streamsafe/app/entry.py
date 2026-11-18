@@ -10,6 +10,7 @@
     <name>.exe link-test --output env:NAME   a few seconds of the black slate to the platform: is the key taken?
     <name>.exe devices                 capture devices of this PC (cameras, capture cards, their sound), one JSON line
     <name>.exe selftest-stream --input ... --output ...   the live path without models: every frame fully covered
+    <name>.exe obs-setup [--server srt://...] [--open]   point OBS at this program (OBS closed); --open: start OBS streaming
 
 In the installed program the product settings are filled in where the environment does not set them
 (``product_defaults``): the ONNX backend, the model folder ``<data>/models`` (or ``--models DIR``), the heads,
@@ -225,6 +226,19 @@ def main(argv: list[str] | None = None) -> int:
 
             encoders.choose_into(os.environ, rest)
         return cli.main(rest, factory=cover_all_analyzer)
+    elif cmd == "obs-setup":  # support / CI: what the window's "Set up OBS for me" does, one JSON line
+        import json
+
+        from streamsafe.app import obs_setup
+        from streamsafe.app import settings as cfg
+
+        server = rest[rest.index("--server") + 1] if "--server" in rest else f"srt://127.0.0.1:{cfg.Settings().srt_port}"
+        why = obs_setup.apply(server)
+        exe = obs_setup.find_obs()
+        opened = bool(not why and "--open" in rest and exe is not None and obs_setup.launch(exe))
+        out = {"result": why or "ok", "set": obs_setup.is_set(server), "obs": str(exe or ""), "opened": opened}
+        print("OBS_SETUP " + json.dumps(out), flush=True)
+        return 0 if not why else 1
     else:
         print((__doc__ or "").replace("<name>", CLI_EXE))
         return 0 if cmd in ("", "-h", "--help") else USAGE_EXIT

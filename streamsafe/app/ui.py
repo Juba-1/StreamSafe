@@ -22,7 +22,7 @@ import webbrowser
 from collections.abc import Callable
 from tkinter import filedialog, messagebox, ttk
 
-from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, passkey, paths, plan, release, updates
+from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, obs_setup, passkey, paths, plan, release, updates
 from streamsafe.app import settings as cfg
 from streamsafe.branding import PRODUCT_NAME
 
@@ -411,6 +411,10 @@ class App(tk.Tk):
         self.test_result.pack(side=side, padx=8)
         s3 = self.step(c, 3, self.tr("step_obs"))
         self.small(s3, self.tr("step_obs_note"))
+        af = self.buttons(s3, (self.tr("obs_auto_btn"), self.on_obs_setup))
+        self.obs_result = self.label(af, "", font=(FONT, 9, "bold"), wraplength=360)
+        self.obs_result.pack(side=side, padx=8)
+        self.small(s3, self.tr("obs_manual"))
         fr = tk.Frame(s3, bg=SAND, padx=10, pady=8)
         self.srt_hint = tk.Label(fr, text="", font=("Consolas", 11, "bold"), bg=SAND, fg=INK)
         ttk.Button(fr, text=self.tr("copy"), width=8, command=lambda: self.copy(self.obs_server())).pack(side=side)
@@ -1015,8 +1019,42 @@ class App(tk.Tk):
             self.ctrl.start(key)
         except (RuntimeError, OSError) as exc:
             self.message.configure(text=self.tr("not_ready", why=self.tr(str(exc)) if str(exc) in i18n.TEXT else str(exc)))
+        else:
+            if self.ctrl.settings.input == cfg.INPUT_SRT:
+                threading.Thread(target=self.bring_obs, name="obs", daemon=True).start()
         self._last_status = ""
         self.show_status(force=True)
+
+    # --- OBS set up by itself -----------------------------------------------------------------------------
+    def obs_text(self, why: str) -> str:
+        return {
+            "": self.tr("obs_auto_done"),
+            "running": self.tr("obs_auto_running"),
+            "no_obs": self.tr("obs_auto_no_obs"),
+        }.get(why, self.tr("obs_auto_error"))
+
+    def on_obs_setup(self) -> None:
+        """Step 3's button: point OBS at us (OBS closed), once."""
+        self.collect()
+        why = obs_setup.apply(self.obs_server())
+        self.obs_result.configure(text=self.obs_text(why), fg="#1b7f3b" if not why else "#b3261e")
+
+    def bring_obs(self) -> None:
+        """After Start (worker thread): OBS closed -> set it up if needed and open it streaming to us by itself;
+        OBS open -> say what to press, or that it must be closed once to be set up."""
+        server = self.obs_server()
+        if obs_setup.obs_running():
+            text = self.tr("obs_press_start") if obs_setup.is_set(server) else self.tr("obs_auto_running")
+            self.post(lambda: self.message.configure(text=text, fg="#44505e"))
+            return
+        why = "" if obs_setup.is_set(server) else obs_setup.apply(server)
+        exe = obs_setup.find_obs()
+        if why or exe is None:
+            text = self.obs_text(why or "no_obs")
+            self.post(lambda: self.message.configure(text=text, fg="#b3261e"))
+            return
+        if obs_setup.launch(exe):
+            self.post(lambda: self.message.configure(text=self.tr("obs_opening"), fg="#44505e"))
 
     def on_stop(self) -> None:
         self.message.configure(text=self.tr("stopping"), fg="#44505e")
