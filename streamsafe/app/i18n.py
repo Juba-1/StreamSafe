@@ -199,7 +199,10 @@ TEXT: dict[str, tuple[str, str]] = {
         "ما قدرنا نعدّل إعدادات OBS. استخدم العنوان تحت وطريقة الربط خطوة بخطوة.",
         "We couldn't change OBS's settings. Use the address below and the step-by-step guide.",
     ),
-    "obs_opening": ("نفتح OBS، ويبدأ يرسل لـ StreamSafe لحاله...", "Opening OBS; it starts sending to StreamSafe by itself..."),
+    "obs_opening": (
+        "نفتح OBS ويبدأ يرسل لـ StreamSafe لحاله. لو ما بدأ خلال ثواني، اضغط Start Streaming في OBS.",
+        "Opening OBS; it starts sending to StreamSafe by itself. If it hasn't within a few seconds, press Start Streaming in OBS.",
+    ),
     "obs_press_start": ("OBS مفتوح وجاهز: اضغط Start Streaming فيه.", "OBS is open and ready: press Start Streaming in it."),
     "obs_manual": (
         "أو بنفسك: في OBS الخدمة «مخصص» والسيرفر هذا العنوان، والمفتاح فاضي.",
