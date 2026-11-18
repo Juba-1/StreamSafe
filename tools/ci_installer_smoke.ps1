@@ -151,6 +151,11 @@ if ($encText -match '"chosen": "[a-z0-9_]+"') {
     $glob | Out-File (Join-Path $cfg "global.ini") -Encoding utf8; $glob | Out-File (Join-Path $cfg "user.ini") -Encoding utf8
     "[General]`r`nName=Untitled`r`n`r`n[Video]`r`nBaseCX=640`r`nBaseCY=360`r`nOutputCX=640`r`nOutputCY=360`r`nFPSType=0`r`nFPSCommon=30`r`n`r`n[Output]`r`nMode=Simple`r`n`r`n[SimpleOutput]`r`nVBitrate=2500`r`nStreamEncoder=x264`r`n" | Out-File (Join-Path $prof "basic.ini") -Encoding utf8
     '{"type":"rtmp_common","settings":{"service":"Twitch","server":"auto","key":"live_123"}}' | Out-File (Join-Path $prof "service.json") -Encoding ascii
+    # a saved scene (OBS only honours --startstreaming when it loads a saved scene collection, as a streamer's OBS does)
+    '{"name":"Untitled","current_scene":"Scene","current_program_scene":"Scene","scene_order":[{"name":"Scene"}],"sources":[' +
+      '{"id":"color_source_v3","versioned_id":"color_source_v3","name":"Game","uuid":"0e4f5b2e-1111-4c1a-9a7e-000000000001","settings":{"color":4278222848,"width":640,"height":360}},' +
+      '{"id":"scene","versioned_id":"scene","name":"Scene","uuid":"0e4f5b2e-1111-4c1a-9a7e-000000000002","settings":{"id_counter":1,"items":[{"name":"Game","source_uuid":"0e4f5b2e-1111-4c1a-9a7e-000000000001","visible":true,"id":1}]}}]}' |
+      Out-File (Join-Path $cfg "basic\scenes\Untitled.json") -Encoding ascii
     $flv2 = Join-Path $ro "platform.flv"
     $plat = Start-Process $ffmpeg -ArgumentList "-hide_banner","-loglevel","error","-y","-listen","1","-i","rtmp://127.0.0.1:19350/app/test_key_123","-c","copy",$flv2 -PassThru -WindowStyle Hidden
     Start-Sleep -Seconds 2
