@@ -242,8 +242,8 @@ FREE_PLANS = f"""<div class="plans">
 <div class="plan pro">
 {
     b(
-        '<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span>$5+ <small>support</small></span></p><p class="per">Support us on Ko-fi and write “Pro” in your message: we email you a Pro key for 30 days.</p><ul><li>Everything in Basic</li><li>Your own or a sponsor’s logo on the cover screen and the cloth</li><li>Priority support by email</li></ul>',
-        '<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span>5 <small>دولار أو أكثر، دعم</small></span></p><p class="per">ادعمنا على Ko-fi واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro لمدة 30 يوم.</p><ul><li>كل مزايا الأساسية</li><li>شعارك أو شعار الراعي على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li></ul>',
+        '<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span>Your call <small>any amount</small></span></p><p class="per">Support us on Ko-fi with whatever feels right to you and write “Pro” in your message: we email you a Pro key for 30 days. Every bit keeps StreamSafe free and growing.</p><ul><li>Everything in Basic</li><li>Your own or a sponsor’s logo on the cover screen and the cloth</li><li>Priority support by email</li></ul>',
+        '<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span>على كيفك <small>بأي مبلغ تحبه</small></span></p><p class="per">ادعمنا على Ko-fi بالمبلغ اللي تشوفه يستاهل، واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro لمدة 30 يوم. دعمك هو اللي يخلي StreamSafe مجاني ويكبر.</p><ul><li>كل مزايا الأساسية</li><li>شعارك أو شعار الراعي على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li></ul>',
     )
 }
 <a class="btn btn-main" href="{SUPPORT_URL}">{b("Get Pro on Ko-fi", "خذ Pro من Ko-fi", "span")}</a>
@@ -474,9 +474,9 @@ FAQ = [
     ),
     (
         "How do I get Pro?",
-        "Support us on Ko-fi with $5 or more and write “Pro” in your message. We email you a Pro key that works for 30 days: open StreamSafe, Advanced, Subscription and Pro key, paste it and press Activate.",
+        "Support us on Ko-fi with any amount you like and write “Pro” in your message. We email you a Pro key that works for 30 days: open StreamSafe, Advanced, Subscription and Pro key, paste it and press Activate.",
         "كيف آخذ Pro؟",
-        "ادعمنا على Ko-fi بـ 5 دولار أو أكثر واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro يشتغل 30 يوم. افتح StreamSafe ثم «إعدادات متقدمة» ثم «الاشتراك ومفتاح Pro»، والصق المفتاح واضغط «تفعيل».",
+        "ادعمنا على Ko-fi بأي مبلغ تحبه واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro يشتغل 30 يوم. افتح StreamSafe ثم «إعدادات متقدمة» ثم «الاشتراك ومفتاح Pro»، والصق المفتاح واضغط «تفعيل».",
     )
     if LAUNCH_FREE
     else (
