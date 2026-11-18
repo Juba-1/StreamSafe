@@ -384,8 +384,8 @@ HOME = f"""
 }</li>
 <li>{
     b(
-        "<h3>OBS, then go live</h3><p>In OBS: Settings, Stream, Service Custom, and paste the address StreamSafe shows. Press Start protection, then Start Streaming in OBS.</p>",
-        "<h3>OBS وابدأ</h3><p>في OBS: الإعدادات ثم البث ثم الخدمة «مخصص»، والصق العنوان اللي يعطيك إياه StreamSafe. اضغط «ابدأ الحماية» وبعدها Start Streaming في OBS.</p>",
+        "<h3>Go live</h3><p>Close OBS and press Set up OBS for me (once). From then on, Start protection opens OBS and your stream starts by itself.</p>",
+        "<h3>ابدأ البث</h3><p>سكّر OBS واضغط «اضبط OBS تلقائياً» مرة وحدة. بعدها «ابدأ الحماية» يفتح OBS ويبدأ بثك لحاله.</p>",
     )
 }</li>
 </ol>
