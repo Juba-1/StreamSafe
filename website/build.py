@@ -41,8 +41,8 @@ CTA_BIG = (
 
 PRICING_HEAD = (
     (
-        "<h2>Free during the GTA 6 launch</h2><p>StreamSafe is free to download and use while GTA 6 launches. Want your own logo on the covers? Pro comes with a small support.</p>",
-        "<h2>مجاني وقت إطلاق GTA 6</h2><p>StreamSafe مجاني تحمّله وتستخدمه وقت إطلاق اللعبة. وتبي شعارك على الغطاء؟ خذ Pro بدعم بسيط.</p>",
+        "<h2>Free during the GTA 6 launch</h2><p>StreamSafe is free to download and use while GTA 6 launches. Want your own logo on the covers? Pro comes with your support.</p>",
+        "<h2>مجاني وقت إطلاق GTA 6</h2><p>StreamSafe مجاني تحمّله وتستخدمه وقت إطلاق اللعبة. وتبي شعارك على الغطاء؟ خذ Pro بدعمك لنا.</p>",
     )
     if LAUNCH_FREE
     else (
@@ -243,7 +243,7 @@ FREE_PLANS = f"""<div class="plans">
 {
     b(
         '<h3>Pro</h3><p class="tag">For creators who want their own brand on screen</p><p class="price"><span>Your call <small>any amount</small></span></p><p class="per">Support us on Ko-fi with whatever feels right to you and write “Pro” in your message: we email you a Pro key for 30 days. Every bit keeps StreamSafe free and growing.</p><ul><li>Everything in Basic</li><li>Your own or a sponsor’s logo on the cover screen and the cloth</li><li>Priority support by email</li></ul>',
-        '<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span>على كيفك <small>بأي مبلغ تحبه</small></span></p><p class="per">ادعمنا على Ko-fi بالمبلغ اللي تشوفه يستاهل، واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro لمدة 30 يوم. دعمك هو اللي يخلي StreamSafe مجاني ويكبر.</p><ul><li>كل مزايا الأساسية</li><li>شعارك أو شعار الراعي على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li></ul>',
+        '<h3>برو</h3><p class="tag">لصنّاع المحتوى اللي يبون شعارهم على الشاشة</p><p class="price"><span>على كيفك <small>أي مبلغ</small></span></p><p class="per">ادعمنا على Ko-fi بالمبلغ اللي تشوفه يستاهل، واكتب «Pro» في رسالتك، ونرسل لك على إيميلك مفتاح Pro لمدة 30 يوم. دعمك هو اللي يخلي StreamSafe مجاني ويكبر.</p><ul><li>كل مزايا الأساسية</li><li>شعارك أو شعار الراعي على شاشة التغطية والقماش</li><li>دعم بأولوية على الإيميل</li></ul>',
     )
 }
 <a class="btn btn-main" href="{SUPPORT_URL}">{b("Get Pro on Ko-fi", "خذ Pro من Ko-fi", "span")}</a>
