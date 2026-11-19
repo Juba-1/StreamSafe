@@ -103,7 +103,7 @@ def screen(name: str, start: float, end: float, cap: str, box: tuple[int, int, i
     chain = []
     if blur is not None:
         bx, by, bw, bh = blur
-        chain.append(f"[0:v]split[a][b];[b]crop={bw}:{bh}:{bx}:{by},boxblur=12:2[k];[a][k]overlay={bx}:{by}[v0]")
+        chain.append(f"[0:v]split[a][b];[b]crop={bw}:{bh}:{bx}:{by},gblur=sigma=9[k];[a][k]overlay={bx}:{by}[v0]")
     else:
         chain.append("[0:v]null[v0]")
     if box is not None:
