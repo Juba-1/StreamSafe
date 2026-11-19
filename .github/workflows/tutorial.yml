@@ -1,8 +1,10 @@
 name: tutorial
 
-# By hand: records the tutorial's screen part on a Windows runner (the real window, the real OBS, real mouse).
+# By hand (or a push to the tutorial-rec branch): records the tutorial's screen part on a Windows runner (the real window, the real OBS, real mouse).
 on:
   workflow_dispatch:
+  push:
+    branches: [tutorial-rec]
 
 permissions:
   contents: read
