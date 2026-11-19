@@ -131,10 +131,13 @@ def run() -> None:
     scroll_home_to(platform_box)
     mark("step1_platform", platform_box)
     glide(platform_box)
-    pump(0.8)
-    pyautogui.press("home")  # Kick is the first in the list
-    pump(0.5)
-    pyautogui.press("enter")
+    pump(0.9)
+    # the open list: Kick is its first line, just under the box
+    x = platform_box.winfo_rootx() + platform_box.winfo_width() // 2
+    y = platform_box.winfo_rooty() + platform_box.winfo_height() + 9
+    pyautogui.moveTo(x, y, duration=0.5, tween=pyautogui.easeInOutQuad)
+    pump(0.3)
+    pyautogui.click()
     pump(1.2)
     if app.platform_value() != "kick":  # the list did not take the keys: pick it the way the list does
         app._vars["platform"].set(app.tr("plat_kick"))
