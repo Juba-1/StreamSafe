@@ -125,5 +125,11 @@
   "step": "done",
   "box": null,
   "dialogs": []
+ },
+ {
+  "t": 0,
+  "step": "_sync",
+  "box": null,
+  "offset": 2.8
  }
 ]

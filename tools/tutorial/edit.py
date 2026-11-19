@@ -20,6 +20,15 @@ W, H, FPS = 1920, 1080, 30
 ROOT = Path(__file__).resolve().parents[2]
 LOGO = base64.b64encode((ROOT / "marketing" / "logo_rgba.png").read_bytes()).decode()
 acts = {a["step"]: a for a in json.loads(ACTIONS.read_text(encoding="utf-8"))}
+# the recording starts before the driver: its clock is ahead by the gap between the two start times
+_rec = ACTIONS.with_name("rec_start.txt")
+if "_sync" in acts:
+    OFFSET = float(acts["_sync"]["offset"])
+elif _rec.is_file() and "t0_epoch" in acts.get("app_open", {}):
+    OFFSET = float(acts["app_open"]["t0_epoch"]) - float(_rec.read_text().strip())
+else:
+    OFFSET = 0.0
+print("OFFSET", round(OFFSET, 2), flush=True)
 
 CSS = """
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@500;700&display=swap');
@@ -69,7 +78,7 @@ def render(htmls: dict[str, str]) -> None:
 
 
 def t(step: str) -> float:
-    return float(acts[step]["t"])
+    return float(acts[step]["t"]) + OFFSET
 
 
 def zoom_box(step: str, w: int = 960, h: int = 540) -> tuple[int, int, int, int]:
