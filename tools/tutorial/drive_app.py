@@ -71,7 +71,7 @@ def mark(name: str, widget=None, **extra) -> None:
     if widget is not None:
         app.update()
         box = [widget.winfo_rootx(), widget.winfo_rooty(), widget.winfo_width(), widget.winfo_height()]
-    ACTIONS.append({"t": round(time.time() - T0, 2), "step": name, "box": box, "dialogs": list(DIALOGS), **extra})
+    ACTIONS.append({"t": round(time.time() - T0, 2), "step": name, "box": box, "dialogs": list(DIALOGS), "t0_epoch": T0, **extra})
     (OUT / "actions.json").write_text(json.dumps(ACTIONS, ensure_ascii=False, indent=1), encoding="utf-8")
     print("STEP", name, box, flush=True)
 

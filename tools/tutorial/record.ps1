@@ -26,6 +26,7 @@ $psi = New-Object System.Diagnostics.ProcessStartInfo $ff
 $psi.Arguments = "-hide_banner -loglevel error -y -f gdigrab -framerate 30 -draw_mouse 1 -i desktop -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p `"$out\screen.mp4`""
 $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false
 $rec = [System.Diagnostics.Process]::Start($psi)
+[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0 | Out-File (Join-Path $out "rec_start.txt") -Encoding ascii  # the edit syncs on it
 Start-Sleep -Seconds 2
 $drv = Start-Process python -ArgumentList "tools/tutorial/drive_app.py", "`"$out`"" -PassThru -NoNewWindow `
   -RedirectStandardOutput (Join-Path $out "drive.txt") -RedirectStandardError (Join-Path $out "drive_err.txt")
