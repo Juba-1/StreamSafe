@@ -43,6 +43,21 @@ controller.Controller.heads_problem = lambda self: ""
 _blockers = controller.Controller.blockers
 controller.Controller.blockers = lambda self, key="": [b for b in _blockers(self, key) if b != "why_check"]  # no GPU here
 
+DIALOGS: list[str] = []
+
+
+def _dialog(kind):  # a dialog would stop the recording (it waits for a click): log it instead, it is a finding
+    def show(title="", message="", **_kw):
+        DIALOGS.append(f"{kind}: {message}")
+        print("DIALOG", kind, message, flush=True)
+        return False
+
+    return show
+
+
+for _k in ("showinfo", "showwarning", "showerror", "askyesno", "askokcancel"):
+    setattr(ui.messagebox, _k, _dialog(_k))
+
 app = ui.App()
 app.lang = "ar"
 app.build()
@@ -54,7 +69,7 @@ def mark(name: str, widget=None, **extra) -> None:
     if widget is not None:
         app.update()
         box = [widget.winfo_rootx(), widget.winfo_rooty(), widget.winfo_width(), widget.winfo_height()]
-    ACTIONS.append({"t": round(time.time() - T0, 2), "step": name, "box": box, **extra})
+    ACTIONS.append({"t": round(time.time() - T0, 2), "step": name, "box": box, "dialogs": list(DIALOGS), **extra})
     (OUT / "actions.json").write_text(json.dumps(ACTIONS, ensure_ascii=False, indent=1), encoding="utf-8")
     print("STEP", name, box, flush=True)
 
