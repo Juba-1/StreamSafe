@@ -71,10 +71,26 @@ def follow_obs(settings: Settings, video: tuple[int, int, float] | None) -> None
     streamer's quality is kept without setting anything twice."""
     if not settings.follow_obs or settings.input != INPUT_SRT or video is None:
         return
-    _w, h, fps = video
-    fits = [name for name, (_rw, rh) in sorted(RESOLUTIONS.items(), key=lambda kv: kv[1][1]) if rh >= h]
+    w, h, fps = video
+    short = min(w, h)
+    fits = [name for name, (_rw, rh) in sorted(RESOLUTIONS.items(), key=lambda kv: kv[1][1]) if rh >= short]
     settings.resolution = fits[0] if fits else "2160p"
     settings.fps = 60 if fps > 45 else 30
+    # OBS's exact shape is kept: a vertical (TikTok) or any other canvas is never squeezed into 16:9
+    settings.obs_size = f"{w - w % 2}x{h - h % 2}" if w >= 16 and h >= 16 else ""
+
+
+def live_size(settings: Settings) -> tuple[int, int]:
+    """The live picture's size: OBS's own shape when following OBS, else the chosen 16:9 size. Platforms other
+    than YouTube take at most 1080 on the short side: more is scaled down here, keeping the shape."""
+    w, h = RESOLUTIONS.get(settings.resolution, RESOLUTIONS["1080p"])
+    if settings.follow_obs and settings.input == INPUT_SRT and settings.obs_size:
+        with contextlib.suppress(ValueError):
+            w, h = (int(v) for v in settings.obs_size.lower().split("x"))
+    if settings.output == OUTPUT_RTMP and settings.platform not in ("youtube", "custom") and min(w, h) > 1080:
+        k = 1080 / min(w, h)
+        w, h = round(w * k / 2) * 2, round(h * k / 2) * 2
+    return w, h
 
 
 def run_args(settings: Settings, reports: Path, record_file: str = "", fast: bool = True) -> list[str]:
@@ -100,14 +116,12 @@ def run_args(settings: Settings, reports: Path, record_file: str = "", fast: boo
     if settings.input == INPUT_FILE:
         args += ["--fps", "auto"]
     else:
-        w, h = RESOLUTIONS.get(settings.resolution, RESOLUTIONS["1080p"])
-        if settings.output == OUTPUT_RTMP and settings.platform not in ("youtube", "custom") and h > 1080:
-            w, h = RESOLUTIONS["1080p"]  # every other platform takes at most 1080p: more is scaled down by it anyway
+        w, h = live_size(settings)
         args += ["--size", f"{w}x{h}", "--fps", str(settings.fps)]
         if settings.output == OUTPUT_RTMP:
             from streamsafe.app import ingest
 
-            args += ["--bitrate", str(ingest.bitrate_for(settings.platform, h, settings.fps))]
+            args += ["--bitrate", str(ingest.bitrate_for(settings.platform, min(w, h), settings.fps))]
     return args
 
 

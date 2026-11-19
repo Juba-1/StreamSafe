@@ -143,3 +143,16 @@ def test_best_effort_drops_a_failing_extra():
     for _ in range(3):
         multi.write(frame())
     assert Good.frames == 3, "the main platform keeps every frame"
+
+
+def test_vertical_obs_canvas_keeps_its_shape(tmp_path):
+    from streamsafe.app import engine
+    from streamsafe.app.settings import Settings
+
+    s = Settings(platform="tiktok")
+    engine.follow_obs(s, (1080, 1920, 30.0))
+    args = engine.run_args(s, tmp_path)
+    assert args[args.index("--size") + 1] == "1080x1920", "a TikTok vertical canvas is never squeezed into 16:9"
+    s = Settings(platform="kick")
+    engine.follow_obs(s, (2560, 1440, 60.0))
+    assert engine.run_args(s, tmp_path)[engine.run_args(s, tmp_path).index("--size") + 1] == "1920x1080"
