@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -133,10 +132,13 @@ def run() -> None:
     mark("step1_platform", platform_box)
     glide(platform_box)
     pump(0.8)
-    app._vars["platform"].set(app.tr("plat_kick"))
-    app.on_platform()
-    pyautogui.press("escape")
+    pyautogui.press("home")  # Kick is the first in the list
+    pump(0.5)
+    pyautogui.press("enter")
     pump(1.2)
+    if app.platform_value() != "kick":  # the list did not take the keys: pick it the way the list does
+        app._vars["platform"].set(app.tr("plat_kick"))
+        app.on_platform()
     mark("step1_done", platform_box)
     # step 2: the key (a placeholder, masked)
     key_entry = find_key_entry()
@@ -163,9 +165,6 @@ def run() -> None:
             break
     mark("running", app.badge)
     pump(6.0)
-    # stop: OBS first, then the program
-    subprocess.run(["taskkill", "/IM", "obs64.exe"], capture_output=True)
-    pump(3.0)
     mark("stop", app.stop_btn)
     glide(app.stop_btn)
     pump(4.0)
