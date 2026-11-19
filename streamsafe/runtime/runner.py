@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import collections
 import json
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -227,6 +228,7 @@ def _run_realtime(
     live = LiveLog(rt.live_log_s)
     v = shown = 0
     stopped_by_user = False
+    panic_file = os.environ.get("PANIC_FILE", "")
     try:
         try:
             while True:
@@ -254,6 +256,8 @@ def _run_realtime(
                     continue
                 while time.perf_counter() < due:
                     time.sleep(0.0005)
+                if panic_file and v % 6 == 0:  # the streamer's panic key (the app makes / removes this file)
+                    gate.manual = os.path.exists(panic_file)
                 out = gate.render(v, frame)
                 # Arabic text, AFTER the gate and on top of the cover: on a normally composed frame and on the full-scene
                 # cover (card / slate: the dialogue goes on while the picture is covered), never on a held repeat; always

@@ -144,7 +144,9 @@ class FFmpegSink:
         audio_bitrate: str = "160k",
         spawn: Callable[..., Any] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        tag: str = "",
     ) -> None:
+        self.tag = tag  # "" = the main platform; "2" = an extra one (its STATUS lines say ``out``)
         exe = shutil.which(ffmpeg)
         if exe is None and spawn is None:
             raise FileNotFoundError("ffmpeg not found on PATH")
@@ -197,7 +199,7 @@ class FFmpegSink:
         self._errors.clear()
         self._sizes = []
         if self.network:
-            link.status("platform_connecting")
+            self._status("platform_connecting")
         self._proc = self._spawn(self._cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         threading.Thread(target=self._watch, args=(self._proc,), name="sink-output", daemon=True).start()
         try:
@@ -230,7 +232,7 @@ class FFmpegSink:
         if len(self._sizes) >= 2 and not self.connected:
             self.connected, self._ever, self._attempt = True, True, 0
             if self.network:
-                link.status("platform_connected")
+                self._status("platform_connected")
 
     def _kill(self) -> None:
         proc, self._proc, self._avi = self._proc, None, None
@@ -256,12 +258,15 @@ class FFmpegSink:
             raise ConnectionError(f"ffmpeg output stopped {detail}".strip())
         self._attempt += 1
         if not self._ever and self._attempt >= self.GIVE_UP_BEFORE_FIRST:
-            link.status("platform_failed", reason=reason, detail=detail)
+            self._status("platform_failed", reason=reason, detail=detail)
             raise PlatformRefused(reason, detail)
         wait = self.RETRY_S[min(self._attempt, len(self.RETRY_S)) - 1]
         self._retry_at = self._clock() + wait
         self.reconnects += int(was_up)
-        link.status("platform_lost", reason=reason, retry_s=wait, attempt=self._attempt, detail=detail)
+        self._status("platform_lost", reason=reason, retry_s=wait, attempt=self._attempt, detail=detail)
+
+    def _status(self, event: str, **fields: object) -> None:
+        link.status(event, **({"out": self.tag} if self.tag else {}), **fields)
 
     # --- frames ---------------------------------------------------------------------------------------------
     def write(self, frame: np.ndarray, audio: np.ndarray | None = None) -> None:
@@ -438,6 +443,28 @@ def takes_audio(sink: FrameSink | None) -> bool:
     return bool(getattr(sink, "takes_audio", False))
 
 
+class BestEffort:
+    """An extra platform: when it fails for good (refused key, ...) it is dropped and the run goes on for the
+    others. It gets the same protected frames as every output: it can never show more."""
+
+    def __init__(self, sink: FrameSink, tag: str) -> None:
+        self.sink, self.tag, self.dead = sink, tag, False
+        self.takes_audio = takes_audio(sink)
+
+    def write(self, frame: np.ndarray, audio: np.ndarray | None = None) -> None:
+        if self.dead:
+            return
+        try:
+            _write(self.sink, frame, audio)
+        except Exception as exc:  # the main platform's own failure still ends the run; this one only drops out
+            self.dead = True
+            link.status("platform_failed", out=self.tag, reason=link.reason_of(str(exc), "broken"))
+
+    def close(self) -> None:
+        with contextlib.suppress(Exception):
+            self.sink.close()
+
+
 class MultiSink:
     def __init__(self, sinks: list[FrameSink]) -> None:
         self.sinks = sinks
@@ -519,7 +546,12 @@ def _write(sink: FrameSink, frame: np.ndarray, audio: np.ndarray | None) -> None
 
 
 def open_sink(
-    spec: str, size: tuple[int, int], fps: float = 30.0, preview_size: tuple[int, int] = (960, 540), audio: bool = True
+    spec: str,
+    size: tuple[int, int],
+    fps: float = 30.0,
+    preview_size: tuple[int, int] = (960, 540),
+    audio: bool = True,
+    tag: str = "",
 ) -> FrameSink:
     """``window`` -> on-screen window; ``scheme://...`` -> FFmpeg stream (with sound unless ``audio`` is off);
     ``record:<file>`` -> a full-quality recording with sound (``RecordSink``); else an MP4 review file (picture only)."""
@@ -528,7 +560,9 @@ def open_sink(
     if spec.startswith("record:"):
         return ThreadedSink(RecordSink(spec[len("record:") :], size, fps, audio=audio))
     if "://" in spec:
-        return ThreadedSink(FFmpegSink(spec, size, fps, audio=audio), keepalive_fps=fps if spec.startswith(STREAM_SCHEMES) else 0.0)
+        return ThreadedSink(
+            FFmpegSink(spec, size, fps, audio=audio, tag=tag), keepalive_fps=fps if spec.startswith(STREAM_SCHEMES) else 0.0
+        )
     return ThreadedSink(VideoFileSink(spec, fps, preview_size))
 
 

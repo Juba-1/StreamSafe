@@ -76,7 +76,8 @@ def resolve_env_outputs(args: list[str], env: MutableMapping[str, str]) -> list[
     a run that silently had no output would look like a stream."""
     out = list(args)
     for i, arg in enumerate(out):
-        spec = arg.split("=", 1)[1] if arg.startswith("--output=") else arg if i and out[i - 1] == "--output" else None
+        flag = next((f for f in ("--output", "--extra-output") if arg.startswith(f + "=")), "")
+        spec = arg.split("=", 1)[1] if flag else arg if i and out[i - 1] in ("--output", "--extra-output") else None
         if spec is not None and spec.startswith("env:"):
             name = spec[4:]
             if not env.get(name):

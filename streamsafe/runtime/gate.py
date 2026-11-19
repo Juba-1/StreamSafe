@@ -14,6 +14,7 @@ Thread-safe: in realtime mode decisions, cut flags and renders come from differe
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from bisect import bisect_right, insort
@@ -28,6 +29,8 @@ from streamsafe.render.lookahead import backfill
 from streamsafe.render.slate import brand_frames
 from streamsafe.render.smooth import TrackSmoother
 from streamsafe.types import ANALYSIS_SIZE, Decision
+
+FULL_HOLD_S = 1.5  # whole-screen mode: the cover stays this long after the last person who needed covering
 
 SCENE_LOOK = 150  # frames: how far ahead a scene decision is searched (late evidence reaches back this far at most)
 
@@ -50,6 +53,12 @@ class OutputGate:
         self._back = round(scene.scene_back_s * fps)
         self._lead = round(scene.mute_lead_s * fps)
         self._tail = round(scene.mute_tail_s * fps)
+        # the streamer's choices: COVER_MODE=screen -> anyone who needs covering covers the WHOLE screen (held
+        # FULL_HOLD_S after the last one); manual -> the panic key: the whole screen, from the next frame shown
+        self.full_mode = os.environ.get("COVER_MODE", "") == "screen"
+        self._full_hold = round(FULL_HOLD_S * fps)
+        self._full_until = -1
+        self.manual = False
         self.muted = False  # game audio state for the frame rendered last
         self._last_full = -(10**9)  # last frame shown full-screen (slate or scene card)
         self._mute_from = -1  # first frame of the current mute interval
@@ -114,6 +123,10 @@ class OutputGate:
             decisions = [self._decisions[k] for k in ids]
             scene = any(d.scene for d in decisions) or self._scene_ahead(v, 0)
             scene_soon = self._scene_ahead(v, self._lead)
+        if self.full_mode and any(d.layers for d in decisions):
+            self._full_until = v + self._full_hold
+        if self.manual or v <= self._full_until:
+            scene = True
         if not decisions or not all(d.ok for d in decisions):
             if self._last is not None and self._held < self.cfg.hold:
                 out = self._last

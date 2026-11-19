@@ -9,6 +9,10 @@ on:
       beta_days:
         description: "Beta length in days from today (the build stops starting streams after it); 0 = never expires"
         default: "0"
+      publish:
+        description: "After every check passed: publish it as the new download (needs repo secret DOWNLOAD_REPO_TOKEN)"
+        type: boolean
+        default: false
       nvidia_runtime_test:
         description: "Also test the NVIDIA runtime switch (downloads about 3.5 GB of NVIDIA libraries; no GPU needed)"
         type: boolean
@@ -93,3 +97,12 @@ jobs:
           path: smoke
           retention-days: 30
           if-no-files-found: warn
+      - name: "publish: the new download (only when asked and every check above passed)"
+        if: ${{ inputs.publish && success() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.DOWNLOAD_REPO_TOKEN }}
+        run: |
+          $v = "${{ steps.meta.outputs.version }}"
+          Copy-Item "dist-installer\${{ steps.meta.outputs.installer }}.exe" "StreamSafe-Setup.exe"
+          gh release create "v$v" "StreamSafe-Setup.exe" -R Juba-1/StreamSafe-download --title "StreamSafe $v" --notes "StreamSafe $v" --latest

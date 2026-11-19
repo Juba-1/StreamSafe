@@ -222,6 +222,23 @@ def apply(server: str, env: Mapping[str, str] | None = None, running: Callable[[
     return ""
 
 
+def restore(env: Mapping[str, str] | None = None, running: Callable[[], bool] = obs_running) -> str:
+    """Puts back the streamer's own OBS stream settings as they were before StreamSafe. "" or running / no_backup."""
+    root = config_dir(env)
+    prof = profile_dir(root) if root else None
+    keep = prof / ("service.json" + BACKUP) if prof else None
+    if keep is None or not keep.is_file():
+        return "no_backup"
+    if running():
+        return "running"
+    try:
+        shutil.copy2(keep, prof / "service.json")  # type: ignore[operator]
+        keep.unlink()  # the next "set up" keeps a fresh copy of whatever the streamer has then
+    except OSError:
+        return "error"
+    return ""
+
+
 def launch(exe: Path, start_streaming: bool = True, popen: Callable[..., object] = subprocess.Popen) -> bool:
     """Opens OBS (from its own folder, as OBS needs) and lets it start streaming to StreamSafe by itself."""
     args = [str(exe)] + (["--startstreaming"] if start_streaming else [])

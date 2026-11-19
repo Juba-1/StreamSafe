@@ -44,6 +44,9 @@ def build_payload(args: argparse.Namespace) -> dict:
             "notes_ar": args.notes_ar or "",
             "notes_en": args.notes_en or "",
         }
+        if args.app_file:  # the installer itself: the app downloads it, checks it and installs it by itself
+            data = Path(args.app_file).read_bytes()
+            payload["app"].update({"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
     if args.models_dir:
         folder = Path(args.models_dir)
         listed = list(json.loads((folder / "manifest.json").read_text(encoding="utf-8"))["files"])
@@ -70,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in (
         "app-version",
         "app-url",
+        "app-file",
         "notes-ar",
         "notes-en",
         "models-dir",

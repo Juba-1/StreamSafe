@@ -26,7 +26,7 @@ from collections.abc import Callable
 from streamsafe import session_report
 from streamsafe.config import Config
 from streamsafe.io import link
-from streamsafe.io.sinks import MultiSink, PlatformRefused, open_sink
+from streamsafe.io.sinks import BestEffort, MultiSink, PlatformRefused, open_sink
 from streamsafe.io.sources import open_source
 from streamsafe.runtime.runner import AnalyzerFactory, run
 
@@ -35,6 +35,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="streamsafe", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--input", required=True, help="video file, FFmpeg URL or device:<name|index>")
     p.add_argument("--output", action="append", default=[], help="mp4 file, FFmpeg URL or 'window' (repeatable)")
+    p.add_argument("--extra-output", action="append", default=[], help="another platform, best effort (repeatable)")
     p.add_argument("--mode", choices=["realtime", "offline"], help="default: realtime")
     p.add_argument("--delay", type=float, help="stream delay in seconds")
     p.add_argument("--secs", type=float, help="stop a file input after this many seconds")
@@ -101,7 +102,7 @@ def main(
     if args.bitrate:
         os.environ["VIDEO_KBPS"] = str(args.bitrate)
     size = tuple(int(v) for v in args.size.lower().split("x")) if args.size else None
-    secrets = [link.Secrets(spec) for spec in args.output]
+    secrets = [link.Secrets(spec) for spec in (*args.output, *args.extra_output)]
     source, sink, report = None, None, None
     code, reason, detail = 0, "", ""
     try:
@@ -112,6 +113,9 @@ def main(
             if before_outputs is not None:
                 before_outputs(args.output)
             sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio) for spec in args.output]
+            for n, spec in enumerate(args.extra_output, 2):  # extra platforms: one failing does not stop the others
+                tag = str(n)
+                sinks.append(BestEffort(open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag), tag))
             sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
             report = run(cfg, source, sink, factory) if factory is not None else run(cfg, source, sink)
             failed = False

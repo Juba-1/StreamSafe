@@ -31,6 +31,7 @@ from streamsafe.app.settings import INPUT_FILE, INPUT_SRT, OUTPUT_RECORD, OUTPUT
 from streamsafe.branding import PRODUCT_NAME
 
 OUTPUT_ENV = "STREAMSAFE_OUTPUT_URL"
+OUTPUT2_ENV = "STREAMSAFE_OUTPUT_URL_2"  # the extra platform (multistream through StreamSafe)
 STOP_ENV = "STREAMSAFE_STOP_ON_STDIN"
 PRODUCT_ENV = "STREAMSAFE_PRODUCT"
 STALE_S = 1.5  # the frame counter not moving for this long while the process lives: shown as "not answering"
@@ -92,7 +93,10 @@ def run_args(settings: Settings, reports: Path, record_file: str = "", fast: boo
     sink = (
         f"env:{OUTPUT_ENV}" if settings.output == OUTPUT_RTMP else f"record:{record_file}" if settings.output == OUTPUT_RECORD else "window"
     )
-    args = ["run", "--input", source, "--output", sink, "--delay", f"{delay_for(settings, fast):g}", "--report-dir", str(reports)]
+    args = ["run", "--input", source, "--output", sink]
+    if settings.output == OUTPUT_RTMP and settings.platform2:
+        args += ["--extra-output", f"env:{OUTPUT2_ENV}"]
+    args += ["--delay", f"{delay_for(settings, fast):g}", "--report-dir", str(reports)]
     if settings.input == INPUT_FILE:
         args += ["--fps", "auto"]
     else:
@@ -114,6 +118,7 @@ class LinkState:
     input: str = ""  # "" / waiting / connected / disconnected / failed
     sent: tuple = ()  # (width, height, fps, kbps) of what OBS sends, when FFmpeg said it
     platform: str = ""  # "" / connecting / connected / lost / failed
+    platform2: str = ""  # the extra platform: the same words
     port: int = 0
     reason: str = ""  # the last platform / input problem, a word of io/link.py
     retry_s: float = 0.0
@@ -124,6 +129,9 @@ class LinkState:
 
     def take(self, event: dict) -> None:
         name = event.get("event", "")
+        if event.get("out"):  # the extra platform: its own line, never the main platform's state
+            self.platform2 = name.replace("platform_", "")
+            return
         if name == "waiting_obs":
             self.input = "waiting" if self.input in ("", "waiting") else "disconnected"
             self.port = int(event.get("port") or 0)
@@ -164,6 +172,7 @@ def engine_env(
     data_env: Mapping[str, str] | None = None,
     translate: bool = False,
     brand_image: str = "",
+    url2: str = "",
 ) -> dict[str, str]:
     """The environment of an engine / prepare / probe process. ``nvidia``: the NVIDIA runtime with TensorRT
     (engines are never built at "go live": ``TRT_BUILD=0``; a model without a ready engine runs on CUDA and the
@@ -186,6 +195,7 @@ def engine_env(
     else:
         env.update({runtime_select.RUNTIME_ENV: runtime_select.DIRECTML, "TRT": "0"})
     env.pop(OUTPUT_ENV, None)
+    env.pop(OUTPUT2_ENV, None)
     env.pop("TRANSLATE_AR", None)
     env.pop("TRANSLATE_DIR", None)
     if translate:  # the engine itself checks the pack and carries on without translation when it is not usable
@@ -204,6 +214,8 @@ def engine_env(
         env["LOGO"] = chest
     if url:
         env[OUTPUT_ENV] = url
+    if url2:
+        env[OUTPUT2_ENV] = url2
     return env
 
 

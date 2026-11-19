@@ -67,6 +67,8 @@ class Update:
     serial: int
     app_version: str = ""  # "" = the manifest names no app version
     app_url: str = ""
+    app_sha256: str = ""  # of the installer at app_url: with it the app updates itself (download, check, install)
+    app_bytes: int = 0
     notes: dict[str, str] = field(default_factory=dict)  # {"ar": ..., "en": ...}
     models_version: str = ""
     model_files: dict[str, dict] = field(default_factory=dict)  # name -> {"url", "sha256", "bytes"}
@@ -112,6 +114,8 @@ def parse_signed(raw: bytes, keys: tuple[str, ...], min_serial: int = 0) -> Upda
             serial=serial,
             app_version=str(app.get("version", "")),
             app_url=str(app.get("url", "")),
+            app_sha256=str(app.get("sha256", "")),
+            app_bytes=int(app.get("bytes", 0)),
             notes={"ar": str(app.get("notes_ar", "")), "en": str(app.get("notes_en", ""))},
             models_version=str(models.get("version", "")),
             model_files={str(n): dict(m) for n, m in (models.get("files") or {}).items()},

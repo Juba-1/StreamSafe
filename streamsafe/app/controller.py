@@ -13,14 +13,14 @@ import os
 import threading
 import time
 from collections.abc import Callable, Mapping, MutableMapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from streamsafe import session_report
 from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, release, updates
 from streamsafe.app import license as lic
 from streamsafe.app import settings as settings_mod
-from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, Settings
+from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, Settings
 from streamsafe.branding import PRODUCT_NAME
 from streamsafe.io import link
 from streamsafe.translate import pack as translate_pack
@@ -61,8 +61,13 @@ class Controller:
         self.env = os.environ if env is None else env
         self.log = log or (lambda _line: None)
         self.allow_http = allow_http
+        self.key2 = ""  # the extra platform's stream key, as typed (the window sets it before a start)
+        self.preview = False  # the running engine shows a local window only (``start(preview=True)``)
         self.settings: Settings = settings_mod.load(paths.settings_file(self.env))
-        self.keys = keystore.KeyStore(paths.key_file(self.env), keystore.default_protector() if protector is None else protector)
+        guard = keystore.default_protector() if protector is None else protector
+        self.keys = keystore.KeyStore(paths.key_file(self.env), guard)
+        kf = paths.key_file(self.env)
+        self.keys2 = keystore.KeyStore(kf.with_name(kf.stem + "_2" + kf.suffix), guard)  # the extra platform's key
         self.engine = engine.EngineProcess(self._engine_line, engine.Redactor())
         self.tracker = engine.StatusTracker()
         self.check_result = CheckResult()
@@ -87,6 +92,16 @@ class Controller:
 
     def stored_key(self) -> str:
         return self.keys.load() if self.settings.remember_key else ""
+
+    def stored_key2(self) -> str:
+        return self.keys2.load() if self.settings.remember_key else ""
+
+    def remember2(self, key: str) -> None:
+        with contextlib.suppress(keystore.NoSecureStoreError, OSError, ValueError):
+            if self.settings.remember_key and key and self.settings.platform2:
+                self.keys2.save(key)
+            else:
+                self.keys2.clear()
 
     def remember(self, key: str) -> bool:
         """Store or forget the key as the settings say. False when the PC has no protected store."""
@@ -113,15 +128,18 @@ class Controller:
     def expired(self) -> bool:
         return updates.expired()
 
-    def blockers(self, key: str = "") -> list[str]:
+    def blockers(self, key: str = "", settings: Settings | None = None) -> list[str]:
         """i18n keys (``why_*`` / ``bad_*``) of what stops a start. Empty: it may start."""
+        s = settings or self.settings
         out: list[str] = []
         if self.engine.running:
             return ["why_running"]
         if self.expired():
             out.append("why_expired")
-        out += self.settings.problems()
-        if self.settings.output == OUTPUT_RTMP and "bad_key" in self.target(key).problems:
+        out += s.problems()
+        if s.output == OUTPUT_RTMP and s.platform2 and "bad_key" in self.target2(self.key2).problems:
+            out.append("bad_key2")
+        if s.output == OUTPUT_RTMP and "bad_key" in self.target(key).problems:
             out.append("bad_key")
         if self.models_problem():
             out.append("why_models")
@@ -321,6 +339,22 @@ class Controller:
         self.save_settings()
         return done
 
+    def download_app_update(self, progress: modelpack.Progress | None = None, cancel: threading.Event | None = None) -> Path:
+        """The new installer, downloaded and checked against the signed manifest's sha256 (never run unchecked)."""
+        u = self.update
+        if u is None or not u.app_sha256 or not u.app_url:
+            raise updates.UpdateError("no installer in the update")
+        dest = paths.downloads_dir(self.env) / f"{PRODUCT_NAME}-Setup-{u.app_version}.exe"
+        return fetch.download(u.app_url, dest, u.app_sha256, u.app_bytes, progress, cancel, self.allow_http)
+
+    @staticmethod
+    def run_installer(installer: Path) -> None:
+        """Installs silently over this version and opens the app again (the window closes itself right after)."""
+        import subprocess
+
+        flags = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/RELAUNCH"]
+        subprocess.Popen([str(installer), *flags], close_fds=True)
+
     def can_roll_back(self) -> bool:
         return modelpack.previous(paths.models_dir(self.env)).is_dir()
 
@@ -331,6 +365,10 @@ class Controller:
     def target(self, key: str) -> ingest.Target:
         """Server and key as they will be used (``ingest.resolve``). Holds the key: never log it."""
         return ingest.resolve(self.settings.rtmp_url, key, self.settings.platform)
+
+    def target2(self, key: str) -> ingest.Target:
+        """The extra platform's server and key. Holds the key: never log it."""
+        return ingest.resolve(self.settings.rtmp_url2, key, self.settings.platform2)
 
     def take_pasted(self, server: str, key: str) -> tuple[str, str]:
         """What the two boxes should show after a paste: a whole address is split into (server, key), spaces go,
@@ -412,25 +450,54 @@ class Controller:
                 f.unlink()
         return folder / f"engine_{time.strftime('%Y%m%d_%H%M%S')}.log"
 
-    def start(self, key: str) -> None:
-        """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start."""
+    def panic_file(self) -> Path:
+        """Exists while the streamer's panic key covers the whole screen (the engine looks for it)."""
+        return paths.data_dir(self.env) / "panic.flag"
+
+    def set_panic(self, on: bool) -> None:
+        f = self.panic_file()
+        with contextlib.suppress(OSError):
+            if on:
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text("1", encoding="ascii")
+            else:
+                f.unlink(missing_ok=True)
+
+    @property
+    def panic(self) -> bool:
+        return self.panic_file().exists()
+
+    def start(self, key: str, preview: bool = False) -> None:
+        """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start.
+        ``preview``: the protected picture goes to a window on this PC only, nothing to the platform."""
         if release.LICENSE_REQUIRED:
             self.check_license()  # every start asks Dodo (a lapsed subscription does not start)
-        why = self.blockers(key)
+        s = replace(self.settings, output=OUTPUT_WINDOW) if preview else self.settings
+        why = self.blockers(key, s)
         if why:
             raise RuntimeError(why[0])
         self.license_stopped = False
-        s = self.settings
+        self.preview = preview
         self.free_port()
         target = self.target(key) if s.output == OUTPUT_RTMP else ingest.Target("", "")
         url = target.url
+        t2 = self.target2(self.key2) if s.output == OUTPUT_RTMP and s.platform2 else ingest.Target("", "")
         env = engine.engine_env(
-            os.environ, self.use_nvidia, url, self.env, translate=s.translate_ar and not self.translate_problem(), brand_image=s.brand_image
+            os.environ,
+            self.use_nvidia,
+            url,
+            self.env,
+            translate=s.translate_ar and not self.translate_problem(),
+            brand_image=s.brand_image,
+            url2=t2.url,
         )
+        env["COVER_MODE"] = s.cover_mode
+        self.set_panic(False)  # a panic left on by an earlier run starts this one uncovered only if pressed again
+        env["PANIC_FILE"] = str(self.panic_file())
         state = paths.obs_state_file(self.env)
         state.unlink(missing_ok=True)  # a line left by an earlier run must not look like this run's
         state.parent.mkdir(parents=True, exist_ok=True)
-        self.engine.redactor_secrets(key, target.key, url)
+        self.engine.redactor_secrets(*(x for x in (key, target.key, url, self.key2, t2.key, t2.url) if x))
         self.tracker.reset()
         self.last_exit = None
         self._engine_lines = []

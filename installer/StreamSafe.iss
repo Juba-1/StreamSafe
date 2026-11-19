@@ -103,8 +103,15 @@ Type: filesandordirs; Name: "{app}"
 
 [Run]
 Filename: "{app}\{#GuiExe}.exe"; Description: "{cm:OpenApp}"; Flags: nowait postinstall skipifsilent
+; the app's own one-click update installs silently with /RELAUNCH: open it again when done
+Filename: "{app}\{#GuiExe}.exe"; Flags: nowait skipifnotsilent; Check: WantRelaunch
 
 [Code]
+function WantRelaunch: Boolean;
+begin
+  Result := Pos('/RELAUNCH', UpperCase(GetCmdTail)) > 0;
+end;
+
 // Uninstall: the program folder always goes. The user's own data (models, settings, reports; one folder under
 // %LOCALAPPDATA%) goes too when the user says yes. A SILENT uninstall removes it as well, unless /KEEPDATA is given,
 // so that "silent install, silent uninstall" leaves nothing behind.

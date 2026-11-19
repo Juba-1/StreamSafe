@@ -20,9 +20,26 @@ import threading
 import tkinter as tk
 import webbrowser
 from collections.abc import Callable
+from dataclasses import replace
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from streamsafe.app import build_info, controller, engine, i18n, ingest, modelpack, obs_setup, passkey, paths, plan, release, updates
+from streamsafe.app import (
+    build_info,
+    controller,
+    engine,
+    hotkey,
+    i18n,
+    ingest,
+    modelpack,
+    obs_setup,
+    passkey,
+    paths,
+    plan,
+    preflight,
+    release,
+    updates,
+)
 from streamsafe.app import settings as cfg
 from streamsafe.branding import PRODUCT_NAME
 
@@ -118,7 +135,9 @@ class App(tk.Tk):
         self._nvidia_offered = False
         self._banner_update = ""
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self._hotkey: hotkey.Hotkey | None = None
         self.build()
+        self.arm_panic_key()
         self.after(POLL_MS, self.tick)
         self.after(100, self.refresh_check)
         self.after(600, self.look_for_updates)
@@ -281,6 +300,11 @@ class App(tk.Tk):
         v("fps", tk.StringVar, "").set(str(st.fps))
         v("translate", tk.BooleanVar, st.translate_ar)
         v("follow_obs", tk.BooleanVar, st.follow_obs)
+        v("cover_mode", tk.StringVar, st.cover_mode)
+        v("platform2", tk.StringVar, "").set(self.tr("plat_" + st.platform2) if st.platform2 else self.tr("plat2_none"))
+        v("rtmp_url2", tk.StringVar, st.rtmp_url2)
+        v("key2", tk.StringVar, self.ctrl.stored_key2() if "key2" not in self._vars else self._vars["key2"].get())
+        v("panic_key", tk.StringVar, st.panic_button)
         v("license_key", tk.StringVar, "")
 
     # --- small building blocks -------------------------------------------------------------------------------
@@ -353,6 +377,7 @@ class App(tk.Tk):
         self.update_row = tk.Frame(h, bg=CARD)
         self.update_text = self.label(self.update_row, "", fg=LAGOON)
         self.update_btn = ttk.Button(self.update_row, text=self.tr("update_button"), command=self.apply_update)
+        self.app_update_btn = ttk.Button(self.update_row, text=self.tr("update_app_now"), command=self.apply_app_update)
 
         row = tk.Frame(h, bg=CARD)
         row.pack(fill="x", pady=(6, 4))
@@ -360,7 +385,12 @@ class App(tk.Tk):
         self.stop_btn = Tile(row, self.tr("stop"), self.tr("stop_sub"), COVER, "white", self.on_stop)
         for b in (self.start_btn, self.stop_btn):
             b.pack(side=side, padx=(0, 6), expand=True, fill="x")
+        prow = tk.Frame(h, bg=CARD)
+        prow.pack(fill="x", pady=(0, 4))
+        self.preview_btn = ttk.Button(prow, text=self.tr("preview"), command=lambda: self.on_start(preview=True))
+        self.preview_btn.pack(side=side)
         self.message = self.collapsing(h, fg="#b3261e", font=(FONT, 10, "bold"))
+        self.pre_note = self.collapsing(h, fg="#b26a00", font=(FONT, 9, "bold"))
         # the two links while it runs: OBS -> us, us -> the platform (or the recording)
         self.link_box = tk.Frame(h, bg=SAND, padx=12, pady=8)
         self.lk_in = self.label(self.link_box, "", bg=SAND, font=(FONT, 10, "bold"), wraplength=520)
@@ -412,7 +442,7 @@ class App(tk.Tk):
         self.test_result.pack(side=side, padx=8)
         s3 = self.step(c, 3, self.tr("step_obs"))
         self.small(s3, self.tr("step_obs_note"))
-        af = self.buttons(s3, (self.tr("obs_auto_btn"), self.on_obs_setup))
+        af = self.buttons(s3, (self.tr("obs_auto_btn"), self.on_obs_setup), (self.tr("obs_restore_btn"), self.on_obs_restore))
         self.obs_result = self.label(af, "", font=(FONT, 9, "bold"), wraplength=360)
         self.obs_result.pack(side=side, padx=8)
         self.small(s3, self.tr("obs_manual"))
@@ -509,6 +539,23 @@ class App(tk.Tk):
         delay = self.field(c, self.tr("delay"), v("delay", tk.StringVar, ""), 10, combo=[self.tr("delay_auto"), "2", "3", "4", "5"])
         delay.configure(state="readonly")  # type: ignore[call-arg]
         self.small(c, self.tr("delay_hint"))
+
+        # how to cover, and the panic key
+        c = self.card(s, self.tr("sec_protect"))
+        choice(c, "cover_people", cfg.COVER_PEOPLE, "cover_mode")
+        choice(c, "cover_screen", cfg.COVER_SCREEN, "cover_mode")
+        pk = self.field(c, self.tr("panic_key"), v("panic_key", tk.StringVar, ""), 12, combo=hotkey.CHOICES)
+        pk.configure(state="readonly")  # type: ignore[call-arg]
+        pk.bind("<<ComboboxSelected>>", lambda e: self.on_panic_key())
+        self.small(c, self.tr("panic_hint"))
+
+        # a second platform through the protection
+        c = self.card(s, self.tr("sec_multi"), self.tr("multi_note"))
+        names2 = [self.tr("plat2_none")] + [self.tr("plat_" + p) for p in ingest.PLATFORMS]
+        p2 = self.field(c, self.tr("platform"), v("platform2", tk.StringVar, ""), combo=names2)
+        p2.configure(state="readonly")  # type: ignore[call-arg]
+        self.field(c, self.tr("rtmp_url"), v("rtmp_url2", tk.StringVar, ""))
+        self.field(c, self.tr("stream_key"), v("key2", tk.StringVar, ""), show="•")
 
         # the subscription (Dodo licence key)
         c = self.card(s, self.tr("sec_license"))
@@ -765,9 +812,17 @@ class App(tk.Tk):
         st.camera_sound, st.input_file = str(v["camera_sound"].get()).strip(), str(v["input_file"].get()).strip()
         st.record_dir = str(v["record_dir"].get()).strip()
         st.platform = self.platform_value()
+        shown2 = str(v["platform2"].get()).replace(RLE, "").replace(PDF, "")
+        names2 = {i18n.t(lang, "plat_" + p): p for p in ingest.PLATFORMS for lang in i18n.LANGS}
+        st.platform2 = names2.get(shown2, "")
+        st.rtmp_url2 = str(v["rtmp_url2"].get()).strip()
+        self.ctrl.key2 = str(v["key2"].get()).strip()
         st.remember_key = bool(v["remember"].get())
         st.translate_ar = bool(v["translate"].get())
         st.follow_obs = bool(v["follow_obs"].get())
+        mode = str(v["cover_mode"].get())
+        st.cover_mode = mode if mode in (cfg.COVER_PEOPLE, cfg.COVER_SCREEN) else cfg.COVER_PEOPLE
+        st.panic_button = str(v["panic_key"].get()) if hotkey.parse(str(v["panic_key"].get())) else st.panic_button
         try:
             st.srt_port = int(str(v["srt_port"].get()).strip())
         except ValueError:
@@ -901,6 +956,8 @@ class App(tk.Tk):
             lk.sent,
             lk.reason,
             lk.retry_s,
+            lk.platform2,
+            self.ctrl.preview,
             lk.record_file,
             lk.recorded,
             st.srt_port,
@@ -932,14 +989,18 @@ class App(tk.Tk):
         if warn and lk.input == "connected":
             text, color = text + "\n" + warn, amber
         self.lk_in.configure(text=text, fg=color)
-        if st.output == cfg.OUTPUT_RTMP:
+        output = cfg.OUTPUT_WINDOW if self.ctrl.preview else st.output
+        if output == cfg.OUTPUT_RTMP:
             text, color = {
                 "connecting": (self.tr("lk_plat_connecting"), amber),
                 "connected": (self.tr("lk_plat_ok"), green),
                 "lost": (self.tr("lk_plat_lost", why=why, s=f"{lk.retry_s:g}"), amber),
                 "failed": (self.tr("lk_plat_failed", why=why), red),
             }.get(lk.platform, (self.tr("lk_plat_wait"), grey))
-        elif st.output == cfg.OUTPUT_RECORD:
+            if st.platform2:
+                state = {"connected": "✓", "lost": "…", "failed": "✗", "connecting": "…"}.get(lk.platform2, "…")
+                text += "\n" + self.tr("link_out2", state=self.tr("plat_" + st.platform2) + " " + state)
+        elif output == cfg.OUTPUT_RECORD:
             text, color = (
                 (self.tr("lk_rec_done", file=lk.record_file), green)
                 if lk.recorded
@@ -1005,12 +1066,13 @@ class App(tk.Tk):
         with contextlib.suppress(OSError):
             engine.open_file(path)
 
-    def on_start(self) -> None:
+    def on_start(self, preview: bool = False) -> None:
         self.collect()
         key = str(self._vars["key"].get()).strip()
         self.message.configure(text="", fg="#b3261e")
+        self.pre_note.configure(text="\n".join(self.tr(w) for w in preflight.warnings(self.ctrl.env)))
         self._announced_exit = False
-        why = self.ctrl.blockers(key)
+        why = self.ctrl.blockers(key, replace(self.ctrl.settings, output=cfg.OUTPUT_WINDOW) if preview else None)
         if why:
             self.message.configure(text=self.tr("not_ready", why=self.tr(why[0])))
             return
@@ -1021,15 +1083,19 @@ class App(tk.Tk):
             return
         if not self.ctrl.remember(key):
             self._vars["remember"].set(False)
+        self.ctrl.remember2(self.ctrl.key2)
         engine.follow_obs(self.ctrl.settings, obs_setup.obs_video())  # the streamer's own OBS quality, nothing to set
         self._vars["resolution"].set(self.ctrl.settings.resolution)
         self._vars["fps"].set(str(self.ctrl.settings.fps))
         self.ctrl.save_settings()
         try:
-            self.ctrl.start(key)
+            self.ctrl.start(key, preview=preview)
         except (RuntimeError, OSError) as exc:
-            self.message.configure(text=self.tr("not_ready", why=self.tr(str(exc)) if str(exc) in i18n.TEXT else str(exc)))
+            why = self.tr("sac_blocked") if preflight.blocked_by_windows(exc) else self.tr(str(exc)) if str(exc) in i18n.TEXT else str(exc)
+            self.message.configure(text=self.tr("not_ready", why=why))
         else:
+            if preview:
+                self.message.configure(text=self.tr("preview_on"), fg="#44505e")
             if self.ctrl.settings.input == cfg.INPUT_SRT:  # the address read here: window values stay on this thread
                 threading.Thread(target=self.bring_obs, args=(self.obs_server(),), name="obs", daemon=True).start()
         self._last_status = ""
@@ -1064,6 +1130,37 @@ class App(tk.Tk):
             return
         if obs_setup.launch(exe):
             self.post(lambda: self.message.configure(text=self.tr("obs_opening"), fg="#44505e"))
+
+    # --- the panic key and OBS put back ---------------------------------------------------------------------------
+    def arm_panic_key(self) -> None:
+        """(Re)registers the streamer's panic key; says so when another program holds it."""
+        if self._hotkey is not None:
+            self._hotkey.stop()
+            self._hotkey = None
+        name = self.ctrl.settings.panic_button
+        if not name:
+            return
+        hk = hotkey.Hotkey(name, lambda: self.post(self.on_panic))
+        if hk.start():
+            self._hotkey = hk
+        elif sys.platform == "win32":
+            self.pre_note.configure(text=self.tr("panic_taken", hk=name))
+
+    def on_panic_key(self) -> None:
+        self.collect()
+        self.ctrl.save_settings()
+        self.arm_panic_key()
+
+    def on_panic(self) -> None:
+        on = not self.ctrl.panic
+        self.ctrl.set_panic(on)
+        text = self.tr("panic_on", hk=self.ctrl.settings.panic_button) if on else self.tr("panic_off")
+        self.message.configure(text=text, fg="#b3261e" if on else "#1b7f3b")
+
+    def on_obs_restore(self) -> None:
+        why = obs_setup.restore()
+        key = {"": "obs_restore_done", "no_backup": "obs_restore_none", "running": "obs_restore_running"}.get(why, "obs_auto_error")
+        self.obs_result.configure(text=self.tr(key), fg="#1b7f3b" if not why else "#b3261e")
 
     def on_stop(self) -> None:
         self.message.configure(text=self.tr("stopping"), fg="#44505e")
@@ -1213,6 +1310,8 @@ class App(tk.Tk):
         self.update_text.pack(side=side, fill="x", expand=True)
         if data_new:
             self.update_btn.pack(side="left" if self.rtl else "right", padx=6)
+        if app_new and self.ctrl.update and self.ctrl.update.app_sha256:
+            self.app_update_btn.pack(side="left" if self.rtl else "right", padx=6)
         self.update_row.pack(fill="x", pady=4, before=self.setup_box if self.setup_box.winfo_ismapped() else self.start_btn.master)
 
     def apply_update(self) -> None:
@@ -1238,6 +1337,36 @@ class App(tk.Tk):
             ),
         )
 
+    def apply_app_update(self) -> None:
+        """One click: download the new version, check it, install it over this one, open again. Never while live."""
+        if self.ctrl.engine.running:
+            self.message.configure(text=self.tr("update_busy"))
+            return
+        got: list[Path] = []
+
+        def work() -> str:
+            try:
+                got.append(self.ctrl.download_app_update(lambda w, d, t: self.on_progress(w, d, t), self._cancel))
+            except Exception as exc:
+                return self.tr("update_failed", why=str(exc)) if not self._cancel.is_set() else self.tr("install_cancelled")
+            return ""
+
+        def done(err: str) -> None:
+            if err or not got:
+                self.message.configure(text=err, fg="#b3261e")
+                return
+            try:
+                self.ctrl.run_installer(got[0])
+            except OSError as exc:
+                why = self.tr("sac_blocked") if preflight.blocked_by_windows(exc) else str(exc)
+                self.message.configure(text=self.tr("update_failed", why=why), fg="#b3261e")
+                return
+            if self._hotkey is not None:
+                self._hotkey.stop()
+            self.destroy()  # the installer closes nothing of ours that is still open, then opens the new version
+
+        self.job("update", work, done)
+
     def roll_back(self) -> None:
         try:
             self.ctrl.roll_back()
@@ -1252,6 +1381,9 @@ class App(tk.Tk):
             if not messagebox.askyesno(PRODUCT_NAME, self.tr("quit_running")):
                 return
             self.ctrl.stop()  # clean stop: outputs closed, report written; killed after 20 s if it does not end
+        if self._hotkey is not None:
+            self._hotkey.stop()
+        self.ctrl.set_panic(False)
         self._cancel.set()
         self.destroy()
 

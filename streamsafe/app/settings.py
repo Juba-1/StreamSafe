@@ -13,6 +13,7 @@ INPUT_CAMERA, INPUT_SRT, INPUT_FILE = "camera", "srt", "file"
 RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "1440p": (2560, 1440), "2160p": (3840, 2160)}
 FPS_CHOICES = (30, 60)
 OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
+COVER_PEOPLE, COVER_SCREEN = "people", "screen"
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
@@ -31,6 +32,8 @@ class Settings:
     output: str = OUTPUT_RTMP
     platform: str = "custom"  # ingest.PLATFORMS: which preset fills the address
     rtmp_url: str = ""  # the ingest address WITHOUT the stream key ("" = the platform's preset)
+    platform2: str = ""  # an extra platform streamed at the same time through the protection ("" = none)
+    rtmp_url2: str = ""
     record_dir: str = ""  # where recordings go ("" = the user's Videos folder)
     remember_key: bool = False
     delay: float = 0.0  # seconds; 0 = automatic (engine.delay_for: 2 s on the fast NVIDIA mode, else 3 s)
@@ -40,6 +43,8 @@ class Settings:
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
     translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
+    cover_mode: str = COVER_PEOPLE  # COVER_PEOPLE: cover the people who need it; COVER_SCREEN: cover the whole screen
+    panic_button: str = "F9"  # the key that covers the whole screen at once (pressed again: back); "" = off
     brand_image: str = ""  # the streamer's / sponsor's logo shown on the full-screen cover (a copy in the data folder)
 
     def problems(self) -> list[str]:
@@ -57,6 +62,8 @@ class Settings:
             from streamsafe.app import ingest
 
             out += [p for p in ingest.resolve(self.rtmp_url, "k" * 8, self.platform).problems if p != "bad_key"]
+            if self.platform2:
+                out += [p + "2" for p in ingest.resolve(self.rtmp_url2, "k" * 8, self.platform2).problems if p != "bad_key"]
         if self.delay != 0 and not 0.5 <= self.delay <= 10:
             out.append("bad_delay")
         return out
@@ -93,6 +100,8 @@ def load(path: Path) -> Settings:
         s.input = INPUT_SRT
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_RTMP
+    if s.cover_mode not in (COVER_PEOPLE, COVER_SCREEN):
+        s.cover_mode = COVER_PEOPLE
     if s.resolution not in RESOLUTIONS:
         s.resolution = "1080p"
     if s.fps not in FPS_CHOICES:
