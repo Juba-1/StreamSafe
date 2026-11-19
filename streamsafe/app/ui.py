@@ -1030,8 +1030,8 @@ class App(tk.Tk):
         except (RuntimeError, OSError) as exc:
             self.message.configure(text=self.tr("not_ready", why=self.tr(str(exc)) if str(exc) in i18n.TEXT else str(exc)))
         else:
-            if self.ctrl.settings.input == cfg.INPUT_SRT:
-                threading.Thread(target=self.bring_obs, name="obs", daemon=True).start()
+            if self.ctrl.settings.input == cfg.INPUT_SRT:  # the address read here: window values stay on this thread
+                threading.Thread(target=self.bring_obs, args=(self.obs_server(),), name="obs", daemon=True).start()
         self._last_status = ""
         self.show_status(force=True)
 
@@ -1049,10 +1049,9 @@ class App(tk.Tk):
         why = obs_setup.apply(self.obs_server())
         self.obs_result.configure(text=self.obs_text(why), fg="#1b7f3b" if not why else "#b3261e")
 
-    def bring_obs(self) -> None:
-        """After Start (worker thread): OBS closed -> set it up if needed and open it streaming to us by itself;
-        OBS open -> say what to press, or that it must be closed once to be set up."""
-        server = self.obs_server()
+    def bring_obs(self, server: str) -> None:
+        """After Start (worker thread, no window access but ``post``): OBS closed -> set it up if needed and open it
+        streaming to us by itself; OBS open -> say what to press, or that it must be closed once to be set up."""
         if obs_setup.obs_running():
             text = self.tr("obs_press_start") if obs_setup.is_set(server) else self.tr("obs_auto_running")
             self.post(lambda: self.message.configure(text=text, fg="#44505e"))
