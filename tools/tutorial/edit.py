@@ -77,7 +77,7 @@ def zoom_box(step: str, w: int = 960, h: int = 540) -> tuple[int, int, int, int]
     x, y, bw, bh = acts[step]["box"]
     cx, cy = x + bw // 2, y + bh // 2
     left = min(max(cx - w // 2, 0), W - w)
-    top = min(max(cy - h // 2, 0), H - h)
+    top = min(max(cy - int(h * 0.38), 0), H - h)  # the widget a bit above the middle: the caption sits low
     return left, top, w, h
 
 
@@ -130,9 +130,11 @@ def main() -> None:
         "c_out": card("حمّله مجاناً", "streamsafe-sa.vercel.app", "ko-fi.com/streamsafe ♥"),
     })  # fmt: skip
     still("title", "c_title.png", 3.5)
-    screen("open", t("app_open") - 0.5, t("step1_platform"), "c_open.png", box=zoom_box("app_open", 1280, 720))
+    ax, ay, aw, _ah = acts["app_open"]["box"]
+    open_box = (min(max(ax + aw // 2 - 640, 0), W - 1280), max(ay - 10, 0), 1280, 720)  # the window's top half
+    screen("open", t("app_open") - 0.5, t("step1_platform"), "c_open.png", box=open_box)
     screen("s1", t("step1_platform") - 0.3, t("step1_done") + 0.6, "c_s1.png", box=zoom_box("step1_platform"))
-    kx, ky, kw, kh = acts["step2_key"]["box"]
+    kx, ky, kw, kh = acts["step2_done"]["box"]  # where the key field is once typed
     screen("s2", t("step2_key") - 0.2, t("step2_done") + 0.8, "c_s2.png", box=zoom_box("step2_key"), blur=(kx, ky, kw, kh))
     screen("s3", t("step3_obs") - 0.2, t("step3_done") + 1.8, "c_s3.png", box=zoom_box("step3_obs"))
     go_end = min(t("running") + 1, t("start") + 40)
@@ -145,7 +147,9 @@ def main() -> None:
     final = OUT / "StreamSafe_tutorial.mp4"
     ff("-f", "concat", "-safe", "0", "-i", str(lst), "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-shortest",
        "-c:v", "copy", "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(final))  # fmt: skip
-    for i, s in enumerate((5, 15, 25, 40, 60, 80, 100)):
+    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(final)],
+                               capture_output=True, text=True).stdout or 0)  # fmt: skip
+    for i, s in enumerate(x for x in (5, 15, 25, 40, 60, 80, 100) if x < dur):
         ff("-ss", str(s), "-i", str(final), "-frames:v", "1", "-vf", "scale=960:-1", str(OUT / f"check_{i}.jpg"))
     print("FINAL", final, final.stat().st_size, flush=True)
 
