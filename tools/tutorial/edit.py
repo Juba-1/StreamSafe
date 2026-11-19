@@ -144,12 +144,13 @@ def main() -> None:
     screen("open", t("app_open") - 0.5, t("step1_platform"), "c_open.png", box=open_box)
     screen("s1", t("step1_platform") - 0.3, t("step1_done") + 0.6, "c_s1.png", box=zoom_box("step1_platform"))
     kx, ky, kw, kh = acts["step2_done"]["box"]  # where the key field is once typed
-    screen("s2", t("step2_key") - 0.2, t("step2_done") + 0.8, "c_s2.png", box=zoom_box("step2_key"), blur=(kx, ky, kw, kh))
-    screen("s3", t("step3_obs") - 0.2, t("step3_done") + 1.8, "c_s3.png", box=zoom_box("step3_obs"))
+    screen("s2", t("step2_key") - 0.2, t("step2_done") + 0.8, "c_s2.png", box=zoom_box("step2_key"), blur=(kx - 4, ky - 4, kw + 8, kh + 8))
+    key = (kx - 4, ky - 4, kw + 8, kh + 8)  # the key stays blurred wherever it is on screen
+    screen("s3", t("step3_obs") - 0.2, t("step3_done") + 1.8, "c_s3.png", box=zoom_box("step3_obs"), blur=key)
     go_end = min(t("running") + 1, t("start") + 40)
-    screen("go", t("start") - 0.4, go_end, "c_go.png", speed=max(1.0, (go_end - t("start")) / 16))
+    screen("go", t("start") - 0.4, go_end, "c_go.png", blur=key, speed=max(1.0, (go_end - t("start")) / 16))
     screen("live", 42, 70, "c_live.png", src=VIEWER)
-    screen("stop", t("stop") - 0.8, t("end"), "c_stop.png", box=zoom_box("stop", 1280, 720))
+    screen("stop", t("stop") - 0.8, t("end"), "c_stop.png", box=zoom_box("stop", 1280, 720), blur=key)
     still("out", "c_out.png", 4.5)
     lst = OUT / "parts.txt"
     lst.write_text("".join(f"file '{p.name}'\n" for p in parts), encoding="utf-8")
