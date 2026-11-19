@@ -40,6 +40,8 @@ def selftest_args(s, reports, record, fast=False):  # the runner has no GPU: the
 engine.run_args = selftest_args
 controller.Controller.models_problem = lambda self: ""
 controller.Controller.heads_problem = lambda self: ""
+_blockers = controller.Controller.blockers
+controller.Controller.blockers = lambda self, key="": [b for b in _blockers(self, key) if b != "why_check"]  # no GPU here
 
 app = ui.App()
 app.lang = "ar"
