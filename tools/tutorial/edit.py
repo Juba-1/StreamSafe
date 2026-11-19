@@ -135,7 +135,7 @@ def main() -> None:
     kx, ky, kw, kh = acts["step2_key"]["box"]
     screen("s2", t("step2_key") - 0.2, t("step2_done") + 0.8, "c_s2.png", box=zoom_box("step2_key"), blur=(kx, ky, kw, kh))
     screen("s3", t("step3_obs") - 0.2, t("step3_done") + 1.8, "c_s3.png", box=zoom_box("step3_obs"))
-    go_end = min(t("running") + 4, t("start") + 40)
+    go_end = min(t("running") + 1, t("start") + 40)
     screen("go", t("start") - 0.4, go_end, "c_go.png", speed=max(1.0, (go_end - t("start")) / 16))
     screen("live", 42, 70, "c_live.png", src=VIEWER)
     screen("stop", t("stop") - 0.8, t("end"), "c_stop.png", box=zoom_box("stop", 1280, 720))
