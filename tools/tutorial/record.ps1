@@ -24,10 +24,13 @@ $psi.Arguments = "-hide_banner -loglevel error -y -f gdigrab -framerate 30 -draw
 $psi.RedirectStandardInput = $true; $psi.UseShellExecute = $false
 $rec = [System.Diagnostics.Process]::Start($psi)
 Start-Sleep -Seconds 2
-python tools/tutorial/drive_app.py $out 2>&1 | Tee-Object (Join-Path $out "drive.txt")
+$drv = Start-Process python -ArgumentList "tools/tutorial/drive_app.py", "`"$out`"" -PassThru -NoNewWindow `
+  -RedirectStandardOutput (Join-Path $out "drive.txt") -RedirectStandardError (Join-Path $out "drive_err.txt")
+if (-not $drv.WaitForExit(600000)) { $drv.Kill() }
+Get-Content (Join-Path $out "drive.txt") -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 $rec.StandardInput.Write("q"); $rec.WaitForExit(20000) | Out-Null
-Get-Process obs64 -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process obs64, ffmpeg -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $plat.Id } | Stop-Process -Force
 if (-not $plat.HasExited) { & taskkill /T /F /PID $plat.Id | Out-Null }
 Copy-Item (Join-Path $cfg "logs") (Join-Path $out "obs_logs") -Recurse -ErrorAction SilentlyContinue
 Get-ChildItem $out | Format-Table Name, Length

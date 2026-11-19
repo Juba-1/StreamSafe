@@ -182,4 +182,5 @@ try:
     run()
 finally:
     mark("done")
+    app.ctrl.stop()  # the engine never outlives the recording
     app.destroy()
