@@ -46,8 +46,8 @@ TRANSLATE_FILES: dict[str, tuple[str, int]] = {
 # A small JSON file signed with ed25519 (``tools/sign_manifest.py``): latest app version, model files and head
 # files with sha256. Empty URL or no key: the app never looks for updates and works as it is. The private key
 # never enters this repository.
-UPDATE_MANIFEST_URL = ""
-UPDATE_PUBLIC_KEYS: tuple[str, ...] = ()  # hex, 32 bytes each; more than one allows changing the key
+UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Juba-1/StreamSafe-download/main/update/manifest.json"
+UPDATE_PUBLIC_KEYS: tuple[str, ...] = ("25a8a66c70df71c3adf7ae4e3d582ce271c1eb02211cb9456255c9ca52c5085d",)  # hex, 32 bytes each; more than one allows changing the key
 
 # --- subscriptions (Dodo Payments licence keys, app/license.py) ------------------------------------------------
 # The app talks only to Dodo's PUBLIC licence endpoints (activate / validate / deactivate: no API key, no secret in
