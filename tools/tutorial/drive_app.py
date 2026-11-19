@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pyautogui
 
+sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+
 OUT = Path(sys.argv[1] if len(sys.argv) > 1 else "tutorial_out")
 OUT.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("STREAMSAFE_DATA_DIR", str(OUT / "data"))
@@ -40,6 +42,7 @@ def selftest_args(s, reports, record, fast=False):  # the runner has no GPU: the
 engine.run_args = selftest_args
 controller.Controller.models_problem = lambda self: ""
 controller.Controller.heads_problem = lambda self: ""
+controller.Controller.has_nvidia_gpu = lambda self: False  # the runner's adapter: no fast-mode question
 _blockers = controller.Controller.blockers
 controller.Controller.blockers = lambda self, key="": [b for b in _blockers(self, key) if b != "why_check"]  # no GPU here
 

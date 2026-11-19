@@ -15,7 +15,10 @@ $glob | Out-File (Join-Path $cfg "global.ini") -Encoding utf8; $glob | Out-File 
 '{"name":"Untitled","current_scene":"Scene","current_program_scene":"Scene","scene_order":[{"name":"Scene"}],"sources":[{"id":"scene","versioned_id":"scene","name":"Scene","uuid":"0e4f5b2e-1111-4c1a-9a7e-000000000009","settings":{"id_counter":0,"items":[]}}]}' |
   Out-File (Join-Path $cfg "basic\scenes\Untitled.json") -Encoding ascii
 
-(New-Object -ComObject Shell.Application).MinimizeAll(); Start-Sleep -Seconds 2  # a clean desktop
+# a clean desktop: the runner's own "System Properties" notice closed, every window minimised
+Get-Process | Where-Object { $_.MainWindowTitle -match "System Properties" } | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process SystemPropertiesPerformance, SystemPropertiesAdvanced -ErrorAction SilentlyContinue | Stop-Process -Force
+(New-Object -ComObject Shell.Application).MinimizeAll(); Start-Sleep -Seconds 2
 $ff = (Get-Command ffmpeg).Source
 $plat = Start-Process $ff -ArgumentList "-hide_banner","-loglevel","error","-y","-listen","1","-i","rtmp://127.0.0.1:19350/app/demo","-c","copy",(Join-Path $out "platform.flv") -PassThru -WindowStyle Hidden
 # the screen recorder: stdin open so it can be stopped cleanly with "q"
