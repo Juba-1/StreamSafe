@@ -176,7 +176,7 @@ shots_html = "".join(
 
 SCREEN = (
     """<video id="hero-video" autoplay muted loop playsinline preload="auto" poster="/media/poster.webp" width="1280" height="720"
- aria-label="GTA 6 trailer after StreamSafe: swimsuits and outfits covered with a navy shirt carrying the StreamSafe logo"><source src="/media/demo.mp4" type="video/mp4"></video>
+ aria-label="GTA 6 trailer after StreamSafe: swimsuits and outfits covered with a navy shirt carrying the StreamSafe logo"><source src="https://cdn.jsdelivr.net/gh/Juba-1/StreamSafe-download@main/media/demo.mp4" type="video/mp4"></video>
 <button class="pp" type="button" aria-pressed="false"><span data-l="en">Pause</span><span data-l="ar">إيقاف</span></button>"""
     if HAS_VIDEO
     else """<img src="/media/roof.webp" alt="GTA 6 trailer scene after StreamSafe: swimsuits covered with a navy shirt carrying the StreamSafe logo" width="960" height="540" fetchpriority="high">
@@ -709,7 +709,7 @@ if __name__ == "__main__":
     OUT.mkdir()
     for f in ("style.css", "lang.js", "logo.webp", "favicon.png"):
         shutil.copy(ROOT / f, OUT / f)
-    shutil.copytree(ROOT / "media", OUT / "media")
+    shutil.copytree(ROOT / "media", OUT / "media", ignore=shutil.ignore_patterns("*.mp4"))  # video: jsDelivr (Vercel bandwidth)
     for name, (title, body) in PAGES.items():
         (OUT / name).write_text(page(title, DESC, body), encoding="utf-8")
     print("built", sorted(p.name for p in OUT.iterdir()), "video" if HAS_VIDEO else "no video")
