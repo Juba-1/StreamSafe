@@ -549,13 +549,15 @@ TERMS = doc(
 <p>You can cancel at any time. Details are in our <a href="/refund.html">Trial, Cancellation &amp; Refunds policy</a>.</p>
 <h2>7. Acceptable use</h2>
 <p>Use StreamSafe only for lawful purposes and with streaming accounts and content you are entitled to use. Do not use it to break any law or any platform's terms.</p>
-<h2>8. Updates and connection</h2>
+<h2>8. Clips of your streams and videos</h2>
+<p>StreamSafe is free, and in return we may show it working. When you use StreamSafe in a stream or video that you make public (for example on Twitch, Kick, YouTube, TikTok or X), you give us a non-exclusive, worldwide, royalty-free licence to copy, cut and publish short clips of it (normally up to two minutes each) on our own accounts, website and ads, to promote StreamSafe. We will credit your channel where we reasonably can and will not edit a clip to change what you said or did. This applies only to content you have the right to license; the rights of others in it (for example the game publisher) stay theirs. You can ask us to remove a clip, or to stop using your content, at any time by writing to <a href="mailto:{EMAIL}">{EMAIL}</a>; we will remove it from our accounts within 7 days and not use your content again.</p>
+<h2>9. Updates and connection</h2>
 <p>We may update the app to improve detection, fix problems or support new platforms. The app needs an internet connection at least every few days to confirm your subscription.</p>
-<h2>9. Liability</h2>
+<h2>10. Liability</h2>
 <p>To the extent the law allows, StreamSafe is provided "as is", and our total liability for any claim is limited to the amount you paid us in the three months before the claim.</p>
-<h2>10. Trademarks</h2>
+<h2>11. Trademarks</h2>
 <p>StreamSafe is not affiliated with, endorsed or sponsored by Rockstar Games or Take-Two Interactive. Grand Theft Auto and GTA are their trademarks.</p>
-<h2>11. Changes and contact</h2>
+<h2>12. Changes and contact</h2>
 <p>We may update these terms and will post the new version here. Questions: <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
 """,
     f"""
@@ -574,13 +576,15 @@ TERMS = doc(
 <p>تقدر تلغي في أي وقت، والتفاصيل في <a href="/refund.html">سياسة التجربة والإلغاء والاسترداد</a>.</p>
 <h2>7. الاستخدام المقبول</h2>
 <p>استخدم StreamSafe لأغراض مشروعة فقط، ومع حسابات بث ومحتوى يحق لك استخدامها، ولا تستخدمه لمخالفة أي نظام أو شروط أي منصة.</p>
-<h2>8. التحديثات والاتصال</h2>
+<h2>8. مقاطع من بثوثك وفيديوهاتك</h2>
+<p>StreamSafe مجاني، ومقابل ذلك نقدر نعرض البرنامج وهو يشتغل. إذا استخدمت StreamSafe في بث أو فيديو نشرته للعامة (مثل Twitch أو Kick أو YouTube أو TikTok أو X)، فأنت تمنحنا ترخيصًا غير حصري، في كل العالم، وبدون مقابل، لنسخ مقاطع قصيرة منه وقصّها ونشرها (عادةً حتى دقيقتين للمقطع) في حساباتنا وموقعنا وإعلاناتنا للتسويق لـ StreamSafe. نذكر قناتك متى ما أمكن، ولا نعدّل أي مقطع بشكل يغيّر كلامك أو تصرفك. هذا يشمل فقط المحتوى اللي يحق لك ترخيصه، وحقوق غيرك فيه (مثل ناشر اللعبة) تبقى لهم. وتقدر في أي وقت تطلب منا حذف مقطع أو التوقف عن استخدام محتواك بمراسلتنا على <a href="mailto:{EMAIL}">{EMAIL}</a>، ونحذفه من حساباتنا خلال 7 أيام ولا نستخدم محتواك مرة ثانية.</p>
+<h2>9. التحديثات والاتصال</h2>
 <p>قد نحدّث البرنامج لتحسين الكشف أو إصلاح المشاكل أو دعم منصات جديدة. يحتاج البرنامج اتصال إنترنت مرة على الأقل كل بضعة أيام للتأكد من الاشتراك.</p>
-<h2>9. المسؤولية</h2>
+<h2>10. المسؤولية</h2>
 <p>في حدود ما يسمح به النظام، يُقدَّم StreamSafe "كما هو"، ومسؤوليتنا الكاملة عن أي مطالبة محدودة بالمبلغ الذي دفعته لنا خلال الأشهر الثلاثة السابقة للمطالبة.</p>
-<h2>10. العلامات التجارية</h2>
+<h2>11. العلامات التجارية</h2>
 <p>StreamSafe ليس تابعًا لشركة Rockstar Games أو Take-Two Interactive ولا معتمدًا منهما. Grand Theft Auto و GTA علامات تجارية مملوكة لهما.</p>
-<h2>11. التعديلات والتواصل</h2>
+<h2>12. التعديلات والتواصل</h2>
 <p>قد نعدّل هذه الشروط وننشر النسخة الجديدة هنا. للأسئلة: <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
 """,
 )
@@ -602,6 +606,8 @@ PRIVACY = doc(
 <p>Your stream key is saved only on your PC in the app's settings and is sent only to the platform you stream to.</p>
 <h2>What we don't do</h2>
 <p>We don't sell your data, show ads, or use tracking cookies on this website. The site remembers your language choice in your own browser.</p>
+<h2>Public clips</h2>
+<p>If you use StreamSafe in a public stream or video, we may republish short clips of it to promote StreamSafe (see section 8 of the <a href="/terms.html">Terms</a>). These can show your username, voice or face as they appeared in your public content. Ask us at <a href="mailto:{EMAIL}">{EMAIL}</a> and we remove them within 7 days.</p>
 <h2>Keeping and deleting data</h2>
 <p>We keep subscription records while your subscription is active and afterwards for as long as the law requires. To see, correct or delete your information, email <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
 """,
@@ -619,6 +625,8 @@ PRIVACY = doc(
 <p>مفتاح البث يُحفظ على جهازك فقط في إعدادات البرنامج، ولا يُرسل إلا للمنصة اللي تبث عليها.</p>
 <h2>وش اللي ما نسويه</h2>
 <p>ما نبيع بياناتك، وما نعرض إعلانات، وما نستخدم كوكيز تتبع في هذا الموقع. الموقع يتذكر اختيار اللغة في متصفحك أنت فقط.</p>
+<h2>المقاطع العامة</h2>
+<p>إذا استخدمت StreamSafe في بث أو فيديو عام، قد نعيد نشر مقاطع قصيرة منه للتسويق لـ StreamSafe (شوف البند 8 في <a href="/terms.html">الشروط</a>). هذي المقاطع ممكن يظهر فيها اسم حسابك أو صوتك أو وجهك مثل ما ظهرت في محتواك العام. راسلنا على <a href="mailto:{EMAIL}">{EMAIL}</a> ونحذفها خلال 7 أيام.</p>
 <h2>حفظ البيانات وحذفها</h2>
 <p>نحتفظ بسجلات الاشتراك طول مدة اشتراكك وبعدها بالقدر اللي يطلبه النظام. للاطلاع على بياناتك أو تصحيحها أو حذفها راسلنا على <a href="mailto:{EMAIL}">{EMAIL}</a>.</p>
 """,
