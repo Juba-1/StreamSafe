@@ -57,11 +57,41 @@ def profile_dir(root: Path) -> Path | None:
 
 def find_obs(env: Mapping[str, str] | None = None) -> Path | None:
     env = os.environ if env is None else env
-    for p in (*OBS_PATHS, env.get("STREAMSAFE_OBS_EXE", "")):
+    for p in (*OBS_PATHS, env.get("STREAMSAFE_OBS_EXE", ""), *_registered_obs(), *_other_obs_places(env)):
         if p and Path(p).is_file():
             return Path(p)
     which = shutil.which(OBS_EXE)
     return Path(which) if which else None
+
+
+def _registered_obs() -> list[str]:
+    """Where Windows says OBS is installed (its installer writes this key): finds installs on another drive."""
+    if sys.platform != "win32":
+        return []
+    import winreg
+
+    found = []
+    for hive, key in ((winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\OBS Studio"), (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\OBS Studio")):
+        try:
+            with winreg.OpenKey(hive, key) as k:
+                folder = winreg.QueryValueEx(k, "")[0]
+        except OSError:
+            continue
+        found.append(str(Path(folder) / "bin" / "64bit" / OBS_EXE))
+    return found
+
+
+def _other_obs_places(env: Mapping[str, str]) -> list[str]:
+    """The Steam copy of OBS and the usual folders on other drives."""
+    bin64 = ("bin", "64bit", OBS_EXE)
+    steam = ("steamapps", "common", "OBS Studio", *bin64)
+    out = [str(Path(env[v], "Steam", *steam)) for v in ("ProgramFiles(x86)", "ProgramFiles") if env.get(v)]
+    for drive in "CDEFG":
+        root = drive + ":\\"
+        for folder in ("obs-studio", "OBS Studio"):
+            out += [str(Path(root, "Program Files", folder, *bin64)), str(Path(root, folder, *bin64))]
+        out.append(str(Path(root, "SteamLibrary", *steam)))
+    return out
 
 
 def obs_running(run: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> bool:
