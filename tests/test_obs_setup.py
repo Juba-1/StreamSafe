@@ -93,7 +93,7 @@ def test_our_picture_follows_obs_own_video_settings(tmp_path):
     assert obs_setup.obs_video(env) == (2560, 1440, 60.0)
     s = cfg.Settings(resolution="1080p", fps=30)
     engine.follow_obs(s, obs_setup.obs_video(env))
-    assert (s.resolution, s.fps) == ("1440p", 60)
+    assert (s.resolution, s.fps) == ("1440p", 30)  # live is always 30 fps (60 broke up on mid-range PCs)
     prof.write_text("[Video]\nOutputCX=1600\nOutputCY=900\nFPSCommon=29.97\n", "utf-8")
     engine.follow_obs(s, obs_setup.obs_video(env))
     assert (s.resolution, s.fps) == ("1080p", 30)  # never smaller than what OBS sends

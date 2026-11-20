@@ -71,11 +71,11 @@ def follow_obs(settings: Settings, video: tuple[int, int, float] | None) -> None
     streamer's quality is kept without setting anything twice."""
     if not settings.follow_obs or settings.input != INPUT_SRT or video is None:
         return
-    w, h, fps = video
+    w, h, _fps = video
     short = min(w, h)
     fits = [name for name, (_rw, rh) in sorted(RESOLUTIONS.items(), key=lambda kv: kv[1][1]) if rh >= short]
     settings.resolution = fits[0] if fits else "2160p"
-    settings.fps = 60 if fps > 45 else 30
+    settings.fps = 30  # 30 for every live stream: 60 doubled the work and the upload and broke up on mid-range PCs
     # OBS's exact shape is kept: a vertical (TikTok) or any other canvas is never squeezed into 16:9
     settings.obs_size = f"{w - w % 2}x{h - h % 2}" if w >= 16 and h >= 16 else ""
 
@@ -121,7 +121,10 @@ def run_args(settings: Settings, reports: Path, record_file: str = "", fast: boo
         if settings.output == OUTPUT_RTMP:
             from streamsafe.app import ingest
 
-            args += ["--bitrate", str(ingest.bitrate_for(settings.platform, min(w, h), settings.fps))]
+            kbps = ingest.bitrate_for(settings.platform, min(w, h), settings.fps)
+            if settings.follow_obs and settings.input == INPUT_SRT and settings.obs_kbps >= 1000:
+                kbps = min(kbps, settings.obs_kbps)  # never more than the streamer's own OBS sends: their upload
+            args += ["--bitrate", str(kbps)]
     return args
 
 

@@ -77,6 +77,9 @@ class EyeConfig:
 @dataclass
 class RiskConfig:
     thr: float = 0.0  # operating threshold; 0 = read thr_h6.txt
+    # the streamer's sensitivity: > 1 covers only clearer cases (fewer covers of modest people). Ali, 20 Nov 2026:
+    # streamers who care steer away from such scenes themselves; covers on the wrong people annoyed them more
+    thr_scale: float = 1.0
     young_k: float = 1.6  # first look at a BIG person needs p >= young_k * thr
     young_min_h: int = 150  # ...for people at least this tall (analysis px)
     release_s: float = 1.0  # clear evidence needed this long before a person is uncovered

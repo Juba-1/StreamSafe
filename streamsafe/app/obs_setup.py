@@ -134,6 +134,21 @@ def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=4), encoding="utf-8")
 
 
+def obs_kbps(env: Mapping[str, str] | None = None) -> int:
+    """The video bitrate the streamer set in OBS (Settings > Output), 0 if unknown: what their internet carries."""
+    root = config_dir(env)
+    prof = profile_dir(root) if root else None
+    if prof is None:
+        return 0
+    cp = _ini(prof / "basic.ini")
+    try:
+        if cp.get("Output", "Mode", fallback="Simple").lower() == "advanced":
+            return int(json.loads((prof / "streamEncoder.json").read_text(encoding="utf-8")).get("bitrate", 0))
+        return cp.getint("SimpleOutput", "VBitrate", fallback=0)
+    except (OSError, ValueError, AttributeError):
+        return 0
+
+
 def obs_video(env: Mapping[str, str] | None = None) -> tuple[int, int, float] | None:
     """What OBS sends: its output width, height and frame rate (Settings > Video), or None if unknown."""
     root = config_dir(env)

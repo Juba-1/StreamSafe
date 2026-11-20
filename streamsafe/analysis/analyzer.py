@@ -51,7 +51,7 @@ class Analyzer:
     def __init__(self, cfg: Config, models: Models, output_scale: float) -> None:
         self.cfg = cfg
         self.models = models
-        self.thr = cfg.risk.thr or models.eye.thr
+        self.thr = min(0.95, (cfg.risk.thr or models.eye.thr) * cfg.risk.thr_scale)
         self.scale = self.thr / 0.40
         self.tracker = Tracker()
         self.eyes = EyeScheduler(cfg.eye)

@@ -50,6 +50,13 @@ def fit_16x9(width: int, height: int) -> tuple[int, int]:
     return (width, height) if width * 9 == height * 16 and width > 0 else DEFAULT_SIZE
 
 
+def shape_in_16x9(w: int, h: int, fw: int, fh: int) -> tuple[int, int, int, int, int, int]:
+    """Where a w x h picture sits, undistorted and centred, in an fw x fh frame: (inner w, inner h, x, y, w, h)."""
+    k = min(fw / w, fh / h)
+    iw, ih = max(2, round(w * k / 2) * 2), max(2, round(h * k / 2) * 2)
+    return iw, ih, (fw - iw) // 2, (fh - ih) // 2, w - w % 2, h - h % 2
+
+
 class VideoFileSource:
     live = False
 
@@ -176,6 +183,9 @@ class FFmpegSource:
         if exe is None and spawn is None:
             raise FileNotFoundError("ffmpeg not found on PATH")
         self.size, self.fps, self.url = fit_16x9(*size), fps, url
+        # another shape (a vertical TikTok canvas): kept undistorted inside the 16:9 frame the engine works on,
+        # and cut out again by the outputs (``crop``: inner w, h, x, y, then the shape asked for)
+        self.crop = shape_in_16x9(*size, *self.size) if self.size != tuple(size) else None
         self.live = url.split("://", 1)[0].lower() in LIVE_SCHEMES if live is None else live
         self.frame_index = -1  # number (over all connections) of the frame frames() gave last
         self.dropped_audio_frames = 0
@@ -184,6 +194,10 @@ class FFmpegSource:
         self._port = link.listener_port(url)
         self.relisten = self._port is not None if relisten is None else relisten
         w, h = self.size
+        geo = f"scale={w}:{h}"
+        if self.crop:
+            iw, ih, x, y, _ow, _oh = self.crop
+            geo = f"scale={iw}:{ih},pad={w}:{h}:{x}:{y}"
         # no "-fflags nobuffer": with FFmpeg 6.1 it decodes nothing from mp4 files or SRT/mpegts (tested).
         # "fps=" makes any input rate (OBS virtual camera at 60 fps) the engine's rate
         # a listener logs at "info": FFmpeg then says what OBS sends (size, frame rate, bitrate), passed on as a
@@ -193,11 +207,11 @@ class FFmpegSource:
         if audio:
             # a small interleave window: if the sound stalls, the picture is not held back for it
             cmd += ["-map", "0:v:0", "-map", "0:a:0?",
-                    "-vf", f"scale={w}:{h},fps={fps}:start_time=0", "-pix_fmt", "bgr24", "-c:v", "rawvideo",
+                    "-vf", f"{geo},fps={fps}:start_time=0", "-pix_fmt", "bgr24", "-c:v", "rawvideo",
                     "-af", f"aresample={AUDIO_RATE}:async=1000:first_pts=0,aformat=sample_fmts=s16:channel_layouts=stereo",
                     "-c:a", "pcm_s16le", "-max_interleave_delta", "100000", "-flush_packets", "1", "-f", "avi", "pipe:1"]  # fmt: skip
         else:
-            cmd += ["-an", "-vf", f"scale={w}:{h},fps={fps}", "-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]
+            cmd += ["-an", "-vf", f"{geo},fps={fps}", "-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]
         self._cmd, self._audio_on = cmd, audio
         self._spawn = spawn or subprocess.Popen
         self._closed = threading.Event()

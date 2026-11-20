@@ -301,6 +301,7 @@ class App(tk.Tk):
         v("translate", tk.BooleanVar, st.translate_ar)
         v("follow_obs", tk.BooleanVar, st.follow_obs)
         v("cover_mode", tk.StringVar, st.cover_mode)
+        v("sensitivity", tk.StringVar, st.sensitivity)
         v("platform2", tk.StringVar, "").set(self.tr("plat_" + st.platform2) if st.platform2 else self.tr("plat2_none"))
         v("rtmp_url2", tk.StringVar, st.rtmp_url2)
         v("key2", tk.StringVar, self.ctrl.stored_key2() if "key2" not in self._vars else self._vars["key2"].get())
@@ -544,6 +545,8 @@ class App(tk.Tk):
         c = self.card(s, self.tr("sec_protect"))
         choice(c, "cover_people", cfg.COVER_PEOPLE, "cover_mode")
         choice(c, "cover_screen", cfg.COVER_SCREEN, "cover_mode")
+        choice(c, "sens_balanced", cfg.SENS_BALANCED, "sensitivity")
+        choice(c, "sens_strict", cfg.SENS_STRICT, "sensitivity")
         pk = self.field(c, self.tr("panic_key"), v("panic_key", tk.StringVar, ""), 12, combo=hotkey.CHOICES)
         pk.configure(state="readonly")  # type: ignore[call-arg]
         pk.bind("<<ComboboxSelected>>", lambda e: self.on_panic_key())
@@ -820,6 +823,8 @@ class App(tk.Tk):
         st.remember_key = bool(v["remember"].get())
         st.translate_ar = bool(v["translate"].get())
         st.follow_obs = bool(v["follow_obs"].get())
+        sens = str(v["sensitivity"].get())
+        st.sensitivity = sens if sens in cfg.THR_SCALE else cfg.SENS_BALANCED
         mode = str(v["cover_mode"].get())
         st.cover_mode = mode if mode in (cfg.COVER_PEOPLE, cfg.COVER_SCREEN) else cfg.COVER_PEOPLE
         st.panic_button = str(v["panic_key"].get()) if hotkey.parse(str(v["panic_key"].get())) else st.panic_button
@@ -1085,6 +1090,7 @@ class App(tk.Tk):
             self._vars["remember"].set(False)
         self.ctrl.remember2(self.ctrl.key2)
         engine.follow_obs(self.ctrl.settings, obs_setup.obs_video())  # the streamer's own OBS quality, nothing to set
+        self.ctrl.settings.obs_kbps = obs_setup.obs_kbps()
         self._vars["resolution"].set(self.ctrl.settings.resolution)
         self._vars["fps"].set(str(self.ctrl.settings.fps))
         self.ctrl.save_settings()

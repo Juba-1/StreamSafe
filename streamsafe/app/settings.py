@@ -14,6 +14,8 @@ RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "1440p": (2560, 1440)
 FPS_CHOICES = (30, 60)
 OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
 COVER_PEOPLE, COVER_SCREEN = "people", "screen"
+SENS_BALANCED, SENS_STRICT = "balanced", "strict"
+THR_SCALE = {SENS_BALANCED: 1.4, SENS_STRICT: 1.0}
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
@@ -39,11 +41,13 @@ class Settings:
     delay: float = 0.0  # seconds; 0 = automatic (engine.delay_for: 2 s on the fast NVIDIA mode, else 3 s)
     resolution: str = "1080p"  # of the live picture (RESOLUTIONS); a recorded video keeps its own
     fps: int = 60  # of the live picture: 30 or 60 (a recorded video keeps its own)
+    obs_kbps: int = 0  # the streamer's own OBS bitrate: we never send more than it (their internet carries it)
     obs_size: str = ""  # OBS's own output size ("1080x1920" for a vertical TikTok canvas), set at every start
     follow_obs: bool = True  # live from OBS: resolution and fps follow OBS's own video settings at every start
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
     translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
+    sensitivity: str = SENS_BALANCED  # balanced: clear cases only (default); strict: anything that might be
     cover_mode: str = COVER_PEOPLE  # COVER_PEOPLE: cover the people who need it; COVER_SCREEN: cover the whole screen
     panic_button: str = "F9"  # the key that covers the whole screen at once (pressed again: back); "" = off
     brand_image: str = ""  # the streamer's / sponsor's logo shown on the full-screen cover (a copy in the data folder)
@@ -101,6 +105,8 @@ def load(path: Path) -> Settings:
         s.input = INPUT_SRT
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_RTMP
+    if s.sensitivity not in THR_SCALE:
+        s.sensitivity = SENS_BALANCED
     if s.cover_mode not in (COVER_PEOPLE, COVER_SCREEN):
         s.cover_mode = COVER_PEOPLE
     if s.resolution not in RESOLUTIONS:

@@ -20,7 +20,7 @@ from streamsafe import session_report
 from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, release, updates
 from streamsafe.app import license as lic
 from streamsafe.app import settings as settings_mod
-from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, Settings
+from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, THR_SCALE, Settings
 from streamsafe.branding import PRODUCT_NAME
 from streamsafe.io import link
 from streamsafe.translate import pack as translate_pack
@@ -492,6 +492,7 @@ class Controller:
             url2=t2.url,
         )
         env["COVER_MODE"] = s.cover_mode
+        env["THR_SCALE"] = str(THR_SCALE.get(s.sensitivity, 1.0))
         self.set_panic(False)  # a panic left on by an earlier run starts this one uncovered only if pressed again
         env["PANIC_FILE"] = str(self.panic_file())
         state = paths.obs_state_file(self.env)

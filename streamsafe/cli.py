@@ -112,10 +112,11 @@ def main(
             source = open_source(args.input, cfg.runtime.fps, cfg.runtime.secs, size, cfg.output.audio)  # type: ignore[arg-type]
             if before_outputs is not None:
                 before_outputs(args.output)
-            sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio) for spec in args.output]
+            crop = getattr(source, "crop", None)
+            sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, crop=crop) for spec in args.output]
             for n, spec in enumerate(args.extra_output, 2):  # extra platforms: one failing does not stop the others
                 tag = str(n)
-                sinks.append(BestEffort(open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag), tag))
+                sinks.append(BestEffort(open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag, crop=crop), tag))
             sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
             report = run(cfg, source, sink, factory) if factory is not None else run(cfg, source, sink)
             failed = False

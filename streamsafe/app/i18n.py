@@ -408,6 +408,11 @@ TEXT: dict[str, tuple[str, str]] = {
     "link_out2": ("المنصة الثانية: {state}", "Second platform: {state}"),
     "update_app_now": ("حدّث الآن", "Update now"),
     "sec_protect": ("طريقة التغطية وزر الطوارئ", "How to cover, and the panic key"),
+    "sens_balanced": ("الحساسية: متوازنة، تغطي الواضح بس (الافتراضي)", "Sensitivity: balanced, clear cases only (default)"),
+    "sens_strict": (
+        "الحساسية: عالية، تغطي أي شي محتمل (تغطي أكثر وأحياناً بالغلط)",
+        "Sensitivity: strict, anything possible (more covers, some wrong)",
+    ),
     "cover_people": ("غطِّ الأشخاص اللي يحتاجون تغطية (الافتراضي)", "Cover the people who need it (default)"),
     "cover_screen": ("غطِّ الشاشة كاملة كل ما ظهر أحد يحتاج تغطية (أحوط)", "Cover the whole screen whenever anyone needs covering (safest)"),
     "panic_key": ("زر الطوارئ", "Panic key"),

@@ -145,6 +145,7 @@ class FFmpegSink:
         spawn: Callable[..., Any] | None = None,
         clock: Callable[[], float] = time.monotonic,
         tag: str = "",
+        crop: tuple[int, int, int, int, int, int] | None = None,
     ) -> None:
         self.tag = tag  # "" = the main platform; "2" = an extra one (its STATUS lines say ``out``)
         exe = shutil.which(ffmpeg)
@@ -164,6 +165,9 @@ class FFmpegSink:
             cmd += ["-probesize", "32", "-analyzeduration", "0", "-f", "avi", "-i", "pipe:0"]
         else:
             cmd += ["-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{w}x{h}", "-r", str(fps), "-i", "pipe:0"]
+        if crop:  # the source kept another shape inside the 16:9 frame: send that shape, as OBS made it
+            iw, ih, x, y, ow, oh = crop
+            cmd += ["-vf", f"crop={iw}:{ih}:{x}:{y},scale={ow}:{oh}"]
         if bitrate is None:
             env_kbps = os.environ.get("VIDEO_KBPS", "")
             bitrate = f"{env_kbps}k" if env_kbps.isdigit() else f"{auto_kbps(size, fps, self.network)}k"
@@ -552,6 +556,7 @@ def open_sink(
     preview_size: tuple[int, int] = (960, 540),
     audio: bool = True,
     tag: str = "",
+    crop: tuple[int, int, int, int, int, int] | None = None,
 ) -> FrameSink:
     """``window`` -> on-screen window; ``scheme://...`` -> FFmpeg stream (with sound unless ``audio`` is off);
     ``record:<file>`` -> a full-quality recording with sound (``RecordSink``); else an MP4 review file (picture only)."""
@@ -561,7 +566,7 @@ def open_sink(
         return ThreadedSink(RecordSink(spec[len("record:") :], size, fps, audio=audio))
     if "://" in spec:
         return ThreadedSink(
-            FFmpegSink(spec, size, fps, audio=audio, tag=tag), keepalive_fps=fps if spec.startswith(STREAM_SCHEMES) else 0.0
+            FFmpegSink(spec, size, fps, audio=audio, tag=tag, crop=crop), keepalive_fps=fps if spec.startswith(STREAM_SCHEMES) else 0.0
         )
     return ThreadedSink(VideoFileSink(spec, fps, preview_size))
 
