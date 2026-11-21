@@ -1352,7 +1352,7 @@ class App(tk.Tk):
 
         def work() -> str:
             try:
-                got.append(self.ctrl.download_app_update(lambda w, d, t: self.on_progress(w, d, t), self._cancel))
+                got.append(self.ctrl.download_app_update(lambda d, t: self.on_progress("update", d, t), self._cancel))
             except Exception as exc:
                 return self.tr("update_failed", why=str(exc)) if not self._cancel.is_set() else self.tr("install_cancelled")
             return ""

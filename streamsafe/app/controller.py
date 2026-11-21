@@ -339,7 +339,7 @@ class Controller:
         self.save_settings()
         return done
 
-    def download_app_update(self, progress: modelpack.Progress | None = None, cancel: threading.Event | None = None) -> Path:
+    def download_app_update(self, progress: Callable[[int, int], None] | None = None, cancel: threading.Event | None = None) -> Path:
         """The new installer, downloaded and checked against the signed manifest's sha256 (never run unchecked)."""
         u = self.update
         if u is None or not u.app_sha256 or not u.app_url:
