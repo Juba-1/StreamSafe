@@ -32,6 +32,7 @@ from streamsafe.runtime.control import LiveControl
 from streamsafe.runtime.threads import usable_cpus
 from streamsafe.types import ANALYSIS_SIZE, Decision, Layer, Person
 
+LIGHT_K = 1.7  # the slider's "light" end: only the score decides (risk.RiskPolicy.light)
 SWIM_SHIFT = 0.05  # beach / pool scenes lower the threshold by up to this (x score scale)
 SCENE_EVERY_S = 1.0  # scene model period when only the beach prior needs it (and on every cut)
 MIN_W = 12
@@ -60,6 +61,7 @@ class Analyzer:
         self.tracker = Tracker()
         self.eyes = EyeScheduler(cfg.eye)
         self.policy = RiskPolicy(cfg.risk, self.thr, models.eye.prisk)
+        self.policy.light = self._k >= LIGHT_K
         self.garments = GarmentBuilder(cfg.garment, output_scale)
         self.p_swim = 0.0
         self.latch = SceneLatch(cfg.scene)
@@ -106,6 +108,7 @@ class Analyzer:
         self.thr = min(0.95, self._base_thr * k)
         self.scale = self.thr / 0.40
         self.policy.base_thr, self.policy.scale = self.thr, self.thr / 0.40
+        self.policy.light = k >= LIGHT_K
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
         k = self.live.get().thr_scale
@@ -177,7 +180,7 @@ class Analyzer:
         timings["eye"], clock = self._lap(clock)
 
         self.tracker.assign(people, cut)
-        thr = self.thr - SWIM_SHIFT * self.scale * (self.p_swim if cfg.eye.scene_prior else 0.0)
+        thr = self.thr - SWIM_SHIFT * self.scale * (self.p_swim if cfg.eye.scene_prior and not self.policy.light else 0.0)
         self.policy.update(people, self.tracker, thr, now)
         self.tracker.forget_old()
         timings["track"], clock = self._lap(clock)

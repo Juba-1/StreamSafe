@@ -50,6 +50,7 @@ class RiskPolicy:
     def __init__(self, cfg: RiskConfig, base_thr: float, prisk: Callable[[np.ndarray], np.ndarray]) -> None:
         self.cfg = cfg
         self.base_thr = base_thr
+        self.light = False  # set by the sensitivity slider (Analyzer.set_sensitivity)
         self.scale = base_thr / 0.40
         self.prisk = prisk
         self._last_update: float | None = None  # time of the previous decision
@@ -114,7 +115,10 @@ class RiskPolicy:
         overlap = max([box_iou(person.box, o.box) for o in others] or [0])
         overlap_risky = max([box_iou(person.box, o.box) for o in others if tracker.tracks[o.tid].risk.risky] or [0])
         weight = 0.5 if overlap > OVERLAP_IOU else 1.0
-        th = thr if person.height >= TINY_H else min(thr, 0.2 * scale)
+        # "light" sensitivity (the streamer's slider): only the score decides - no lower bar for tiny people, no
+        # early first-look cover, a shorter hold. Measured 23 Nov: a quarter of covers came from these rules
+        light = self.light
+        th = thr if light or person.height >= TINY_H else min(thr, 0.2 * scale)
 
         gain = weight * (_logit(p) - _logit(th))
         # an uncovered person who waited for this look: the decisions they waited count with the reading they
@@ -127,11 +131,15 @@ class RiskPolicy:
             r.safe_since = now
 
         prior = r.history[:-1]
-        first_look = max(
-            th,
-            cfg.young_k * self.base_thr if person.height >= cfg.young_min_h else self.base_thr,
-            # someone half-hidden behind a covered person: only a clear reading counts
-            0.6 * scale if (overlap_risky > OVERLAP_IOU and prior and max(prior) < 0.2 * scale) else 0,
+        first_look = (
+            th
+            if light
+            else max(
+                th,
+                cfg.young_k * self.base_thr if person.height >= cfg.young_min_h else self.base_thr,
+                # someone half-hidden behind a covered person: only a clear reading counts
+                0.6 * scale if (overlap_risky > OVERLAP_IOU and prior and max(prior) < 0.2 * scale) else 0,
+            )
         )
         never_clear = HARD if cfg.fast_clear_k <= 0 else min(HARD, cfg.fast_clear_k * thr)
         fast_clear = len(r.history) >= 2 and max(r.history[-2:]) < 0.08 * scale and overlap <= OVERLAP_IOU and r.max_p < never_clear
@@ -142,6 +150,6 @@ class RiskPolicy:
         elif r.evidence >= S_COVER or person.p >= HARD or (r.n_obs <= FIRST_LOOKS and p >= first_look):
             r.risky = True
             r.safe_run = 0
-        elif r.risky and r.safe_run >= SAFE_RUN_RELEASE and now - r.safe_since >= cfg.release_s:
+        elif r.risky and r.safe_run >= SAFE_RUN_RELEASE and now - r.safe_since >= cfg.release_s * (0.5 if light else 1.0):
             r.risky = False
         return r.risky
