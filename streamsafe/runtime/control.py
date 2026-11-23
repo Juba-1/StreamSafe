@@ -1,7 +1,7 @@
 """What the streamer changes while live, without stopping the stream: one small JSON file the window writes and
 the engine re-reads (``CONTROL_FILE``). Missing or unreadable: the defaults, which change nothing.
 
-    {"panic": false, "thr_scale": 1.4, "zones": [[x0, y0, x1, y1], ...]}
+    {"panic": false, "everyone": false, "thr_scale": 1.4, "zones": [[x0, y0, x1, y1], ...]}
 
 ``zones``: parts of the picture (fractions 0-1, e.g. the streamer's webcam) where people are never covered by
 person covers; panic and whole-screen covers still cover everything.
@@ -19,6 +19,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Live:
     panic: bool = False
+    everyone: bool = False  # dress every person, men too (ads): the brand garment on everyone
     thr_scale: float = 0.0  # 0 = keep the start value
     zones: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
 
@@ -42,7 +43,12 @@ def parse(data: object) -> Live:
         k = float(data.get("thr_scale", 0) or 0)
     except (TypeError, ValueError):
         k = 0.0
-    return Live(panic=bool(data.get("panic", False)), thr_scale=k if 0.3 <= k <= 3.0 else 0.0, zones=tuple(zones))
+    return Live(
+        panic=bool(data.get("panic", False)),
+        everyone=bool(data.get("everyone", False)),
+        thr_scale=k if 0.3 <= k <= 3.0 else 0.0,
+        zones=tuple(zones),
+    )
 
 
 class LiveControl:

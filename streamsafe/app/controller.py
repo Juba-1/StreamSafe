@@ -461,7 +461,7 @@ class Controller:
 
     def write_control(self) -> None:
         s = self.settings
-        data = {"panic": self._panic, "thr_scale": s.sens_scale, "zones": s.zones}
+        data = {"panic": self._panic, "everyone": s.dress_everyone, "thr_scale": s.sens_scale, "zones": s.zones}
         f = self.control_file()
         with contextlib.suppress(OSError):
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -476,6 +476,11 @@ class Controller:
     @property
     def panic(self) -> bool:
         return self._panic
+
+    def set_everyone(self, on: bool) -> None:
+        self.settings.dress_everyone = on
+        self.save_settings()
+        self.write_control()
 
     def set_sensitivity(self, k: float) -> None:
         self.settings.sens_scale = k

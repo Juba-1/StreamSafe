@@ -111,7 +111,8 @@ class Analyzer:
         self.policy.light = k >= LIGHT_K
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
-        k = self.live.get().thr_scale
+        live = self.live.get()
+        k = live.thr_scale
         if k and k != self._k:
             self.set_sensitivity(k)
         """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
@@ -182,6 +183,9 @@ class Analyzer:
         self.tracker.assign(people, cut)
         thr = self.thr - SWIM_SHIFT * self.scale * (self.p_swim if cfg.eye.scene_prior and not self.policy.light else 0.0)
         self.policy.update(people, self.tracker, thr, now)
+        if self.live.get().everyone:  # the streamer's "dress everyone" switch (ads: every character in the brand)
+            for person in people:
+                person.risky = True
         self.tracker.forget_old()
         timings["track"], clock = self._lap(clock)
         st["body_rule"].append(self._body_rule(im, rgb, people))

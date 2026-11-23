@@ -48,6 +48,7 @@ class Settings:
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
     sens_scale: float = SENS_DEFAULT  # the live sensitivity slider; > 1 only clearer cases, < 1 anything possible
     zones: list = field(default_factory=list)  # [[x0, y0, x1, y1], ...] fractions: the webcam, never dressed
+    dress_everyone: bool = False  # ads: every character, men too, wears the brand garment (switch, live)
     cover_mode: str = COVER_PEOPLE  # COVER_PEOPLE: cover the people who need it; COVER_SCREEN: cover the whole screen
     panic_button: str = "F9"  # the key that covers the whole screen at once (pressed again: back); "" = off
     brand_image: str = ""  # the streamer's / sponsor's logo shown on the full-screen cover (a copy in the data folder)

@@ -408,6 +408,7 @@ TEXT: dict[str, tuple[str, str]] = {
     "link_out2": ("المنصة الثانية: {state}", "Second platform: {state}"),
     "update_app_now": ("حدّث الآن", "Update now"),
     "sec_protect": ("طريقة التغطية وزر الطوارئ", "How to cover, and the panic key"),
+    "everyone": ("لبّس الكل (للإعلانات، الرجال بعد)", "Dress everyone (ads, men too)"),
     "sens_label": ("الحساسية", "Sensitivity"),
     "sens_light": ("خفيفة: الواضح بس", "Light: clear cases only"),
     "sens_mid": ("متوازنة", "Balanced"),

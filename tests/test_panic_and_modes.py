@@ -197,4 +197,4 @@ def test_controller_writes_the_live_control(tmp_path):
     ctrl.set_zones([[0.7, 0.0, 1.0, 0.3], [2, 2, 1, 1]])
     ctrl.set_panic(True)
     data = json.loads(ctrl.control_file().read_text(encoding="utf-8"))
-    assert data == {"panic": True, "thr_scale": 1.9, "zones": [[0.7, 0.0, 1.0, 0.3]]}
+    assert data == {"panic": True, "everyone": False, "thr_scale": 1.9, "zones": [[0.7, 0.0, 1.0, 0.3]]}

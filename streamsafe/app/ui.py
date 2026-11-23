@@ -399,6 +399,10 @@ class App(tk.Tk):
         lo, hi = (cfg.SENS_MIN, cfg.SENS_MAX) if self.rtl else (cfg.SENS_MAX, cfg.SENS_MIN)
         self.sens = ttk.Scale(srow, from_=lo, to=hi, value=self.ctrl.settings.sens_scale, command=lambda _v: self.show_sens())
         self.sens.pack(side=side, fill="x", expand=True, padx=8)
+        self.everyone = tk.BooleanVar(value=self.ctrl.settings.dress_everyone)
+        ttk.Checkbutton(
+            srow, text=self.tr("everyone"), variable=self.everyone, command=lambda: self.ctrl.set_everyone(self.everyone.get())
+        ).pack(side="left" if self.rtl else "right", padx=8)
         self.sens.bind("<ButtonRelease-1>", lambda e: self.ctrl.set_sensitivity(round(float(self.sens.get()), 2)))
         self.show_sens()
         self.message = self.collapsing(h, fg="#b3261e", font=(FONT, 10, "bold"))
