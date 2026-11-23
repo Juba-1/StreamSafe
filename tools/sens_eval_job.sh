@@ -63,7 +63,7 @@ for c in beach_01 beach_14 club_05 nightclub_08 stripclub_10 npc_19 street_28 ni
   ffmpeg -hide_banner -loglevel error -ss 30 -i "$f" -t $SECS -an -c:v libx264 -preset veryfast -crf 20 -y /workspace/in_$c.mp4
   for lv in light:2.0 mid:1.4 high:0.8; do
     n=${lv%%:*}; k=${lv##*:}
-    THR_SCALE=$k timeout 900 python -m streamsafe.cli run --input /workspace/in_$c.mp4 --output /workspace/o_${c}_$n.mp4 \
+    THR_SCALE=$k timeout 900 python -m streamsafe.cli --input /workspace/in_$c.mp4 --output /workspace/o_${c}_$n.mp4 \
       --mode offline --size 1280x720 --fps 15 --stats $R/stats_${c}_$n.json --no-report > $R/eng_${c}_$n.txt 2>&1 || echo "ENG_FAIL $c $n"
   done
   # sheet: rows = 6 times, columns = light | balanced | high
