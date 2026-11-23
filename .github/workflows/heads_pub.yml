@@ -1,0 +1,20 @@
+name: heads-pub
+on:
+  push:
+    branches: [heads-pub]
+jobs:
+  pub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: copy the chosen heads from the private HF store to the public download repo (heads/v2)
+        env:
+          HF: ${{ secrets.HF_HEADS_TOKEN }}
+          GH_TOKEN: ${{ secrets.DOWNLOAD_REPO_TOKEN }}
+        run: |
+          git clone -q https://x-access-token:${GH_TOKEN}@github.com/Juba-1/StreamSafe-download.git d
+          mkdir -p d/heads/v2
+          for f in fast_h6.txt male_h6.txt thr_h6.txt; do
+            curl -sSfL -H "Authorization: Bearer $HF" -o d/heads/v2/$f "https://huggingface.co/datasets/juba-1/streamsafe-work/resolve/main/runs/train_g6_r1/heads_w1/ali/$f"
+          done
+          sha256sum d/heads/v2/*
+          cd d && git config user.name "StreamSafe CI" && git config user.email "ci@streamsafe" && git add heads/v2 && git commit -qm "heads v2 (GTA 6 round 1, w1)" && git push -q
