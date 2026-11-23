@@ -301,7 +301,6 @@ class App(tk.Tk):
         v("translate", tk.BooleanVar, st.translate_ar)
         v("follow_obs", tk.BooleanVar, st.follow_obs)
         v("cover_mode", tk.StringVar, st.cover_mode)
-        v("sensitivity", tk.StringVar, st.sensitivity)
         v("platform2", tk.StringVar, "").set(self.tr("plat_" + st.platform2) if st.platform2 else self.tr("plat2_none"))
         v("rtmp_url2", tk.StringVar, st.rtmp_url2)
         v("key2", tk.StringVar, self.ctrl.stored_key2() if "key2" not in self._vars else self._vars["key2"].get())
@@ -390,6 +389,18 @@ class App(tk.Tk):
         prow.pack(fill="x", pady=(0, 4))
         self.preview_btn = ttk.Button(prow, text=self.tr("preview"), command=lambda: self.on_start(preview=True))
         self.preview_btn.pack(side=side)
+        ttk.Button(prow, text=self.tr("zone_btn"), command=self.on_zones).pack(side=side, padx=6)
+        # the sensitivity, changed while live (the engine reads it within a fraction of a second)
+        srow = tk.Frame(h, bg=CARD)
+        srow.pack(fill="x", pady=(2, 4))
+        tk.Label(srow, text=self.tr("sens_label"), bg=CARD, font=(FONT, 10, "bold")).pack(side=side)
+        self.sens_word = tk.Label(srow, bg=CARD, fg="#44505e", font=(FONT, 9))
+        self.sens_word.pack(side="left" if self.rtl else "right", padx=6)
+        lo, hi = (cfg.SENS_MIN, cfg.SENS_MAX) if self.rtl else (cfg.SENS_MAX, cfg.SENS_MIN)
+        self.sens = ttk.Scale(srow, from_=lo, to=hi, value=self.ctrl.settings.sens_scale, command=lambda _v: self.show_sens())
+        self.sens.pack(side=side, fill="x", expand=True, padx=8)
+        self.sens.bind("<ButtonRelease-1>", lambda e: self.ctrl.set_sensitivity(round(float(self.sens.get()), 2)))
+        self.show_sens()
         self.message = self.collapsing(h, fg="#b3261e", font=(FONT, 10, "bold"))
         self.pre_note = self.collapsing(h, fg="#b26a00", font=(FONT, 9, "bold"))
         # the two links while it runs: OBS -> us, us -> the platform (or the recording)
@@ -545,8 +556,6 @@ class App(tk.Tk):
         c = self.card(s, self.tr("sec_protect"))
         choice(c, "cover_people", cfg.COVER_PEOPLE, "cover_mode")
         choice(c, "cover_screen", cfg.COVER_SCREEN, "cover_mode")
-        choice(c, "sens_balanced", cfg.SENS_BALANCED, "sensitivity")
-        choice(c, "sens_strict", cfg.SENS_STRICT, "sensitivity")
         pk = self.field(c, self.tr("panic_key"), v("panic_key", tk.StringVar, ""), 12, combo=hotkey.CHOICES)
         pk.configure(state="readonly")  # type: ignore[call-arg]
         pk.bind("<<ComboboxSelected>>", lambda e: self.on_panic_key())
@@ -823,8 +832,6 @@ class App(tk.Tk):
         st.remember_key = bool(v["remember"].get())
         st.translate_ar = bool(v["translate"].get())
         st.follow_obs = bool(v["follow_obs"].get())
-        sens = str(v["sensitivity"].get())
-        st.sensitivity = sens if sens in cfg.THR_SCALE else cfg.SENS_BALANCED
         mode = str(v["cover_mode"].get())
         st.cover_mode = mode if mode in (cfg.COVER_PEOPLE, cfg.COVER_SCREEN) else cfg.COVER_PEOPLE
         st.panic_button = str(v["panic_key"].get()) if hotkey.parse(str(v["panic_key"].get())) else st.panic_button
@@ -1151,6 +1158,65 @@ class App(tk.Tk):
             self._hotkey = hk
         elif sys.platform == "win32":
             self.pre_note.configure(text=self.tr("panic_taken", hk=name))
+
+    def show_sens(self) -> None:
+        k = float(self.sens.get())
+        self.sens_word.configure(text=self.tr("sens_light" if k >= 1.7 else "sens_mid" if k >= 1.15 else "sens_high"))
+
+    def on_zones(self) -> None:
+        """The streamer marks the webcam (or any part of the picture) where people are never dressed."""
+        pic = self.ctrl.preview_file()
+        if not self.ctrl.engine.running or not pic.is_file():
+            self.message.configure(text=self.tr("zone_need_run"), fg="#b3261e")
+            return
+        win = tk.Toplevel(self)
+        win.title(self.tr("zone_btn"))
+        img = tk.PhotoImage(file=str(pic))
+        w, h = img.width(), img.height()
+        cv = tk.Canvas(win, width=w, height=h, highlightthickness=0)
+        cv.pack()
+        cv.create_image(0, 0, image=img, anchor="nw")
+        cv.image = img  # type: ignore[attr-defined]  # keep it alive
+        zones = [list(z) for z in self.ctrl.settings.zones]
+        start: list[float] = []
+
+        def draw() -> None:
+            cv.delete("z")
+            for x0, y0, x1, y1 in zones:
+                cv.create_rectangle(x0 * w, y0 * h, x1 * w, y1 * h, outline="#00c853", width=3, tags="z")
+
+        def down(e: tk.Event) -> None:
+            start[:] = [e.x, e.y]
+
+        def drag(e: tk.Event) -> None:
+            if start:
+                cv.delete("new")
+                cv.create_rectangle(start[0], start[1], e.x, e.y, outline="#ffab00", width=3, tags="new")
+
+        def up(e: tk.Event) -> None:
+            if start:
+                x0, x1 = sorted((start[0] / w, e.x / w))
+                y0, y1 = sorted((start[1] / h, e.y / h))
+                if x1 - x0 > 0.02 and y1 - y0 > 0.02:
+                    zones.append([round(x0, 4), round(y0, 4), round(x1, 4), round(y1, 4)])
+                cv.delete("new")
+                start.clear()
+                draw()
+
+        def save() -> None:
+            self.ctrl.set_zones(zones)
+            self.message.configure(text=self.tr("zone_saved", n=len(self.ctrl.settings.zones)), fg="#1b7f3b")
+            win.destroy()
+
+        cv.bind("<ButtonPress-1>", down)
+        cv.bind("<B1-Motion>", drag)
+        cv.bind("<ButtonRelease-1>", up)
+        tk.Label(win, text=self.tr("zone_hint"), wraplength=w, justify="center").pack(pady=4)
+        row = tk.Frame(win)
+        row.pack(pady=6)
+        ttk.Button(row, text=self.tr("zone_save"), command=save).pack(side="left", padx=4)
+        ttk.Button(row, text=self.tr("zone_clear"), command=lambda: (zones.clear(), draw())).pack(side="left", padx=4)
+        draw()
 
     def on_panic_key(self) -> None:
         self.collect()

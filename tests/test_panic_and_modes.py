@@ -156,3 +156,45 @@ def test_vertical_obs_canvas_keeps_its_shape(tmp_path):
     s = Settings(platform="kick")
     engine.follow_obs(s, (2560, 1440, 60.0))
     assert engine.run_args(s, tmp_path)[engine.run_args(s, tmp_path).index("--size") + 1] == "1920x1080"
+
+
+# ---------------------------------------------------------------------------------- live control
+def test_live_control_file(tmp_path):
+    import os
+    import time as _t
+
+    from streamsafe.runtime.control import LiveControl, parse
+
+    assert parse({"zones": [[0.7, 0.7, 1.2, 1.0], [0.5, 0.5, 0.4, 0.6], "x"], "thr_scale": 9}).zones == ((0.7, 0.7, 1.0, 1.0),)
+    f = tmp_path / "control.json"
+    live = LiveControl(f, every_s=0)
+    assert live.get().panic is False, "no file: nothing changes"
+    f.write_text('{"panic": true, "thr_scale": 1.8, "zones": [[0.75, 0.0, 1.0, 0.3]]}', encoding="utf-8")
+    got = live.get()
+    assert got.panic and got.thr_scale == 1.8 and got.in_zone(0.9, 0.1) and not got.in_zone(0.5, 0.5)
+    f.write_text("{half", encoding="utf-8")
+    os.utime(f, (_t.time() + 5, _t.time() + 5))
+    assert live.get().panic, "a half-written file keeps the last good value"
+
+
+def test_webcam_zone_is_never_dressed():
+    from streamsafe.runtime.control import Live
+
+    gate = OutputGate(RenderConfig(motion=False), (W, H))
+    gate.zones = Live(zones=((0.4, 0.4, 0.6, 0.6),))  # the layer's centre (950, 550) is inside
+    d = Decision(frame_id=0, ok=True, layers=[layer()])
+    gate.add_decision(d)
+    assert d.layers == []
+
+
+def test_controller_writes_the_live_control(tmp_path):
+    import json
+
+    from streamsafe.app import controller
+
+    ctrl = controller.Controller(env={"LOCALAPPDATA": str(tmp_path), "APPDATA": str(tmp_path)})
+    ctrl.set_sensitivity(1.9)
+    ctrl.set_zones([[0.7, 0.0, 1.0, 0.3], [2, 2, 1, 1]])
+    ctrl.set_panic(True)
+    data = json.loads(ctrl.control_file().read_text(encoding="utf-8"))
+    assert data == {"panic": True, "thr_scale": 1.9, "zones": [[0.7, 0.0, 1.0, 0.3]]}

@@ -28,6 +28,7 @@ from streamsafe.render.compositor import DrawLog, compose, usable_decisions
 from streamsafe.render.lookahead import backfill
 from streamsafe.render.slate import brand_frames
 from streamsafe.render.smooth import TrackSmoother
+from streamsafe.runtime.control import Live
 from streamsafe.types import ANALYSIS_SIZE, Decision
 
 FULL_HOLD_S = 1.5  # whole-screen mode: the cover stays this long after the last person who needed covering
@@ -46,6 +47,8 @@ class OutputGate:
         brand: BrandConfig | None = None,
     ) -> None:
         self.cfg = cfg
+        self.size = output_size
+        self.zones: Live = Live()  # the streamer's webcam zones: no person cover there (set while live)
         self.scale = output_size[0] / ANALYSIS_SIZE[0]
         self.slate, self.card = brand_frames(*output_size, brand or BrandConfig())
         self.smoother = TrackSmoother(cfg.smooth_alpha, cfg.smooth_beta, cfg.smooth_reset, cfg.smooth_fast) if cfg.smooth else None
@@ -82,6 +85,9 @@ class OutputGate:
             self._cuts[frame_id] = cut
 
     def add_decision(self, decision: Decision) -> None:
+        if self.zones.zones and decision.layers:  # the streamer's own picture (webcam) is never dressed
+            w, h = self.size
+            decision.layers = [g for g in decision.layers if not self.zones.in_zone(g.centroid[1] / w, g.centroid[0] / h)]
         with self._lock:
             if decision.frame_id not in self._decisions:
                 insort(self._keys, decision.frame_id)

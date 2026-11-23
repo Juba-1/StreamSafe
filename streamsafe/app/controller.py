@@ -20,7 +20,7 @@ from streamsafe import session_report
 from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, release, updates
 from streamsafe.app import license as lic
 from streamsafe.app import settings as settings_mod
-from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, THR_SCALE, Settings
+from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, Settings
 from streamsafe.branding import PRODUCT_NAME
 from streamsafe.io import link
 from streamsafe.translate import pack as translate_pack
@@ -61,6 +61,7 @@ class Controller:
         self.env = os.environ if env is None else env
         self.log = log or (lambda _line: None)
         self.allow_http = allow_http
+        self._panic = False
         self.key2 = ""  # the extra platform's stream key, as typed (the window sets it before a start)
         self.preview = False  # the running engine shows a local window only (``start(preview=True)``)
         self.settings: Settings = settings_mod.load(paths.settings_file(self.env))
@@ -450,22 +451,43 @@ class Controller:
                 f.unlink()
         return folder / f"engine_{time.strftime('%Y%m%d_%H%M%S')}.log"
 
-    def panic_file(self) -> Path:
-        """Exists while the streamer's panic key covers the whole screen (the engine looks for it)."""
-        return paths.data_dir(self.env) / "panic.flag"
+    # --- what the streamer changes while live (runtime/control.py reads it) -------------------------------------
+    def control_file(self) -> Path:
+        return paths.data_dir(self.env) / "control.json"
+
+    def preview_file(self) -> Path:
+        """A small picture of what the viewers see, refreshed every 2 s by the running engine."""
+        return paths.data_dir(self.env) / "preview.png"
+
+    def write_control(self) -> None:
+        s = self.settings
+        data = {"panic": self._panic, "thr_scale": s.sens_scale, "zones": s.zones}
+        f = self.control_file()
+        with contextlib.suppress(OSError):
+            f.parent.mkdir(parents=True, exist_ok=True)
+            tmp = f.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data), encoding="utf-8")
+            os.replace(tmp, f)
 
     def set_panic(self, on: bool) -> None:
-        f = self.panic_file()
-        with contextlib.suppress(OSError):
-            if on:
-                f.parent.mkdir(parents=True, exist_ok=True)
-                f.write_text("1", encoding="ascii")
-            else:
-                f.unlink(missing_ok=True)
+        self._panic = on
+        self.write_control()
 
     @property
     def panic(self) -> bool:
-        return self.panic_file().exists()
+        return self._panic
+
+    def set_sensitivity(self, k: float) -> None:
+        self.settings.sens_scale = k
+        self.save_settings()
+        self.write_control()
+
+    def set_zones(self, zones: list) -> None:
+        from streamsafe.runtime.control import parse
+
+        self.settings.zones = [list(z) for z in parse({"zones": zones}).zones]
+        self.save_settings()
+        self.write_control()
 
     def start(self, key: str, preview: bool = False) -> None:
         """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start.
@@ -492,9 +514,10 @@ class Controller:
             url2=t2.url,
         )
         env["COVER_MODE"] = s.cover_mode
-        env["THR_SCALE"] = str(THR_SCALE.get(s.sensitivity, 1.0))
+        env["THR_SCALE"] = str(s.sens_scale)
         self.set_panic(False)  # a panic left on by an earlier run starts this one uncovered only if pressed again
-        env["PANIC_FILE"] = str(self.panic_file())
+        env["CONTROL_FILE"] = str(self.control_file())
+        env["PREVIEW_FILE"] = str(self.preview_file())
         state = paths.obs_state_file(self.env)
         state.unlink(missing_ok=True)  # a line left by an earlier run must not look like this run's
         state.parent.mkdir(parents=True, exist_ok=True)

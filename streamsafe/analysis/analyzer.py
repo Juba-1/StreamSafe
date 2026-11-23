@@ -28,6 +28,7 @@ from streamsafe.config import Config
 from streamsafe.garment.builder import GarmentBuilder, SafePerson, choose_mode
 from streamsafe.models import Models
 from streamsafe.render.motion import make_motion_ref
+from streamsafe.runtime.control import LiveControl
 from streamsafe.runtime.threads import usable_cpus
 from streamsafe.types import ANALYSIS_SIZE, Decision, Layer, Person
 
@@ -51,8 +52,11 @@ class Analyzer:
     def __init__(self, cfg: Config, models: Models, output_scale: float) -> None:
         self.cfg = cfg
         self.models = models
-        self.thr = min(0.95, (cfg.risk.thr or models.eye.thr) * cfg.risk.thr_scale)
+        self._base_thr = cfg.risk.thr or models.eye.thr
+        self._k = cfg.risk.thr_scale
+        self.thr = min(0.95, self._base_thr * self._k)
         self.scale = self.thr / 0.40
+        self.live = LiveControl.from_env()  # the streamer's sensitivity slider, changed while live
         self.tracker = Tracker()
         self.eyes = EyeScheduler(cfg.eye)
         self.policy = RiskPolicy(cfg.risk, self.thr, models.eye.prisk)
@@ -96,7 +100,17 @@ class Analyzer:
             self.governor = headroom.BudgetGovernor(self.eyes.budget, self.headroom.limit_ms)
         self.stats["headroom"] = [report]
 
+    def set_sensitivity(self, k: float) -> None:
+        """k > 1: only clearer cases are covered; k < 1: more is covered. Takes effect on the next decision."""
+        self._k = k
+        self.thr = min(0.95, self._base_thr * k)
+        self.scale = self.thr / 0.40
+        self.policy.base_thr, self.policy.scale = self.thr, self.thr / 0.40
+
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
+        k = self.live.get().thr_scale
+        if k and k != self._k:
+            self.set_sensitivity(k)
         """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
         also supplies the eye crops)."""
         t0 = self.clock()

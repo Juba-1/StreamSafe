@@ -6,7 +6,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 INPUT_CAMERA, INPUT_SRT, INPUT_FILE = "camera", "srt", "file"
@@ -14,8 +14,7 @@ RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "1440p": (2560, 1440)
 FPS_CHOICES = (30, 60)
 OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
 COVER_PEOPLE, COVER_SCREEN = "people", "screen"
-SENS_BALANCED, SENS_STRICT = "balanced", "strict"
-THR_SCALE = {SENS_BALANCED: 1.4, SENS_STRICT: 1.0}
+SENS_MIN, SENS_MAX, SENS_DEFAULT = 0.6, 2.2, 1.4  # the sensitivity slider (a threshold scale): higher = fewer covers
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
@@ -47,7 +46,8 @@ class Settings:
     update_serial: int = 0  # the highest update-manifest serial seen (replay protection)
     translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
-    sensitivity: str = SENS_BALANCED  # balanced: clear cases only (default); strict: anything that might be
+    sens_scale: float = SENS_DEFAULT  # the live sensitivity slider; > 1 only clearer cases, < 1 anything possible
+    zones: list = field(default_factory=list)  # [[x0, y0, x1, y1], ...] fractions: the webcam, never dressed
     cover_mode: str = COVER_PEOPLE  # COVER_PEOPLE: cover the people who need it; COVER_SCREEN: cover the whole screen
     panic_button: str = "F9"  # the key that covers the whole screen at once (pressed again: back); "" = off
     brand_image: str = ""  # the streamer's / sponsor's logo shown on the full-screen cover (a copy in the data folder)
@@ -105,8 +105,13 @@ def load(path: Path) -> Settings:
         s.input = INPUT_SRT
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_RTMP
-    if s.sensitivity not in THR_SCALE:
-        s.sensitivity = SENS_BALANCED
+    try:
+        s.sens_scale = min(SENS_MAX, max(SENS_MIN, float(s.sens_scale)))
+    except (TypeError, ValueError):
+        s.sens_scale = SENS_DEFAULT
+    from streamsafe.runtime.control import parse
+
+    s.zones = [list(z) for z in parse({"zones": s.zones if isinstance(s.zones, list) else []}).zones]
     if s.cover_mode not in (COVER_PEOPLE, COVER_SCREEN):
         s.cover_mode = COVER_PEOPLE
     if s.resolution not in RESOLUTIONS:

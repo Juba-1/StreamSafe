@@ -11,6 +11,7 @@ Both modes share the analyzer, the output gate and the reporting.
 from __future__ import annotations
 
 import collections
+import contextlib
 import json
 import os
 import threading
@@ -26,6 +27,7 @@ from streamsafe.config import Config
 from streamsafe.io.obs_link import ObsStateWriter
 from streamsafe.io.sinks import FrameSink, takes_audio
 from streamsafe.io.sources import FrameSource
+from streamsafe.runtime.control import LiveControl
 from streamsafe.runtime.cuts import CutDetector
 from streamsafe.runtime.gate import OutputGate
 from streamsafe.runtime.report import device_stats, device_summary, summarize, write_outputs
@@ -77,6 +79,16 @@ class LiveLog:
             line = dict(frame=frame_id, late_ms_max=round(self._worst, 1), waiting_max=self._waiting, dropped=dropped)
             print("LIVE " + json.dumps(line), flush=True)
             self._next, self._worst, self._waiting = self._next + self.every_s, 0.0, 0
+
+
+def snap(frame: np.ndarray, path: str) -> None:
+    """A small copy of the shown picture, replaced whole (the window never reads half a file)."""
+    h, w = frame.shape[:2]
+    small = cv2.resize(frame, (640, max(2, round(640 * h / w))), interpolation=cv2.INTER_AREA)
+    tmp = path + ".tmp.png"
+    if cv2.imwrite(tmp, small):
+        with contextlib.suppress(OSError):
+            os.replace(tmp, path)
 
 
 def default_analyzer(cfg: Config, output_scale: float) -> Analyzer:
@@ -228,7 +240,9 @@ def _run_realtime(
     live = LiveLog(rt.live_log_s)
     v = shown = 0
     stopped_by_user = False
-    panic_file = os.environ.get("PANIC_FILE", "")
+    ctl = LiveControl.from_env()  # panic key and webcam zones, changed by the window while live
+    preview_file = os.environ.get("PREVIEW_FILE", "")
+    preview_every = max(1, round(2 * cfg.runtime.fps))
     try:
         try:
             while True:
@@ -256,14 +270,17 @@ def _run_realtime(
                     continue
                 while time.perf_counter() < due:
                     time.sleep(0.0005)
-                if panic_file and v % 6 == 0:  # the streamer's panic key (the app makes / removes this file)
-                    gate.manual = os.path.exists(panic_file)
+                if v % 6 == 0:
+                    now_live = ctl.get()
+                    gate.manual, gate.zones = now_live.panic, now_live
                 out = gate.render(v, frame)
                 # Arabic text, AFTER the gate and on top of the cover: on a normally composed frame and on the full-scene
                 # cover (card / slate: the dialogue goes on while the picture is covered), never on a held repeat; always
                 # on a copy, so nothing the gate keeps (its slate, card or last frame) ever carries the text
                 text_ok = out is frame or out is gate.card or out is gate.slate
                 visible = tr.overlay(v, out) if tr is not None and text_ok else out
+                if preview_file and v % preview_every == 0:  # what the viewers see, for the window (webcam zone)
+                    snap(visible, preview_file)
                 if sink is not None and takes_audio(sink):
                     # fail closed: sound only for a frame that is shown, not muted and not full-screen, and only
                     # that frame's own samples; anything else (also "not arrived") is silence

@@ -408,10 +408,24 @@ TEXT: dict[str, tuple[str, str]] = {
     "link_out2": ("المنصة الثانية: {state}", "Second platform: {state}"),
     "update_app_now": ("حدّث الآن", "Update now"),
     "sec_protect": ("طريقة التغطية وزر الطوارئ", "How to cover, and the panic key"),
-    "sens_balanced": ("الحساسية: متوازنة، تغطي الواضح بس (الافتراضي)", "Sensitivity: balanced, clear cases only (default)"),
-    "sens_strict": (
-        "الحساسية: عالية، تغطي أي شي محتمل (تغطي أكثر وأحياناً بالغلط)",
-        "Sensitivity: strict, anything possible (more covers, some wrong)",
+    "sens_label": ("الحساسية", "Sensitivity"),
+    "sens_light": ("خفيفة: الواضح بس", "Light: clear cases only"),
+    "sens_mid": ("متوازنة", "Balanced"),
+    "sens_high": ("عالية: أي شي محتمل", "High: anything possible"),
+    "zone_btn": ("حدد مكان الكاميرا", "Mark your webcam"),
+    "zone_need_run": (
+        "شغّل «جرّب بدون بث» أو «ابدأ الحماية» أول، بعدين حدد مكان الكاميرا.",
+        "Start a trial or the protection first, then mark your webcam.",
+    ),
+    "zone_hint": (
+        "اسحب بالماوس مربع على مكان الكاميرا (أو أي مكان ما تبي البرنامج يغطي فيه أشخاص). تقدر ترسم أكثر من مربع.",
+        "Drag a box over your webcam (or anywhere people should never be covered). You can draw more than one.",
+    ),
+    "zone_save": ("حفظ", "Save"),
+    "zone_clear": ("امسح الكل", "Clear all"),
+    "zone_saved": (
+        "تم: {n} منطقة ما يتغطى فيها أحد (يشتغل على طول بدون إيقاف البث).",
+        "Done: {n} zone(s) where nobody is covered (live, no restart).",
     ),
     "cover_people": ("غطِّ الأشخاص اللي يحتاجون تغطية (الافتراضي)", "Cover the people who need it (default)"),
     "cover_screen": ("غطِّ الشاشة كاملة كل ما ظهر أحد يحتاج تغطية (أحوط)", "Cover the whole screen whenever anyone needs covering (safest)"),
