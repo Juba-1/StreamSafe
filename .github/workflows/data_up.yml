@@ -1,0 +1,16 @@
+name: data-up
+on:
+  push:
+    branches: [data-gta6]
+jobs:
+  up:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tar the clips and put them on the private HF dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_HEADS_TOKEN }}
+        run: |
+          tar -cf gta6_v1.tar gta6 && ls -l gta6_v1.tar && sha256sum gta6_v1.tar
+          pip install -q huggingface_hub
+          python -c "from huggingface_hub import HfApi; HfApi().upload_file(path_or_fileobj='gta6_v1.tar', path_in_repo='data/gta6_v1.tar', repo_id='juba-1/streamsafe-work', repo_type='dataset', commit_message='GTA 6 clips v1 (29, Manus, 23 Nov)')"
