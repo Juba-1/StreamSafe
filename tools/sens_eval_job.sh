@@ -80,7 +80,7 @@ import json, pathlib, sys
 R = pathlib.Path(sys.argv[1]); out = []
 for f in sorted(R.glob("stats_*.json")):
     s = json.loads(f.read_text()); c, n = f.stem[6:].rsplit("_", 1)
-    out.append(f"{c:14s} {n:6s} risky={s.get('risky_decisions', s.get('risky'))} decisions={s.get('decisions')} slate_s={s.get('fail_closed_s', s.get('slate_s'))}")
+    out.append(f"{c:14s} {n:6s} " + json.dumps({k: v for k, v in s.items() if not isinstance(v, (list, dict))}))
 (R / "summary.txt").write_text("\n".join(out) + "\n"); print("\n".join(out))
 P
 echo "== DONE $(date -u)"
