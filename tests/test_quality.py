@@ -45,7 +45,7 @@ def test_stream_and_recording_settings(monkeypatch):
     monkeypatch.delenv("ENCODER_PLAIN", raising=False)
     live = _cmd("rtmp://h/app/k", encoder="h264_nvenc")
     assert live[live.index("-b:v") + 1] == "6000k" and live[live.index("-maxrate") + 1] == "6000k"
-    assert live[live.index("-rc") + 1] == "cbr" and live[live.index("-preset") + 1] == "p5" and "-tune" in live
+    assert live[live.index("-rc") + 1] == "cbr" and live[live.index("-preset") + 1] == "p4" and "-tune" in live
     monkeypatch.setenv("VIDEO_KBPS", "8000")  # what the app sets for the platform
     assert _cmd("rtmp://h/app/k")[_cmd("rtmp://h/app/k").index("-b:v") + 1] == "8000k"
     monkeypatch.delenv("VIDEO_KBPS")

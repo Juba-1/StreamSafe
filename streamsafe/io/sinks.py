@@ -92,18 +92,33 @@ def auto_kbps(size: tuple[int, int], fps: float, network: bool) -> int:
     return max(20000, round(w * h * fps * 0.2 / 1000))
 
 
+SLOW_SPEED = 0.95  # FFmpeg's speed below this = the encoder is falling behind the live stream
+ABOVE_NORMAL = 0x00008000  # Windows ABOVE_NORMAL_PRIORITY_CLASS: OBS's own choice for its encoding while streaming
+
+
+def priority_flags() -> int:
+    """The stream's FFmpeg processes get a little more CPU time than the game when both want it (Windows): a
+    stalled pipe is a stutter every viewer sees; the game loses at most a fraction of one core."""
+    return ABOVE_NORMAL if sys.platform == "win32" else 0
+
+
 def encoder_flags(encoder: str, live: bool) -> list[str]:
     """Quality settings of each encoder: the best quality that still keeps up with a live stream. ``live``: a
     stream to a platform (constant bitrate, low delay); else a recording (variable bitrate, slower = better).
     ``ENCODER_PLAIN=1`` (the app's encoder test found these settings refused on this PC): none."""
     if os.environ.get("ENCODER_PLAIN") == "1":
         return []
+    # live: the game shares the graphics card, so the encoder must never fall behind (a late encoder = frames
+    # dropped = picture stutter and the voice cutting). OBS's own default NVENC preset is p4; a recording keeps the
+    # slower, best settings (nothing waits for it).
     if encoder == "h264_nvenc":
-        return ["-preset", "p5", "-tune", "hq", "-rc", "cbr" if live else "vbr", "-profile:v", "high", "-spatial-aq", "1"]
+        if live:
+            return ["-preset", "p4", "-tune", "hq", "-rc", "cbr", "-profile:v", "high"]
+        return ["-preset", "p5", "-tune", "hq", "-rc", "vbr", "-profile:v", "high", "-spatial-aq", "1"]
     if encoder == "h264_amf":
-        return ["-quality", "quality", "-rc", "cbr" if live else "vbr_peak", "-profile:v", "high"]
+        return ["-quality", "balanced" if live else "quality", "-rc", "cbr" if live else "vbr_peak", "-profile:v", "high"]
     if encoder == "h264_qsv":
-        return ["-preset", "slow", "-profile:v", "high"]
+        return ["-preset", "faster" if live else "slow", "-profile:v", "high"]
     if encoder == "libx264":
         return ["-preset", "veryfast", "-tune", "zerolatency"] if live else ["-preset", "fast", "-profile:v", "high"]
     return []
@@ -159,6 +174,7 @@ class FFmpegSink:
         self.connected = False  # the platform is taking the stream right now
         self.reconnects = 0
         self.unsent = 0  # frames not sent because the link was down
+        self.speed_reports = self.slow_reports = 0  # FFmpeg progress lines, and those where the encoder lagged
         fmt = "flv" if url.startswith(("rtmp://", "rtmps://")) else "mpegts" if url.startswith(("srt://", "udp://")) else None
         cmd = [exe or ffmpeg, "-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:2", "-stats_period", "0.5", "-y"]
         if audio:  # our own stream, nothing to probe: start at once
@@ -204,7 +220,8 @@ class FFmpegSink:
         self._sizes = []
         if self.network:
             self._status("platform_connecting")
-        self._proc = self._spawn(self._cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        extra = {"creationflags": priority_flags()} if priority_flags() else {}
+        self._proc = self._spawn(self._cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, **extra)
         threading.Thread(target=self._watch, args=(self._proc,), name="sink-output", daemon=True).start()
         try:
             self._avi = AviWriter(self._proc.stdin, self.size, self.fps) if self.takes_audio else None
@@ -228,6 +245,18 @@ class FFmpegSink:
                     continue
                 if m.group(1) == "total_size" and m.group(2).strip().isdigit() and proc is self._proc:
                     self._progress(int(m.group(2)))
+                elif m.group(1) == "speed":
+                    self._speed(m.group(2))
+
+    def _speed(self, text: str) -> None:
+        """FFmpeg's ``speed=0.93x``: below 1 the encoder does not keep up with the stream (counted once connected)."""
+        try:
+            x = float(text.strip().rstrip("x"))
+        except ValueError:
+            return
+        if self.connected and x > 0:
+            self.speed_reports += 1
+            self.slow_reports += x < SLOW_SPEED
 
     def _progress(self, total: int) -> None:
         # connected = bytes kept leaving over two reports in a row (a refused stream dies before the second)
@@ -499,6 +528,8 @@ class ThreadedSink:
         self.takes_audio = takes_audio(sink)
         self.keepalive_fps = keepalive_fps
         self.filled = 0
+        self.queue_max = 0  # most frames waiting for the encoder at once
+        self.blocked_s = 0.0  # time the engine waited because the encoder was full
         self._queue: queue.Queue[tuple[np.ndarray, np.ndarray | None] | None] = queue.Queue(maxsize=max_queue)
         self._error: BaseException | None = None
         self._thread = threading.Thread(target=self._run, name="sink", daemon=True)
@@ -532,7 +563,13 @@ class ThreadedSink:
     def write(self, frame: np.ndarray, audio: np.ndarray | None = None) -> None:
         if self._error is not None:
             raise self._error
-        self._queue.put((frame, audio))
+        try:
+            self._queue.put_nowait((frame, audio))
+        except queue.Full:
+            t = time.perf_counter()
+            self._queue.put((frame, audio))
+            self.blocked_s += time.perf_counter() - t
+        self.queue_max = max(self.queue_max, self._queue.qsize())
 
     def close(self) -> None:
         self._queue.put(None)

@@ -46,6 +46,8 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
         problems.append("slow_decisions")
     if s.get("dropped_frames"):
         problems.append("dropped_frames")
+    if (s.get("encoder_slow_share") or 0) > 0.05 or (s.get("output_blocked_s") or 0) > 1.0:
+        problems.append("encoder_slow")
     if s.get("frames_out", -1) == 0:
         problems.append("never_started")
     reason = s.get("stop_reason", "")
@@ -76,6 +78,9 @@ def build(report: dict[str, Any], fps: float) -> dict[str, Any]:
         held_s=_secs(report, "held_frames", fps),
         muted_s=_secs(report, "muted_frames", fps),
         dropped_frames=s.get("dropped_frames", 0),
+        late_frames=s.get("late_frames", 0),
+        encoder_slow_share=s.get("encoder_slow_share"),
+        output_blocked_s=s.get("output_blocked_s", 0),
         worker_restarts=s.get("worker_restarts", 0),
         analyzer_errors=s.get("analyzer_errors", 0),
         verdict="ok" if not problems else "check",
@@ -143,6 +148,7 @@ AR_PROBLEMS = {
     "long_failclosed": "الشاشة تغطت بالكامل لفترة طويلة بسبب بطء أو خطأ",
     "slow_decisions": "الجهاز أبطأ من المطلوب في بعض اللحظات",
     "dropped_frames": "فيه فريمات ما وصلت للبث",
+    "encoder_slow": "ترميز الفيديو ما لحق (كرت الشاشة مشغول باللعبة): هذا يسبب تقطيع. خفّض الدقة أو البت ريت في OBS",
     "never_started": "البث ما بدأ: البرنامج وقف قبل ما توصله صورة (تأكد من OBS ومن تبويب الفحص)",
 }
 

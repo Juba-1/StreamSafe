@@ -325,6 +325,9 @@ def stop_on_stdin_close(stream=None, interrupt: Callable[[], None] | None = None
     return thread
 
 
+from streamsafe.io.sinks import priority_flags  # noqa: E402
+
+
 def _no_window_flags() -> int:
     return getattr(subprocess, "CREATE_NO_WINDOW", 0)  # a console child of a window app: no console flashes up
 
@@ -365,7 +368,9 @@ class EngineProcess:
             encoding="utf-8",
             errors="replace",
             bufsize=1,
-            creationflags=_no_window_flags(),
+            # above normal (as OBS does for its own streaming): the frame pacing never waits behind the game.
+            # Its analyzer child starts at normal priority (Windows' rule), so the game keeps its share.
+            creationflags=_no_window_flags() | priority_flags(),
         )
         self._reader = threading.Thread(target=self._read, args=(self._proc,), name="engine-output", daemon=True)
         self._reader.start()

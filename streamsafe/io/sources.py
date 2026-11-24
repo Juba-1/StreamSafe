@@ -226,7 +226,12 @@ class FFmpegSource:
     def _start(self) -> None:
         w, h = self.size
         self._errors.clear()
-        self._proc = self._spawn(self._cmd, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=w * h * 3)
+        from streamsafe.io.sinks import priority_flags  # the input pipe gets the same priority as the output
+
+        extra = {"creationflags": priority_flags()} if priority_flags() else {}
+        self._proc = self._spawn(
+            self._cmd, stdout=subprocess.PIPE, stdin=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=w * h * 3, **extra
+        )
         assert self._proc.stdout is not None
         self._avi = AviReader(self._proc.stdout) if self._audio_on else None
         sound = AudioBuffer(self.fps, self._keep_s) if self._audio_on else None

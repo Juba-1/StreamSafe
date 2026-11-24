@@ -165,6 +165,13 @@ def _finish(args: argparse.Namespace, report: dict | None, fps: float, reason: s
     inner = [getattr(s, "sink", s) for s in inner]
     summary["platform_reconnects"] = sum(getattr(s, "reconnects", 0) for s in inner)
     summary["unsent_frames"] = sum(getattr(s, "unsent", 0) for s in inner)
+    # stutter evidence: did the encoder keep up (FFmpeg speed), did frames wait for it, and for how long
+    outer = list(getattr(sink, "sinks", [sink] if sink is not None else []))
+    outer = [getattr(s, "sink", s) if not hasattr(s, "queue_max") else s for s in outer]
+    reports = sum(getattr(s, "speed_reports", 0) for s in inner)
+    summary["encoder_slow_share"] = round(sum(getattr(s, "slow_reports", 0) for s in inner) / reports, 3) if reports else None
+    summary["output_queue_max"] = max((getattr(s, "queue_max", 0) for s in outer), default=0)
+    summary["output_blocked_s"] = round(sum(getattr(s, "blocked_s", 0.0) for s in outer), 2)
     link.status("stopped", reason=reason, detail=detail[:400])
     _write_report(args, report, fps)
 

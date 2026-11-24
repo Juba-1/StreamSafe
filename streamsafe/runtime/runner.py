@@ -81,6 +81,27 @@ class LiveLog:
             self._next, self._worst, self._waiting = self._next + self.every_s, 0.0, 0
 
 
+class Snapper:
+    """``snap`` on its own thread: the resize and the PNG never delay a frame of the stream. Busy = skipped."""
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self._busy = threading.Event()
+
+    def __call__(self, frame: np.ndarray) -> None:
+        if self._busy.is_set():
+            return
+        self._busy.set()
+
+        def run() -> None:
+            try:
+                snap(frame, self.path)
+            finally:
+                self._busy.clear()
+
+        threading.Thread(target=run, name="preview", daemon=True).start()
+
+
 def snap(frame: np.ndarray, path: str) -> None:
     """A small copy of the shown picture, replaced whole (the window never reads half a file)."""
     h, w = frame.shape[:2]
@@ -242,6 +263,7 @@ def _run_realtime(
     stopped_by_user = False
     ctl = LiveControl.from_env()  # panic key and webcam zones, changed by the window while live
     preview_file = os.environ.get("PREVIEW_FILE", "")
+    preview = Snapper(preview_file) if preview_file else None
     preview_every = max(1, round(2 * cfg.runtime.fps))
     try:
         try:
@@ -279,8 +301,8 @@ def _run_realtime(
                 # on a copy, so nothing the gate keeps (its slate, card or last frame) ever carries the text
                 text_ok = out is frame or out is gate.card or out is gate.slate
                 visible = tr.overlay(v, out) if tr is not None and text_ok else out
-                if preview_file and v % preview_every == 0:  # what the viewers see, for the window (webcam zone)
-                    snap(visible, preview_file)
+                if preview is not None and v % preview_every == 0:  # what the viewers see, for the window
+                    preview(visible)
                 if sink is not None and takes_audio(sink):
                     # fail closed: sound only for a frame that is shown, not muted and not full-screen, and only
                     # that frame's own samples; anything else (also "not arrived") is silence
@@ -330,6 +352,7 @@ def _run_realtime(
         worker_restarts=restarts,
         stopped_by_user=stopped_by_user,
         # frames sent with their sound / frames that should have had sound but none was there (silence instead)
+        late_frames=sum(stats.get("late_frames", [])),
         audio_frames=n_sound,
         audio_missing_frames=n_no_sound if getattr(source, "has_audio", False) else 0,
     )
