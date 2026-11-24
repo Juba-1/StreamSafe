@@ -52,8 +52,6 @@ class Settings:
     sens_scale: float = SENS_DEFAULT  # the live sensitivity slider; > 1 only clearer cases, < 1 anything possible
     zones: list = field(default_factory=list)  # [[x0, y0, x1, y1], ...] fractions: the webcam, never dressed
     covers: list = field(default_factory=list)  # [[x0, y0, x1, y1], ...] fractions: always covered (a map, a code)
-    vertical2: bool = False  # the extra platform gets a vertical 9:16 part of the picture (TikTok)
-    vcrop: list = field(default_factory=list)  # [x0, y0, x1, y1]: that part ([] = the middle, full height)
     dress_everyone: bool = False  # ads: every character, men too, wears the brand garment (switch, live)
     cover_mode: str = COVER_PEOPLE  # COVER_PEOPLE: cover the people who need it; COVER_SCREEN: cover the whole screen
     panic_button: str = "F9"  # the key that covers the whole screen at once (pressed again: back); "" = off
@@ -120,8 +118,7 @@ def load(path: Path) -> Settings:
 
     s.zones = [list(z) for z in parse({"zones": s.zones if isinstance(s.zones, list) else []}).zones]
     s.covers = [list(z) for z in parse({"covers": s.covers if isinstance(s.covers, list) else []}).covers]
-    vc = parse({"vcrop": s.vcrop}).vcrop if isinstance(s.vcrop, list) and len(s.vcrop) == 4 else None
-    s.vcrop = list(vc) if vc else []
+
     if s.cover_mode not in (COVER_PEOPLE, COVER_SCREEN):
         s.cover_mode = COVER_PEOPLE
     if s.resolution not in RESOLUTIONS:

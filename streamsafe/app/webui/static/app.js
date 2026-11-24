@@ -14,12 +14,10 @@ const W = {
     full: "غطِّ الشاشة كاملة", full_sub: "بدل تغطية الشخص، تنحجب الشاشة كلها لحظة الخطر",
     areas: "مناطق الشاشة", camera_sub: "حدد مكان كاميرتك عشان ما نغطيك أبدًا، أو جزء يتغطى دائمًا (خريطة، كود).",
     camera_edit: "مكان الكاميرا", camera_done: "تم", camera_add: "أضف منطقة", zone: "كاميرتي",
-    cover_edit: "غطِّ جزء دائمًا", cover_zone: "مغطى دائمًا", tiktok_edit: "جزء تيك توك", tiktok_zone: "تيك توك 9:16",
+    cover_edit: "غطِّ جزء دائمًا", cover_zone: "مغطى دائمًا",
     edit_cam: "اسحب المربع الأخضر فوق كاميرتك، وكبّره من الزاوية.", edit_cover: "اسحب المربع الوردي فوق الجزء اللي تبيه يتغطى دائمًا.",
-    edit_tiktok: "حرّك الإطار البرتقالي على الجزء اللي يشوفه جمهور تيك توك. يتغيّر وأنت تبث.",
     boxes_hint: "اضغط على أي تغطية في الصورة عشان تشيلها دقيقة (لو غطّت شخص بالغلط). ترجع لحالها.",
     release: "شيل التغطية دقيقة", restore_in: "ترجع بعد {n} ث — اضغط ترجعها الحين",
-    vertical: "تيك توك طولي 9:16", vertical_sub: "المنصة الثانية تاخذ جزء طولي من الشاشة (يبدأ من البث الجاي)",
     connection: "الاتصال", obs: "OBS", idle_screen: "اضغط «جرّب بدون بث» عشان تشوف الحماية قبل ما تبث، أو ابدأ البث مباشرة.",
     wait_screen: "ننتظر الصورة من OBS… افتح OBS واضغط Start Streaming.",
     back: "رجوع", next: "التالي", finish: "جاهز، روح للبث", cancel: "إلغاء",
@@ -33,7 +31,7 @@ const W = {
     obs_do: "اضبط OBS تلقائيًا", obs_ok: "OBS مضبوط", obs_missing: "ما لقينا OBS. ثبّته من obsproject.com ثم ارجع.",
     s4_h: "كل شي جاهز", s4_p: "من الحين: افتح StreamSafe، اضغط ابدأ، وبعدها Start Streaming في OBS.",
     platform_main: "المنصة الأساسية", platform_second: "منصة ثانية (اختياري)",
-    second_sub: "نبث نفس الصورة المحمية لمنصة ثانية. لتيك توك نقصها طولية تلقائيًا.",
+    second_sub: "نبث نفس الصورة المحمية لمنصة ثانية بنفس الشكل اللي ضبطته في OBS.",
     none: "بدون", save: "احفظ", saved: "انحفظ",
     panic_key: "زر الطوارئ", panic_sub: "زر من الكيبورد يغطي البث كامل فورًا حتى وأنت داخل اللعبة.",
     more: "خيارات", follow_obs: "اتبع إعدادات OBS", follow_obs_sub: "نفس الدقة والجودة اللي في OBS",
@@ -55,12 +53,10 @@ const W = {
     full: "Cover the whole screen", full_sub: "Instead of covering the person, the whole screen hides at the risky moment",
     areas: "Screen areas", camera_sub: "Mark your webcam so we never cover you, or a part that is always covered (a map, a code).",
     camera_edit: "My webcam", camera_done: "Done", camera_add: "Add area", zone: "My webcam",
-    cover_edit: "Always cover a part", cover_zone: "Always covered", tiktok_edit: "TikTok part", tiktok_zone: "TikTok 9:16",
+    cover_edit: "Always cover a part", cover_zone: "Always covered",
     edit_cam: "Drag the green box over your webcam; resize from the corner.", edit_cover: "Drag the pink box over the part to always cover.",
-    edit_tiktok: "Move the orange frame to the part TikTok viewers see. Changes while live.",
     boxes_hint: "Click any cover in the picture to lift it for a minute (a wrong cover). It comes back by itself.",
     release: "Lift this cover for a minute", restore_in: "Back in {n} s — click to cover now",
-    vertical: "Vertical TikTok 9:16", vertical_sub: "The second platform gets a tall part of the screen (from the next start)",
     connection: "Connection", obs: "OBS", idle_screen: "Press “Try without streaming” to see protection before going live, or start streaming.",
     wait_screen: "Waiting for OBS… open OBS and press Start Streaming.",
     back: "Back", next: "Next", finish: "Ready, go live", cancel: "Cancel",
@@ -74,7 +70,7 @@ const W = {
     obs_do: "Set up OBS for me", obs_ok: "OBS is set", obs_missing: "OBS not found. Install it from obsproject.com and come back.",
     s4_h: "All set", s4_p: "From now on: open StreamSafe, press Start, then Start Streaming in OBS.",
     platform_main: "Main platform", platform_second: "Second platform (optional)",
-    second_sub: "Sends the same protected picture to a second platform. TikTok gets a vertical crop.",
+    second_sub: "Sends the same protected picture to a second platform, in the shape you set in OBS.",
     none: "None", save: "Save", saved: "Saved",
     panic_key: "Panic key", panic_sub: "A keyboard key that covers the whole stream at once, even in game.",
     more: "Options", follow_obs: "Follow OBS settings", follow_obs_sub: "Same resolution and quality as OBS",
@@ -91,9 +87,9 @@ let S = null; // last state
 let lang = "ar";
 let view = "live";
 let step = 0;
-let editing = null; // null | "cam" | "cover" | "tiktok"
-const rects = { cam: [], cover: [], tiktok: [] };
-const SAVE = { cam: (r) => act("zones", { zones: r }), cover: (r) => act("covers", { covers: r }), tiktok: (r) => act("vertical", { vcrop: r[0] || [] }) };
+let editing = null; // null | "cam" | "cover"
+const rects = { cam: [], cover: [] };
+const SAVE = { cam: (r) => act("zones", { zones: r }), cover: (r) => act("covers", { covers: r }) };
 let previewAt = 0;
 const $ = (id) => document.getElementById(id);
 const w = (k, v = {}) => (W[lang][k] || k).replace(/\{(\w+)\}/g, (_, n) => v[n] ?? "");
@@ -188,13 +184,10 @@ function paintLive() {
   if (!editing) {
     rects.cam = s.settings.zones.map((z) => [...z]);
     rects.cover = s.settings.covers.map((z) => [...z]);
-    rects.tiktok = s.settings.platform2 && s.settings.vertical2 ? [s.settings.vcrop.length ? [...s.settings.vcrop] : defaultTall()] : [];
     paintZones();
   }
   paintLiveBoxes(s);
-  $("tiktok-btn").hidden = !(s.settings.platform2 && s.settings.vertical2);
-  $("vertical-row").hidden = !s.settings.platform2;
-  $("sw-vertical").checked = s.settings.vertical2;
+
 }
 
 // --- covers on the live picture: click to lift one for a minute, click again to bring it back ------------
@@ -215,25 +208,21 @@ function paintLiveBoxes(s) {
 }
 
 // --- screen areas: webcam (never covered), always-covered parts, the TikTok 9:16 frame ---------------------------
-const tallW = (h) => { const r = $("screen").getBoundingClientRect(); return (h * r.height * 9) / 16 / r.width; };
-function defaultTall() { const w = tallW(1); return [0.5 - w / 2, 0, 0.5 + w / 2, 1]; }
 function paintZones() {
   const box = $("zones");
   box.classList.toggle("edit", !!editing);
   box.replaceChildren();
-  for (const kind of ["cover", "tiktok", "cam"]) {
+  for (const kind of ["cover", "cam"]) {
     rects[kind].forEach((z, i) => {
       const el = document.createElement("div");
       el.className = `zone ${kind}` + (editing === kind ? " active" : "");
       place(el, z);
-      el.textContent = w({ cam: "zone", cover: "cover_zone", tiktok: "tiktok_zone" }[kind]);
+      el.textContent = w({ cam: "zone", cover: "cover_zone" }[kind]);
       const h = document.createElement("i"); h.className = "h";
       el.append(h);
-      if (kind !== "tiktok") {
-        const x = document.createElement("button"); x.className = "x"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "remove");
-        x.onclick = (e) => { e.stopPropagation(); rects[kind].splice(i, 1); paintZones(); };
-        el.append(x);
-      }
+      const x = document.createElement("button"); x.className = "x"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "remove");
+      x.onclick = (e) => { e.stopPropagation(); rects[kind].splice(i, 1); paintZones(); };
+      el.append(x);
       el.onpointerdown = (e) => editing === kind && drag(e, kind, i, e.target === h ? "size" : "move");
       box.append(el);
     });
@@ -253,24 +242,21 @@ function drag(e, kind, i, mode) {
     if (mode === "move") {
       z[0] = Math.min(1 - ww, Math.max(0, z0[0] + dx)); z[1] = Math.min(1 - hh, Math.max(0, z0[1] + dy));
       z[2] = z[0] + ww; z[3] = z[1] + hh;
-    } else if (kind === "tiktok") { // 9:16 kept: the height sets the width, the centre stays
-      const nh = Math.min(1 - z0[1], Math.max(0.2, hh + dy)), nw = tallW(nh), cx = (z0[0] + z0[2]) / 2;
-      z[1] = z0[1]; z[3] = z0[1] + nh; z[0] = Math.max(0, Math.min(1 - nw, cx - nw / 2)); z[2] = z[0] + nw;
+
     } else { // the handle sits on the bottom corner at the inline-start side
       if (document.documentElement.dir === "rtl") z[2] = clamp(Math.max(z0[0] + 0.04, z0[2] + dx)); else z[0] = clamp(Math.min(z0[2] - 0.04, z0[0] + dx));
       z[3] = clamp(Math.max(z0[1] + 0.04, z0[3] + dy));
     }
     place(el, z);
   };
-  el.onpointerup = () => { el.onpointermove = null; if (kind === "tiktok") SAVE.tiktok(rects.tiktok); }; // TikTok follows at once
+  el.onpointerup = () => { el.onpointermove = null; };
 }
 function editAreas(kind) {
   if (editing) SAVE[editing](rects[editing]);
   editing = kind;
-  if (kind && !rects[kind].length) rects[kind].push(kind === "cam" ? [0.74, 0.62, 0.98, 0.96] : kind === "cover" ? [0.02, 0.62, 0.22, 0.96] : defaultTall());
+  if (kind && !rects[kind].length) rects[kind].push(kind === "cam" ? [0.74, 0.62, 0.98, 0.96] : [0.02, 0.62, 0.22, 0.96]);
   $("area-btns").hidden = !!kind;
   $("area-edit").hidden = !kind;
-  $("zone-add").hidden = kind === "tiktok";
   $("areas-text").textContent = kind ? w("edit_" + kind) : w("camera_sub");
   paintZones();
 }
@@ -411,7 +397,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.querySelectorAll(".area-btn").forEach((b) => { b.onclick = () => editAreas(b.dataset.kind); });
   $("zone-done").onclick = () => editAreas(null);
   $("zone-add").onclick = () => { rects[editing].push([0.4, 0.4, 0.6, 0.6]); paintZones(); };
-  $("sw-vertical").onchange = (e) => act("vertical", { on: e.target.checked });
   $("banner").onclick = () => { step = 0; go("setup"); };
   $("job-cancel").onclick = () => act("cancel");
   $("step-back").onclick = () => { step = Math.max(0, step - 1); paintSetup(); };

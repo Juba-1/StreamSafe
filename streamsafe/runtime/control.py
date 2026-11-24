@@ -2,15 +2,13 @@
 the engine re-reads (``CONTROL_FILE``). Missing or unreadable: the defaults, which change nothing.
 
     {"panic": false, "everyone": false, "thr_scale": 1.4, "zones": [[x0, y0, x1, y1], ...],
-     "covers": [[x0, y0, x1, y1], ...], "vcrop": [x0, y0, x1, y1]}
+     "covers": [[x0, y0, x1, y1], ...]}
 
 ``zones``: parts of the picture (fractions 0-1, e.g. the streamer's webcam) where people are never covered by
 person covers; panic and whole-screen covers still cover everything.
 ``covers``: parts of the picture that are ALWAYS covered (a map, a phone screen with a code): they win over zones.
 ``allow``: [[x0, y0, x1, y1, until], ...] covers the streamer let go of in the window, until an epoch time (at most
 ``ALLOW_MAX_S`` ahead): people there are not dressed until then; always-covered parts and panic still win.
-``vcrop``: the part of the picture the vertical (9:16) extra platform shows - its height and centre count, its
-width follows from the 9:16 shape.
 """
 
 from __future__ import annotations
@@ -29,7 +27,6 @@ class Live:
     thr_scale: float = 0.0  # 0 = keep the start value
     zones: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
     covers: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
-    vcrop: tuple[float, float, float, float] | None = None
     allow: tuple[tuple[float, float, float, float, float], ...] = field(default_factory=tuple)  # (+ until, epoch s)
 
     def in_zone(self, x: float, y: float) -> bool:
@@ -56,7 +53,6 @@ def rects(items: object) -> tuple[tuple[float, float, float, float], ...]:
 def parse(data: object) -> Live:
     if not isinstance(data, dict):
         return Live()
-    vcrop = rects([data.get("vcrop")]) if data.get("vcrop") else ()
     try:
         k = float(data.get("thr_scale", 0) or 0)
     except (TypeError, ValueError):
@@ -67,7 +63,6 @@ def parse(data: object) -> Live:
         thr_scale=k if 0.3 <= k <= 3.0 else 0.0,
         zones=rects(data.get("zones")),
         covers=rects(data.get("covers")),
-        vcrop=vcrop[0] if vcrop else None,
         allow=allowed(data.get("allow")),
     )
 

@@ -59,43 +59,12 @@ def test_preview_never_blocks(tmp_path):
     assert (tmp_path / "p.png").exists()
 
 
-def test_vertical_cut_follows_the_live_choice():
-    from streamsafe.runtime.control import Live
-
-    class Ctl:
-        now = Live()
-
-        def get(self):
-            return self.now
-
-    got = []
-
-    class Out:
-        def write(self, frame):
-            got.append(frame.shape)
-
-        def close(self):
-            pass
-
-    size = sinks.vertical_size((1920, 1080))
-    assert size == (608, 1080)
-    ctl = Ctl()
-    v = sinks.VerticalSink(Out(), size, ctl)
-    frame = np.zeros((1080, 1920, 3), np.uint8)
-    assert v.box(1920, 1080) == (656, 0, 608, 1080)  # the middle, full height
-    ctl.now = Live(vcrop=(0.7, 0.5, 0.9, 1.0))  # lower right, half height: scaled to the fixed size
-    x, y, cw, ch = v.box(1920, 1080)
-    assert (y, ch, cw) == (540, 540, 304) and x + cw <= 1920
-    v.write(frame)
-    assert got == [(1080, 608, 3)]
-
-
 def test_always_covered_parts():
     from streamsafe.runtime.control import parse
     from streamsafe.runtime.runner import COVER_BGR, cover_parts
 
-    live = parse({"covers": [[0, 0, 0.5, 0.5], [2, 2, 3, 3]], "vcrop": [0.3, 0, 0.6, 1]})
-    assert live.covers == ((0, 0, 0.5, 0.5),) and live.vcrop == (0.3, 0, 0.6, 1)
+    live = parse({"covers": [[0, 0, 0.5, 0.5], [2, 2, 3, 3]]})
+    assert live.covers == ((0, 0, 0.5, 0.5),)
     f = np.full((100, 200, 3), 255, np.uint8)
     cover_parts(f, live.covers)
     assert tuple(f[10, 10]) == COVER_BGR and tuple(f[90, 190]) == (255, 255, 255)

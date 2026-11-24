@@ -169,8 +169,6 @@ class WebApp:
                 "panic_button": s.panic_button,
                 "zones": s.zones,
                 "covers": s.covers,
-                "vertical2": s.vertical2,
-                "vcrop": s.vcrop,
                 "follow_obs": s.follow_obs,
                 "translate": s.translate_ar,
             },
@@ -366,10 +364,6 @@ class WebApp:
 
     def do_covers(self, a: dict) -> None:
         self.ctrl.set_covers(list(a.get("covers", [])))
-
-    def do_vertical(self, a: dict) -> None:
-        on = bool(a.get("on", self.ctrl.settings.vertical2))
-        self.ctrl.set_vertical(on, a.get("vcrop") if "vcrop" in a else None)
 
     def do_panic_key(self, a: dict) -> None:
         name = str(a.get("key", ""))

@@ -36,7 +36,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--input", required=True, help="video file, FFmpeg URL or device:<name|index>")
     p.add_argument("--output", action="append", default=[], help="mp4 file, FFmpeg URL or 'window' (repeatable)")
     p.add_argument("--extra-output", action="append", default=[], help="another platform, best effort (repeatable)")
-    p.add_argument("--extra-vertical", action="store_true", help="the extra platforms get a vertical 9:16 part (TikTok)")
     p.add_argument("--mode", choices=["realtime", "offline"], help="default: realtime")
     p.add_argument("--delay", type=float, help="stream delay in seconds")
     p.add_argument("--secs", type=float, help="stop a file input after this many seconds")
@@ -117,9 +116,7 @@ def main(
             sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, crop=crop) for spec in args.output]
             for n, spec in enumerate(args.extra_output, 2):  # extra platforms: one failing does not stop the others
                 tag = str(n)
-                extra = open_sink(
-                    spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag, crop=crop, vertical=args.extra_vertical
-                )
+                extra = open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag, crop=crop)
                 sinks.append(BestEffort(extra, tag))
             sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
             report = run(cfg, source, sink, factory) if factory is not None else run(cfg, source, sink)
@@ -165,7 +162,7 @@ def _finish(args: argparse.Namespace, report: dict | None, fps: float, reason: s
     summary = report.setdefault("summary", {})
     summary["stop_reason"], summary["stop_detail"] = reason, detail[:400]
     summary["input_connections"] = getattr(source, "connections", None)
-    layers = []  # every wrapper of every output (best effort / thread / vertical cut / FFmpeg): each counts its own
+    layers = []  # every wrapper of every output (best effort / thread / FFmpeg): each counts its own
     for top in getattr(sink, "sinks", [sink] if sink is not None else []):
         while top is not None:
             layers.append(top)
