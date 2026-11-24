@@ -69,7 +69,22 @@ def main() -> int:
     c.settings.follow_obs = False  # FFmpeg plays OBS here: no OBS settings files on the pod
     c.save_settings()
     c.run_check()
-    c.use_nvidia = True  # the pod's own CUDA / TensorRT (pip), not the Windows NVIDIA pack
+    # the pod's own CUDA / TensorRT from pip (the app's NVIDIA pack is the Windows one): same engines, TRT on
+    from streamsafe.app import controller as ctl_mod
+    from streamsafe.app import engine as eng_mod
+    from streamsafe.app import runtime_select
+
+    real_env = eng_mod.engine_env
+
+    def pod_env(*args, **kw):
+        env = real_env(*args, **kw)
+        env.pop(runtime_select.RUNTIME_ENV, None)
+        env.update({"TRT": "1", "TRT_BUILD": "0"})
+        return env
+
+    eng_mod.engine_env = pod_env
+    if hasattr(ctl_mod, "engine_env"):
+        ctl_mod.engine_env = pod_env
     say(f"ready: platform={c.settings.platform} key={'yes' if app.key else 'NO'} models={c.models_problem() or 'ok'}")
 
     srv = server.ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(app, "live", [time.monotonic()]))
