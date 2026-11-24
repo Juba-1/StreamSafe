@@ -43,6 +43,9 @@ for t in 1 2; do timeout 900 pip install -q --default-timeout 60 "onnxruntime-gp
 pip install -q --no-build-isolation -e . 2>&1 | tail -2; python -c "import streamsafe" || { echo PIP_FAIL; exit 1; }
 command -v ffmpeg >/dev/null || { apt-get update -qq && apt-get install -y -qq ffmpeg >/dev/null; }
 python -m playwright install --with-deps chromium 2>&1 | tail -1
+command -v Xvfb >/dev/null || { apt-get update -qq && apt-get install -y -qq xvfb >/dev/null; }
+Xvfb :99 -screen 0 1600x900x24 -nolisten tcp >/dev/null 2>&1 &
+export DISPLAY=:99
 export STREAMSAFE_DATA_DIR=/workspace/ssdata OUT=$R
 # models + heads through the app first (no window yet), then TensorRT engines like "fast mode" does
 python - <<'P'
