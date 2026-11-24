@@ -122,10 +122,12 @@ def main(
             report = run(cfg, source, sink, factory) if factory is not None else run(cfg, source, sink)
             failed = False
         finally:
+            print("STOP_PHASE closing input and outputs", flush=True)
             for part in (source, sink):
                 try:
                     if part is not None:
                         part.close()
+                    print(f"STOP_PHASE closed {type(part).__name__}", flush=True)
                 except Exception:  # a sink says again at close why it broke: only news when the run itself went well
                     if not failed:
                         raise

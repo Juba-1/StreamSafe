@@ -318,7 +318,19 @@ def stop_on_stdin_close(stream=None, interrupt: Callable[[], None] | None = None
                     break
         except (OSError, ValueError):
             pass
+        print("STOP_PHASE stop asked", flush=True)
         interrupt()
+        timer = threading.Timer(12.0, slow_stop)  # still here: where every thread is waiting goes into the report
+        timer.daemon = True
+        timer.start()
+
+    def slow_stop() -> None:
+        import faulthandler
+
+        print("STOP_SLOW the stop takes long; threads:", flush=True)
+        with contextlib.suppress(Exception):
+            faulthandler.dump_traceback(file=sys.stdout, all_threads=True)
+        sys.stdout.flush()
 
     thread = threading.Thread(target=watch, name="stop-watch", daemon=True)
     thread.start()

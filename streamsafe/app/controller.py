@@ -435,7 +435,7 @@ class Controller:
 
     # --- the engine -----------------------------------------------------------------------------------------
     def _engine_line(self, line: str) -> None:
-        self._engine_lines = [*self._engine_lines[-60:], line]
+        self._engine_lines = [*self._engine_lines[-240:], line]
         event = link.parse(line)
         if event is not None:
             self.link.take(event)
@@ -603,7 +603,7 @@ class Controller:
                 return path
             reason = self.link.stopped if self.link.stopped in session_report.FAILED_REASONS else "start_failed"
             seconds = 0.0
-            if self.engine.stop_requested and self.link.input == "connected" and self._started_at:
+            if self.engine.stop_requested and self._started_at and time.monotonic() - self._started_at > 30:
                 # it streamed, the streamer pressed Stop, and the engine had to be ended: say that, not "never started"
                 reason, seconds = "stop_timeout", time.monotonic() - self._started_at
             detail = f"exit code {code}: {self.exit_reason()} {self.link.detail}".strip()

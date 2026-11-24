@@ -206,7 +206,7 @@ def write(report: dict[str, Any], fps: float, folder: str | os.PathLike | None =
 LOG_HEAD = "--- سجل المحرك (آخر الأسطر) / engine log (last lines) ---"
 
 
-def add_log(path: Path, lines: list[str], keep: int = 40) -> None:
+def add_log(path: Path, lines: list[str], keep: int = 160) -> None:
     """Put the engine's last lines under a report (once): a failed start then explains itself in one file."""
     try:
         if LOG_HEAD in path.read_text(encoding="utf-8"):

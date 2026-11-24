@@ -208,7 +208,8 @@ def main() -> int:
         say(("LIVE ON KICK" if live else "NOT CONNECTED") + f" ({time.strftime('%H:%M:%S')} UTC): part 1, the window")
         caption("البث شغّال: الحين نجرّب كل زر")
         page.wait_for_timeout(8000)
-        for i, (what, do) in enumerate(tour(page.locator("#sens button"))):
+        steps = tour(page.locator("#sens button")) if os.environ.get("TOUR", "1") == "1" else []
+        for i, (what, do) in enumerate(steps):
             step(what, do)
             st = app.state()
             say(f"  live: engine={'on' if st['running'] else 'OFF'} platform={c.link.platform} panic={st['panic']}")
@@ -237,6 +238,7 @@ def main() -> int:
         report = wait(lambda: page.locator("#report").is_visible(), 60)
         say("report shown under the picture" if report else "REPORT NOT SHOWN")
         shot("99_report")
+        (OUT / "engine_tail.txt").write_text("\n".join(c._engine_lines), encoding="utf-8")
         st = app.state()
         if st.get("report"):
             (OUT / "report_in_window.txt").write_text(st["report"]["text"], encoding="utf-8")

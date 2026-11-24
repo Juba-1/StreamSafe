@@ -351,11 +351,13 @@ def _run_realtime(
                 shown += 1
         except KeyboardInterrupt:  # Ctrl+C: stop showing frames, but still close cleanly and write the report
             stopped_by_user = True
+            print("STOP_PHASE frames stopped", flush=True)
     finally:
         if obs is not None:
             obs.close()
             stats["obs_write_errors"].append(obs.errors)
         worker.shutdown(receiver)
+        print("STOP_PHASE analyzer stopped", flush=True)
         if tr is not None:
             tr.stop()
     gate.finish()
