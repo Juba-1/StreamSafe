@@ -63,7 +63,7 @@ def main() -> int:
         try:
             c.apply_update(lambda *a: None, threading.Event())  # data only: this dev copy cannot run the Windows installer
             say("heads updated through the update channel")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             say(f"heads update failed: {type(exc).__name__}: {exc}")
     app.do_platform({"platform": "kick", "key": os.environ["STREAM_URL"].strip()})
     c.settings.follow_obs = False  # FFmpeg plays OBS here: no OBS settings files on the pod
