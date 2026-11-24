@@ -31,6 +31,7 @@ from streamsafe.io.sources import FrameSource
 from streamsafe.runtime.control import LiveControl
 from streamsafe.runtime.cuts import CutDetector
 from streamsafe.runtime.gate import OutputGate
+from streamsafe.runtime.pictures import PictureWatch
 from streamsafe.runtime.report import device_stats, device_summary, summarize, write_outputs
 from streamsafe.runtime.threads import limit_threads
 from streamsafe.runtime.worker import AnalyzerWorker
@@ -280,6 +281,8 @@ def _run_realtime(
     preview_file = os.environ.get("PREVIEW_FILE", "")
     preview = Snapper(preview_file) if preview_file else None
     parts: tuple = ()  # the always-covered parts, from the live control file
+    pics: tuple = ()  # saved pictures covered whenever they show
+    watch = PictureWatch()
     preview_every = max(1, round(2 * cfg.runtime.fps))
     try:
         try:
@@ -310,10 +313,11 @@ def _run_realtime(
                     time.sleep(0.0005)
                 if v % 6 == 0:
                     now_live = ctl.get()
-                    gate.manual, gate.zones, parts = now_live.panic, now_live, now_live.covers
+                    gate.manual, gate.zones, parts, pics = now_live.panic, now_live, now_live.covers, now_live.pictures
+                found = watch(frame, pics) if pics else []  # on the untouched frame, before any cover is drawn
                 out = gate.render(v, frame)
-                if parts and out is not gate.slate and out is not gate.card:
-                    cover_parts(out, parts)  # always covered (a map, a code), whatever the analysis said
+                if (parts or found) and out is not gate.slate and out is not gate.card:
+                    cover_parts(out, (*parts, *found))  # always covered (a map, a code), whatever the analysis said
                 # Arabic text, AFTER the gate and on top of the cover: on a normally composed frame and on the full-scene
                 # cover (card / slate: the dialogue goes on while the picture is covered), never on a held repeat; always
                 # on a copy, so nothing the gate keeps (its slate, card or last frame) ever carries the text
@@ -371,6 +375,7 @@ def _run_realtime(
         stopped_by_user=stopped_by_user,
         # frames sent with their sound / frames that should have had sound but none was there (silence instead)
         late_frames=sum(stats.get("late_frames", [])),
+        picture_frames=watch.matches,
         audio_frames=n_sound,
         audio_missing_frames=n_no_sound if getattr(source, "has_audio", False) else 0,
     )

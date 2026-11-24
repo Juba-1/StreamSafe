@@ -174,6 +174,7 @@ class WebApp:
             },
             "panic": c.panic,
             "boxes": self.live_boxes() if running else [],
+            "pictures": [{k: i[k] for k in ("id", "game", "name", "rect", "full", "on")} for i in c.pictures.items],
             "allow": [[*a[:4], round(a[4] - time.time())] for a in c.live_allow()],
             "platforms": [{"id": p, "name": self.tr("plat_" + p)} for p in ingest.PLATFORMS],
             "panic_keys": hotkey.CHOICES,
@@ -362,6 +363,29 @@ class WebApp:
     def do_restore(self, a: dict) -> None:
         self.ctrl.restore(a.get("i") if isinstance(a.get("i"), int) else None)
 
+    # --- pictures always covered (per game) ---
+    def do_pic_freeze(self, a: dict) -> dict:
+        if not self.ctrl.engine.running:
+            return {"ok": False, "why": "not_running"}
+        return {"ok": self.ctrl.pictures.freeze(self.ctrl.preview_file())}
+
+    def do_pic_add(self, a: dict) -> dict:
+        why = self.ctrl.pictures.add(str(a.get("game", "")), str(a.get("name", "")), list(a.get("rect", [])), bool(a.get("full")))
+        self.ctrl.write_control()
+        return {"ok": not why, "why": self.tr(why) if why else ""}
+
+    def do_pic_del(self, a: dict) -> None:
+        self.ctrl.pictures.remove(str(a.get("id", "")))
+        self.ctrl.write_control()
+
+    def do_pic_set(self, a: dict) -> None:
+        values = {k: a[k] for k in ("on", "full") if k in a}
+        if "game" in a:
+            self.ctrl.pictures.set_game(str(a["game"]), bool(a.get("on")))
+        else:
+            self.ctrl.pictures.set(str(a.get("id", "")), **values)
+        self.ctrl.write_control()
+
     def do_covers(self, a: dict) -> None:
         self.ctrl.set_covers(list(a.get("covers", [])))
 
@@ -513,6 +537,14 @@ def make_handler(app: WebApp, token: str, seen: list[float]) -> type[BaseHTTPReq
             elif path == "/api/state":
                 if self._ok():
                     self._send(200, json.dumps(app.state()).encode(), "application/json")
+            elif path == "/api/picture":
+                if not self._ok():
+                    return
+                f = app.ctrl.pictures.file(parse_qs(urlparse(self.path).query).get("id", [""])[0])
+                if f is None:
+                    self._send(404, b"", "text/plain")
+                else:
+                    self._send(200, f.read_bytes(), "image/png")
             elif path == "/api/preview":
                 if not self._ok():
                     return

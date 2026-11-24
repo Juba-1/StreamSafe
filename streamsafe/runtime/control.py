@@ -2,10 +2,11 @@
 the engine re-reads (``CONTROL_FILE``). Missing or unreadable: the defaults, which change nothing.
 
     {"panic": false, "everyone": false, "thr_scale": 1.4, "zones": [[x0, y0, x1, y1], ...],
-     "covers": [[x0, y0, x1, y1], ...]}
+     "covers": [[x0, y0, x1, y1], ...], "pictures": [{"rect": [x0, y0, x1, y1], "file": "...png", "full": false}]}
 
 ``zones``: parts of the picture (fractions 0-1, e.g. the streamer's webcam) where people are never covered by
 person covers; panic and whole-screen covers still cover everything.
+``pictures``: saved pictures watched at their place and covered when they show (runtime/pictures.py).
 ``covers``: parts of the picture that are ALWAYS covered (a map, a phone screen with a code): they win over zones.
 ``allow``: [[x0, y0, x1, y1, until], ...] covers the streamer let go of in the window, until an epoch time (at most
 ``ALLOW_MAX_S`` ahead): people there are not dressed until then; always-covered parts and panic still win.
@@ -27,6 +28,7 @@ class Live:
     thr_scale: float = 0.0  # 0 = keep the start value
     zones: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
     covers: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
+    pictures: tuple[tuple[float, float, float, float, str, bool], ...] = field(default_factory=tuple)
     allow: tuple[tuple[float, float, float, float, float], ...] = field(default_factory=tuple)  # (+ until, epoch s)
 
     def in_zone(self, x: float, y: float) -> bool:
@@ -64,7 +66,19 @@ def parse(data: object) -> Live:
         zones=rects(data.get("zones")),
         covers=rects(data.get("covers")),
         allow=allowed(data.get("allow")),
+        pictures=pictures(data.get("pictures")),
     )
+
+
+def pictures(items: object) -> tuple[tuple[float, float, float, float, str, bool], ...]:
+    out = []
+    for p in items if isinstance(items, list) else []:
+        if not isinstance(p, dict) or not isinstance(p.get("file"), str):
+            continue
+        r = rects([p.get("rect")])
+        if r:
+            out.append((*r[0], p["file"], bool(p.get("full", False))))
+    return tuple(out)
 
 
 ALLOW_MAX_S = 120.0  # a released cover comes back after this at the latest

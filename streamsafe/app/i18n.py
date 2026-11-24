@@ -267,6 +267,12 @@ TEXT: dict[str, tuple[str, str]] = {
     "plat_youtube": ("يوتيوب YouTube", "YouTube"),
     "plat_tiktok": ("تيك توك TikTok", "TikTok"),
     "plat_facebook": ("فيسبوك Facebook", "Facebook"),
+    "pic_bad_rect": ("حدد مربع أكبر على الصورة", "Mark a bigger box on the picture"),
+    "pic_too_many": ("وصلت للحد (60 صورة). احذف صور قديمة", "Limit reached (60 pictures). Delete old ones"),
+    "pic_no_preview": (
+        "ما فيه صورة من البث. شغّل «جرّب بدون بث» أولًا",
+        "No picture from the stream yet. Start “Try without streaming” first",
+    ),
     "plat_custom": ("منصة أخرى (اكتب العنوان)", "Another platform (type the address)"),
     "plat_hint_kick": (
         "من كيك: لوحة التحكم > الإعدادات > Stream URL & Key. الصق المفتاح بس (والعنوان لو يختلف).",

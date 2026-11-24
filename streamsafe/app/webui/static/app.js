@@ -3,7 +3,14 @@
 
 const W = {
   ar: {
-    nav_live: "البث", nav_setup: "الإعداد", nav_settings: "الإعدادات", nav_check: "الفحص",
+    nav_live: "البث", nav_setup: "الإعداد", nav_pictures: "تغطية دائمة",
+    pics_title: "صور تتغطى دائمًا", pics_sub: "لكل لعبة: أي صورة تطلع بنفس المكان (الخريطة، الجوال، قائمة) تتغطى أول ما تظهر.",
+    pic_new: "أضف صورة", pic_game: "اللعبة", pic_name: "اسم الصورة (مثل: الخريطة)", pic_full: "غطِّ الشاشة كاملة لما تطلع",
+    pic_full_sub: "بدل ما نغطي مكانها بس", pic_save: "احفظ", pic_retake: "صورة جديدة",
+    pic_step: "افتح الشي في اللعبة (مثل الخريطة)، وبعدها اسحب مربع على الجزء اللي يميّزه وما يتغير.",
+    pic_need: "عشان نصوّر الشاشة لازم الحماية تكون شغالة: اضغط «جرّب بدون بث»، افتح الشي في اللعبة، وارجع هنا.",
+    pics_empty: "ما أضفت صور للحين. اضغط «أضف صورة» وأنت فاتح الشي اللي تبيه يتغطى في اللعبة.",
+    pic_on_all: "شغّل الكل", pic_off_all: "طفّ الكل", pic_area: "مكانها فقط", pic_screen: "الشاشة كاملة", pic_del: "احذف", nav_settings: "الإعدادات", nav_check: "الفحص",
     viewers_see: "هذا اللي يشوفه جمهورك", trial: "جرّب بدون بث", start: "ابدأ الحماية والبث", stop: "أوقف",
     starting: "يجهّز…", panic: "غطِّ الكل", panic_off: "ارجع للعرض", panic_on_title: "البث مغطّى بالكامل",
     sens: "قوة التغطية", live_change: "تتغير وأنت تبث", s_light: "خفيفة", s_mid: "متوازنة", s_high: "عالية",
@@ -42,7 +49,14 @@ const W = {
     leave_live: "البث شغّال. إذا سكّرت النافذة يوقف البث.", days_left: "باقي {n} يوم على النسخة التجريبية",
   },
   en: {
-    nav_live: "Live", nav_setup: "Setup", nav_settings: "Settings", nav_check: "Check",
+    nav_live: "Live", nav_setup: "Setup", nav_pictures: "Always cover",
+    pics_title: "Pictures always covered", pics_sub: "Per game: anything that shows at the same place (the map, the phone, a menu) is covered as soon as it appears.",
+    pic_new: "Add picture", pic_game: "Game", pic_name: "Picture name (e.g. the map)", pic_full: "Cover the whole screen when it shows",
+    pic_full_sub: "Instead of only its place", pic_save: "Save", pic_retake: "New snapshot",
+    pic_step: "Open it in the game (e.g. the map), then drag a box over the part that identifies it and does not change.",
+    pic_need: "To take a snapshot, protection must be running: press “Try without streaming”, open it in the game, and come back here.",
+    pics_empty: "No pictures yet. Press “Add picture” while the thing to cover is open in the game.",
+    pic_on_all: "All on", pic_off_all: "All off", pic_area: "Its place only", pic_screen: "Whole screen", pic_del: "Delete", nav_settings: "Settings", nav_check: "Check",
     viewers_see: "What your viewers see", trial: "Try without streaming", start: "Start protection & stream", stop: "Stop",
     starting: "Starting…", panic: "Cover everything", panic_off: "Back to stream", panic_on_title: "Stream fully covered",
     sens: "Cover strength", live_change: "Changes while live", s_light: "Light", s_mid: "Balanced", s_high: "High",
@@ -117,6 +131,7 @@ function go(name) {
   document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== "view-" + name; });
   if (name === "setup") paintSetup();
   if (name === "settings") paintSettings(true);
+  if (name === "pictures") { $("pic-need").hidden = true; paintPictures(true); }
 }
 
 // --- live view --------------------------------------------------------------------------------------------
@@ -334,6 +349,73 @@ function platformForm(second) {
   return box;
 }
 
+// --- pictures always covered -------------------------------------------------------------------------------
+let picRect = null;
+let picSig = "";
+const tok = () => window.TOKEN;
+function paintPictures(force) {
+  if (!S) return;
+  const sig = JSON.stringify([S.pictures, lang]);
+  $("pic-need").hidden = S.running || $("pic-add").hidden === false ? true : $("pic-need").hidden;
+  if (sig === picSig && !force) return;
+  picSig = sig;
+  const games = [...new Set(S.pictures.map((p) => p.game))];
+  $("pic-games").replaceChildren(...games.map((g) => el("option", { value: g })));
+  const list = $("pic-list");
+  if (!S.pictures.length) { list.replaceChildren(el("div", { class: "card empty", text: w("pics_empty") })); return; }
+  list.replaceChildren(...games.map((g) => {
+    const items = S.pictures.filter((p) => p.game === g);
+    const allOn = items.every((p) => p.on);
+    const head = el("div", { class: "game-head" }, el("h2", { text: g }),
+      el("button", { class: "ghost small", type: "button", text: allOn ? w("pic_off_all") : w("pic_on_all"), onclick: () => act("pic_set", { game: g, on: !allOn }) }));
+    const grid = el("div", { class: "pic-grid" }, ...items.map((p) => {
+      const sw = el("input", { type: "checkbox", "aria-label": p.name });
+      sw.checked = p.on;
+      sw.onchange = () => act("pic_set", { id: p.id, on: sw.checked });
+      const thumb = el("div", { class: "thumb" });
+      thumb.style.backgroundImage = `url("/api/picture?id=${p.id}&t=${tok()}")`;
+      return el("div", { class: "card pic" + (p.on ? "" : " off") }, thumb,
+        el("div", { class: "pic-row" }, el("span", {}, el("b", { text: p.name }), el("br"), el("small", { text: p.full ? w("pic_screen") : w("pic_area") })), sw),
+        el("div", { class: "pic-row" }, el("span"), el("button", { class: "del", type: "button", text: w("pic_del"), onclick: () => act("pic_del", { id: p.id }) })));
+    }));
+    return el("section", { class: "game" }, head, grid);
+  }));
+}
+async function picStart() {
+  $("pic-err").hidden = true;
+  if (!S?.running) { $("pic-need").hidden = false; $("pic-add").hidden = true; return; }
+  const r = await api("pic_freeze", {});
+  if (!r.ok) { $("pic-need").hidden = false; return; }
+  $("pic-need").hidden = true;
+  $("pic-add").hidden = false;
+  $("pic-step").textContent = w("pic_step");
+  $("pic-frozen").src = `/api/picture?id=_frozen&t=${tok()}&v=${Date.now()}`;
+  picRect = null; $("pic-sel").hidden = true;
+  if (!$("pic-game").value && S.pictures.length) $("pic-game").value = S.pictures[S.pictures.length - 1].game;
+}
+function picDraw() {
+  const shot = document.querySelector(".pic-shot");
+  shot.onpointerdown = (e) => {
+    const r = shot.getBoundingClientRect();
+    const fx = (x) => Math.min(1, Math.max(0, (x - r.left) / r.width)), fy = (y) => Math.min(1, Math.max(0, (y - r.top) / r.height));
+    const x0 = fx(e.clientX), y0 = fy(e.clientY);
+    shot.setPointerCapture(e.pointerId);
+    shot.onpointermove = (m) => {
+      const x1 = fx(m.clientX), y1 = fy(m.clientY);
+      picRect = [Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)];
+      $("pic-sel").hidden = false; place($("pic-sel"), picRect);
+    };
+    shot.onpointerup = () => { shot.onpointermove = null; };
+  };
+}
+async function picSave() {
+  const err = $("pic-err");
+  const out = await api("pic_add", { game: $("pic-game").value, name: $("pic-name").value, rect: picRect || [], full: $("pic-full").checked });
+  if (!out.ok) { err.textContent = out.why; err.hidden = false; return; }
+  $("pic-add").hidden = true; $("pic-name").value = ""; $("pic-full").checked = false;
+  await tick(); paintPictures(true);
+}
+
 // --- settings / check -------------------------------------------------------------------------------------
 function paintSettings(full) {
   if (!S) return;
@@ -379,6 +461,7 @@ async function tick() {
   paintLive();
   if (view === "settings") paintSettings(false);
   if (view === "check") paintCheck();
+  if (view === "pictures") paintPictures(false);
   document.querySelectorAll(".result").forEach((r) => { r.textContent = S.test.text; r.className = "result " + (S.test.kind || ""); });
   if (view === "setup" && !document.activeElement?.matches("input")) paintSetupLight();
 }
@@ -395,6 +478,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("sw-everyone").onchange = (e) => act("everyone", { on: e.target.checked });
   $("sw-full").onchange = (e) => act("cover_mode", { mode: e.target.checked ? "screen" : "people" });
   document.querySelectorAll(".area-btn").forEach((b) => { b.onclick = () => editAreas(b.dataset.kind); });
+  $("pic-new").onclick = picStart;
+  $("pic-retake").onclick = picStart;
+  $("pic-cancel").onclick = () => { $("pic-add").hidden = true; };
+  $("pic-save").onclick = picSave;
+  $("pic-trial").onclick = () => act("start", { preview: true }).then(() => setTimeout(picStart, 3500));
+  picDraw();
   $("zone-done").onclick = () => editAreas(null);
   $("zone-add").onclick = () => { rects[editing].push([0.4, 0.4, 0.6, 0.6]); paintZones(); };
   $("banner").onclick = () => { step = 0; go("setup"); };
@@ -415,7 +504,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   paintWords();
   await tick();
   // first run: send the streamer to the guided setup
-  if (S?.tab) { go({ home: "live", check: "check", settings: "settings", setup: "setup" }[S.tab] || "live"); }
+  if (S?.tab) { go({ home: "live", check: "check", settings: "settings", setup: "setup", pictures: "pictures" }[S.tab] || "live"); }
   else if (S && (S.setup.models || !S.setup.key_ok || !S.setup.obs_set)) { step = S.setup.models ? 0 : !S.setup.key_ok ? 1 : 2; go("setup"); }
   loop();
 });

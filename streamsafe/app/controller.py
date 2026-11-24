@@ -17,7 +17,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from streamsafe import session_report
-from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, release, updates
+from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, pictures, release, updates
 from streamsafe.app import license as lic
 from streamsafe.app import settings as settings_mod
 from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, Settings
@@ -78,6 +78,7 @@ class Controller:
         self.use_nvidia = False  # decided by the last check: engines ready AND the NVIDIA libraries in place
         self.last_exit: int | None = None
         self.allow: list = []  # person covers let go of for a while (window clicks), this session only
+        self.pictures = pictures.Library(paths.data_dir(self.env) / "pictures")  # always covered when they show
         self.update: updates.Update | None = None
         self._engine_lines: list[str] = []
         self.link = engine.LinkState()
@@ -463,7 +464,7 @@ class Controller:
     def write_control(self) -> None:
         s = self.settings
         data = {"panic": self._panic, "everyone": s.dress_everyone, "thr_scale": s.sens_scale, "zones": s.zones,
-                "covers": s.covers, "allow": self.allow}  # fmt: skip
+                "covers": s.covers, "allow": self.allow, "pictures": self.pictures.active()}  # fmt: skip
         f = self.control_file()
         with contextlib.suppress(OSError):
             f.parent.mkdir(parents=True, exist_ok=True)

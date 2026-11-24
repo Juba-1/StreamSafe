@@ -27,6 +27,7 @@
     <nav class="side" aria-label="sections">
       <button class="nav on" data-view="live" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span data-w="nav_live"></span></button>
       <button class="nav" data-view="setup" type="button"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/></svg><span data-w="nav_setup"></span></button>
+      <button class="nav" data-view="pictures" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span data-w="nav_pictures"></span></button>
       <button class="nav" data-view="settings" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span data-w="nav_settings"></span></button>
       <button class="nav" data-view="check" type="button"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg><span data-w="nav_check"></span></button>
     </nav>
@@ -88,6 +89,31 @@
         <ol id="steps" class="steps"></ol>
         <div id="step-body" class="step-body"></div>
         <div class="step-nav"><button id="step-back" class="ghost" type="button" data-w="back"></button><button id="step-next" class="primary" type="button"></button></div>
+      </section>
+
+      <!-- PICTURES ALWAYS COVERED -->
+      <section id="view-pictures" class="view pictures" hidden>
+        <div class="page-head">
+          <div><h1 data-w="pics_title"></h1><p class="muted" data-w="pics_sub"></p></div>
+          <button id="pic-new" class="primary" type="button" data-w="pic_new"></button>
+        </div>
+        <div id="pic-add" class="card pic-add" hidden>
+          <div class="pic-add-grid">
+            <div>
+              <p id="pic-step" class="explain"></p>
+              <div class="pic-shot"><img id="pic-frozen" alt=""><div id="pic-sel" class="zone cover" hidden></div></div>
+            </div>
+            <div class="pic-form">
+              <label class="lab" data-w="pic_game"></label><input id="pic-game" class="field" list="pic-games" autocomplete="off"><datalist id="pic-games"></datalist>
+              <label class="lab" data-w="pic_name"></label><input id="pic-name" class="field" autocomplete="off">
+              <label class="switch-row"><span><b data-w="pic_full"></b><small data-w="pic_full_sub"></small></span><input id="pic-full" type="checkbox"></label>
+              <p id="pic-err" class="msg bad" hidden></p>
+              <div class="row-btns"><button id="pic-save" class="primary" type="button" data-w="pic_save"></button><button id="pic-cancel" class="ghost" type="button" data-w="cancel"></button><button id="pic-retake" class="ghost" type="button" data-w="pic_retake"></button></div>
+            </div>
+          </div>
+        </div>
+        <div id="pic-need" class="card" hidden><p class="explain" data-w="pic_need"></p><div class="row-btns"><button id="pic-trial" class="secondary" type="button" data-w="trial"></button></div></div>
+        <div id="pic-list"></div>
       </section>
 
       <!-- SETTINGS -->
