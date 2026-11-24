@@ -124,7 +124,7 @@ def run(page: Page, app: App, out: Path, live: bool) -> None:
 
     # --- live: sensitivity, switches, panic, screen areas ---------------------------------------------------
     page.click("[data-view=live]")
-    for i, k in enumerate((1.3, 1.0, 0.75)):
+    for i, k in enumerate((1.7, 1.3, 1.0)):
         page.locator("#sens button").nth(i).click()
         check(wait_for(lambda k=k: abs(app.state()["settings"]["sens"] - k) < 1e-6), f"sensitivity {k} saved")
         check(wait_for(lambda i=i: page.locator("#sens button").nth(i).get_attribute("aria-checked") == "true"), f"sensitivity {k} shown")

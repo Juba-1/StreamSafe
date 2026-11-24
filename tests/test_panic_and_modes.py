@@ -206,3 +206,17 @@ def test_controller_writes_the_live_control(tmp_path):
         "allow": [],
         "pictures": [],
     }
+
+
+def test_old_default_sensitivity_moves_to_the_lighter_default(tmp_path):
+    import json as _json
+
+    from streamsafe.app import settings as st
+
+    f = tmp_path / "s.json"
+    f.write_text(_json.dumps({"sens_scale": 1.0}))
+    assert st.load(f).sens_scale == st.SENS_DEFAULT == 1.3  # the old default
+    f.write_text(_json.dumps({"sens_scale": 0.8}))
+    assert st.load(f).sens_scale == 0.8  # a streamer's own choice stays
+    f.write_text(_json.dumps({"sens_scale": 1.0, "sens_v": st.SENS_VERSION}))
+    assert st.load(f).sens_scale == 1.0  # chosen after the change: stays

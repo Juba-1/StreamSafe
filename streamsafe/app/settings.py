@@ -16,8 +16,9 @@ OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
 COVER_PEOPLE, COVER_SCREEN = "people", "screen"
 # the sensitivity slider (a threshold scale; higher = fewer covers). Measured 24 Nov on 183 held-out GTA 6 crops
 # (Ali's labels): 1.4 caught only 1-2 of 28 borderline revealing women, so 1.0 is the default and 1.5 the light end
-SENS_MIN, SENS_MAX, SENS_DEFAULT = 0.7, 1.5, 1.0
-OLD_DEFAULT = 1.4  # the default until 3.0.0.37: such saved settings move to the new default
+SENS_MIN, SENS_MAX, SENS_DEFAULT = 0.7, 2.0, 1.3
+OLD_DEFAULTS = (1.4, 1.0)  # the defaults until 3.0.0.37 and until 3.0.0.43: such saved settings move to the new default
+SENS_VERSION = 2  # bumped when the default moves; settings saved before it get the new default once
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
@@ -50,6 +51,7 @@ class Settings:
     translate_ar: bool = False  # live English -> Arabic translation of on-screen text (experimental, off by default)
     nvidia_declined: bool = False  # the streamer said no to the NVIDIA download: do not ask at every start
     sens_scale: float = SENS_DEFAULT  # the live sensitivity slider; > 1 only clearer cases, < 1 anything possible
+    sens_v: int = SENS_VERSION  # which default the saved sensitivity belongs to
     zones: list = field(default_factory=list)  # [[x0, y0, x1, y1], ...] fractions: the webcam, never dressed
     covers: list = field(default_factory=list)  # [[x0, y0, x1, y1], ...] fractions: always covered (a map, a code)
     dress_everyone: bool = False  # ads: every character, men too, wears the brand garment (switch, live)
@@ -111,9 +113,11 @@ def load(path: Path) -> Settings:
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_RTMP
     try:
-        s.sens_scale = SENS_DEFAULT if float(s.sens_scale) == OLD_DEFAULT else min(SENS_MAX, max(SENS_MIN, float(s.sens_scale)))
+        old = isinstance(raw, dict) and raw.get("sens_v", 0) < SENS_VERSION and float(s.sens_scale) in OLD_DEFAULTS
+        s.sens_scale = SENS_DEFAULT if old else min(SENS_MAX, max(SENS_MIN, float(s.sens_scale)))
     except (TypeError, ValueError):
         s.sens_scale = SENS_DEFAULT
+    s.sens_v = SENS_VERSION
     from streamsafe.runtime.control import parse
 
     s.zones = [list(z) for z in parse({"zones": s.zones if isinstance(s.zones, list) else []}).zones]
