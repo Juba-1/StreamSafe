@@ -32,7 +32,7 @@ from streamsafe.types import ANALYSIS_SIZE
 MID_H = 200  # analysis px: below this a person is "small / mid" (wider band, preferred)
 BAND_SMALL = (0.2, 3.0)  # p / thr band for small and mid people
 BAND_BIG = (0.45, 2.2)  # p / thr band for big people (borderline outfits, modest uniforms)
-SMALL_SHARE = 0.7
+SMALL_SHARE = float(os.environ.get("SMALL_SHARE", 0.7))  # share of small/mid people in a video's picks
 DUP_VIDEO = 0.93  # cosine: same person / pose inside one video
 DUP_LABELED = 0.95  # cosine: already labeled in an earlier round
 CELL_H, CROP_W, CTX_W, ID_H = 180, 120, 220, 28

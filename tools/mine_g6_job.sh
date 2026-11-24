@@ -41,7 +41,7 @@ T=os.environ['HF_TOKEN']; R='juba-1/streamsafe-work'
 for i in range(5):
     try:
         hf_hub_download(R,'data/gta6_v1.tar',repo_type='dataset',token=T,local_dir='/workspace/vt')
-        snapshot_download(R,repo_type='dataset',token=T,local_dir='/workspace/h',allow_patterns=['runs/run48_lucia_runner/heads_lucia/ali/*.txt','runs/run37_ali_labels_photos/labeled37.npz'])
+        snapshot_download(R,repo_type='dataset',token=T,local_dir='/workspace/h',allow_patterns=['runs/run48_lucia_runner/heads_lucia/ali/*.txt','runs/run37_ali_labels_photos/labeled37.npz','runs/train_g6_r1/heads_w1/ali/*.txt'])
         snapshot_download('juba-1/streamsafe-models',local_dir='/workspace/m',allow_patterns=['v1/*'],ignore_patterns=['v1/translate/*'])
         break
     except Exception as e: print('retry', e)
@@ -63,6 +63,6 @@ echo "== mine"
 VIDS=$(ls /workspace/v/gta6/*.mp4)
 FPS=${FPS:-1} SECS=${SECS:-240} PER_VIDEO=${PER_VIDEO:-30} PER_TEST_VIDEO=${PER_TEST_VIDEO:-40} \
 TEST=${TEST:-nightclub_09,beach_13,street_30,npc_21,drive_23} \
-  python -m training.mine_hard $R/g6 $HEAD_DIR /workspace/h/runs/run37_ali_labels_photos/labeled37.npz $VIDS 2>&1 | tail -20
-ls $R/g6 | head; ls $R/g6/sheets | wc -l; wc -l $R/g6/meta.csv
+  python -m training.mine_hard $R/g6 ${MINE_HEADS:-$HEAD_DIR} /workspace/h/runs/run37_ali_labels_photos/labeled37.npz $VIDS 2>&1 | tail -20
+ls $R/g6/sheets | wc -l; wc -l $R/g6/meta.csv; tar -cf $R/g6_review.tar -C $R/g6 crops ctx meta.csv && ls -l $R/g6_review.tar
 echo "== DONE $(date -u)"
