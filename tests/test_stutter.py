@@ -99,3 +99,21 @@ def test_always_covered_parts():
     f = np.full((100, 200, 3), 255, np.uint8)
     cover_parts(f, live.covers)
     assert tuple(f[10, 10]) == COVER_BGR and tuple(f[90, 190]) == (255, 255, 255)
+
+
+def test_released_cover_lets_go_for_a_while_only(tmp_path, monkeypatch):
+    import json
+
+    from streamsafe.app import controller
+    from streamsafe.runtime.control import ALLOW_MAX_S, parse
+
+    for var in ("LOCALAPPDATA", "APPDATA", "STREAMSAFE_DATA"):
+        monkeypatch.setenv(var, str(tmp_path))
+    c = controller.Controller()
+    c.release([0.4, 0.4, 0.5, 0.8], 60)
+    live = parse(json.loads(c.control_file().read_text()))
+    assert live.in_zone(0.45, 0.6) and not live.in_zone(0.9, 0.9)
+    assert parse({"allow": [[0, 0, 1, 1, time.time() + 9999]]}).allow[0][4] <= time.time() + ALLOW_MAX_S + 1
+    assert not parse({"allow": [[0, 0, 1, 1, time.time() - 1]]}).allow  # over: covered again
+    c.restore(0)
+    assert not parse(json.loads(c.control_file().read_text())).in_zone(0.45, 0.6)

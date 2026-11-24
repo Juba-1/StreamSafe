@@ -48,6 +48,7 @@ class OutputGate:
     ) -> None:
         self.cfg = cfg
         self.size = output_size
+        self.shown_boxes: list[tuple[float, float, float, float]] = []
         self.zones: Live = Live()  # the streamer's webcam zones: no person cover there (set while live)
         self.scale = output_size[0] / ANALYSIS_SIZE[0]
         self.slate, self.card = brand_frames(*output_size, brand or BrandConfig())
@@ -85,7 +86,7 @@ class OutputGate:
             self._cuts[frame_id] = cut
 
     def add_decision(self, decision: Decision) -> None:
-        if self.zones.zones and decision.layers:  # the streamer's own picture (webcam) is never dressed
+        if (self.zones.zones or self.zones.allow) and decision.layers:  # the streamer's own picture (webcam) is never dressed
             w, h = self.size
             decision.layers = [g for g in decision.layers if not self.zones.in_zone(g.centroid[1] / w, g.centroid[0] / h)]
         with self._lock:
@@ -155,6 +156,12 @@ class OutputGate:
                     self.smoother.clear()
                 self.smoother.prune(v)
             out = compose(frame, v, decisions, gray, self.cfg.mc_min, self.scale, self.log, self.smoother)
+            h, w = frame.shape[:2]
+            self.shown_boxes = [  # where the person covers of this frame are (fractions), for the window
+                (g.x / w, g.y / h, (g.x + g.mask.shape[1]) / w, (g.y + g.mask.shape[0]) / h) for g in decisions[-1].layers
+            ]
+        if out is self.slate or out is self.card:
+            self.shown_boxes = []
         self._last = out
         if out is self.slate or out is self.card:
             self._last_full = v

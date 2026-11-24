@@ -7,6 +7,8 @@ the engine re-reads (``CONTROL_FILE``). Missing or unreadable: the defaults, whi
 ``zones``: parts of the picture (fractions 0-1, e.g. the streamer's webcam) where people are never covered by
 person covers; panic and whole-screen covers still cover everything.
 ``covers``: parts of the picture that are ALWAYS covered (a map, a phone screen with a code): they win over zones.
+``allow``: [[x0, y0, x1, y1, until], ...] covers the streamer let go of in the window, until an epoch time (at most
+``ALLOW_MAX_S`` ahead): people there are not dressed until then; always-covered parts and panic still win.
 ``vcrop``: the part of the picture the vertical (9:16) extra platform shows - its height and centre count, its
 width follows from the 9:16 shape.
 """
@@ -28,10 +30,14 @@ class Live:
     zones: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
     covers: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
     vcrop: tuple[float, float, float, float] | None = None
+    allow: tuple[tuple[float, float, float, float, float], ...] = field(default_factory=tuple)  # (+ until, epoch s)
 
     def in_zone(self, x: float, y: float) -> bool:
         """(x, y) as fractions of the picture."""
-        return any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in self.zones)
+        if any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in self.zones):
+            return True
+        now = time.time()  # covers the streamer let go of for a while (clicked in the window); they come back by themselves
+        return any(x0 <= x <= x1 and y0 <= y <= y1 and now < until for x0, y0, x1, y1, until in self.allow)
 
 
 def rects(items: object) -> tuple[tuple[float, float, float, float], ...]:
@@ -62,7 +68,27 @@ def parse(data: object) -> Live:
         zones=rects(data.get("zones")),
         covers=rects(data.get("covers")),
         vcrop=vcrop[0] if vcrop else None,
+        allow=allowed(data.get("allow")),
     )
+
+
+ALLOW_MAX_S = 120.0  # a released cover comes back after this at the latest
+
+
+def allowed(items: object) -> tuple[tuple[float, float, float, float, float], ...]:
+    out = []
+    now = time.time()
+    for a in items if isinstance(items, list) else []:
+        if not isinstance(a, list) or len(a) != 5:
+            continue
+        r = rects([a[:4]])
+        try:
+            until = min(float(a[4]), now + ALLOW_MAX_S)
+        except (TypeError, ValueError):
+            continue
+        if r and until > now:
+            out.append((*r[0], until))
+    return tuple(out)
 
 
 class LiveControl:

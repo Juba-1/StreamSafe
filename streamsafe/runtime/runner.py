@@ -17,6 +17,7 @@ import os
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import cv2
@@ -98,7 +99,7 @@ class Snapper:
         self.path = path
         self._busy = threading.Event()
 
-    def __call__(self, frame: np.ndarray) -> None:
+    def __call__(self, frame: np.ndarray, boxes: list | None = None) -> None:
         if self._busy.is_set():
             return
         self._busy.set()
@@ -106,6 +107,10 @@ class Snapper:
         def run() -> None:
             try:
                 snap(frame, self.path)
+                tmp = self.path + ".json.tmp"  # where the person covers are, so the window can offer to release one
+                with contextlib.suppress(OSError):
+                    Path(tmp).write_text(json.dumps({"t": time.time(), "boxes": [list(map(float, b)) for b in boxes or []]}))
+                    os.replace(tmp, self.path + ".json")
             finally:
                 self._busy.clear()
 
@@ -315,7 +320,7 @@ def _run_realtime(
                 text_ok = out is frame or out is gate.card or out is gate.slate
                 visible = tr.overlay(v, out) if tr is not None and text_ok else out
                 if preview is not None and v % preview_every == 0:  # what the viewers see, for the window
-                    preview(visible)
+                    preview(visible, gate.shown_boxes)
                 if sink is not None and takes_audio(sink):
                     # fail closed: sound only for a frame that is shown, not muted and not full-screen, and only
                     # that frame's own samples; anything else (also "not arrived") is silence

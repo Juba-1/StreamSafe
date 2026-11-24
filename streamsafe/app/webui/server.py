@@ -175,6 +175,8 @@ class WebApp:
                 "translate": s.translate_ar,
             },
             "panic": c.panic,
+            "boxes": self.live_boxes() if running else [],
+            "allow": [[*a[:4], round(a[4] - time.time())] for a in c.live_allow()],
             "platforms": [{"id": p, "name": self.tr("plat_" + p)} for p in ingest.PLATFORMS],
             "panic_keys": hotkey.CHOICES,
             "obs_server": c.obs_server(),
@@ -186,6 +188,14 @@ class WebApp:
             "days_left": c.days_left(),
             "tab": os.environ.get("STREAMSAFE_TAB", ""),
         }
+
+    def live_boxes(self) -> list:
+        """Where the person covers are on the latest preview (fresh only)."""
+        try:
+            data = json.loads(Path(str(self.ctrl.preview_file()) + ".json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        return data.get("boxes", []) if time.time() - float(data.get("t", 0)) < 5 else []
 
     def target_problems(self) -> list[str]:
         return list(self.ctrl.target(self.key).problems) if self.ctrl.settings.output == cfg.OUTPUT_RTMP else []
@@ -347,6 +357,12 @@ class WebApp:
 
     def do_zones(self, a: dict) -> None:
         self.ctrl.set_zones(list(a.get("zones", [])))
+
+    def do_release(self, a: dict) -> None:
+        self.ctrl.release(list(a.get("box", [])), 60.0)
+
+    def do_restore(self, a: dict) -> None:
+        self.ctrl.restore(a.get("i") if isinstance(a.get("i"), int) else None)
 
     def do_covers(self, a: dict) -> None:
         self.ctrl.set_covers(list(a.get("covers", [])))

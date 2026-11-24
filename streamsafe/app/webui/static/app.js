@@ -17,6 +17,8 @@ const W = {
     cover_edit: "غطِّ جزء دائمًا", cover_zone: "مغطى دائمًا", tiktok_edit: "جزء تيك توك", tiktok_zone: "تيك توك 9:16",
     edit_cam: "اسحب المربع الأخضر فوق كاميرتك، وكبّره من الزاوية.", edit_cover: "اسحب المربع الوردي فوق الجزء اللي تبيه يتغطى دائمًا.",
     edit_tiktok: "حرّك الإطار البرتقالي على الجزء اللي يشوفه جمهور تيك توك. يتغيّر وأنت تبث.",
+    boxes_hint: "اضغط على أي تغطية في الصورة عشان تشيلها دقيقة (لو غطّت شخص بالغلط). ترجع لحالها.",
+    release: "شيل التغطية دقيقة", restore_in: "ترجع بعد {n} ث — اضغط ترجعها الحين",
     vertical: "تيك توك طولي 9:16", vertical_sub: "المنصة الثانية تاخذ جزء طولي من الشاشة (يبدأ من البث الجاي)",
     connection: "الاتصال", obs: "OBS", idle_screen: "اضغط «جرّب بدون بث» عشان تشوف الحماية قبل ما تبث، أو ابدأ البث مباشرة.",
     wait_screen: "ننتظر الصورة من OBS… افتح OBS واضغط Start Streaming.",
@@ -56,6 +58,8 @@ const W = {
     cover_edit: "Always cover a part", cover_zone: "Always covered", tiktok_edit: "TikTok part", tiktok_zone: "TikTok 9:16",
     edit_cam: "Drag the green box over your webcam; resize from the corner.", edit_cover: "Drag the pink box over the part to always cover.",
     edit_tiktok: "Move the orange frame to the part TikTok viewers see. Changes while live.",
+    boxes_hint: "Click any cover in the picture to lift it for a minute (a wrong cover). It comes back by itself.",
+    release: "Lift this cover for a minute", restore_in: "Back in {n} s — click to cover now",
     vertical: "Vertical TikTok 9:16", vertical_sub: "The second platform gets a tall part of the screen (from the next start)",
     connection: "Connection", obs: "OBS", idle_screen: "Press “Try without streaming” to see protection before going live, or start streaming.",
     wait_screen: "Waiting for OBS… open OBS and press Start Streaming.",
@@ -187,9 +191,27 @@ function paintLive() {
     rects.tiktok = s.settings.platform2 && s.settings.vertical2 ? [s.settings.vcrop.length ? [...s.settings.vcrop] : defaultTall()] : [];
     paintZones();
   }
+  paintLiveBoxes(s);
   $("tiktok-btn").hidden = !(s.settings.platform2 && s.settings.vertical2);
   $("vertical-row").hidden = !s.settings.platform2;
   $("sw-vertical").checked = s.settings.vertical2;
+}
+
+// --- covers on the live picture: click to lift one for a minute, click again to bring it back ------------
+function paintLiveBoxes(s) {
+  const box = $("live-boxes");
+  box.replaceChildren();
+  const show = s.running && !editing && !s.panic;
+  $("boxes-hint").hidden = !show || !(s.boxes.length || s.allow.length);
+  if (!show) return;
+  const add = (z, cls, text, onclick) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "lbox " + cls; place(b, z);
+    const t = document.createElement("span"); t.textContent = text; b.append(t);
+    b.onclick = onclick; box.append(b);
+  };
+  s.allow.forEach((a, i) => add(a, "allowed", w("restore_in", { n: a[4] }), () => act("restore", { i })));
+  s.boxes.forEach((z) => add(z, "", w("release"), () => act("release", { box: z })));
 }
 
 // --- screen areas: webcam (never covered), always-covered parts, the TikTok 9:16 frame ---------------------------

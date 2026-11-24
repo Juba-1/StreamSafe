@@ -77,6 +77,7 @@ class Controller:
         self.license_stopped = False  # protection was stopped because the subscription is no longer valid
         self.use_nvidia = False  # decided by the last check: engines ready AND the NVIDIA libraries in place
         self.last_exit: int | None = None
+        self.allow: list = []  # person covers let go of for a while (window clicks), this session only
         self.update: updates.Update | None = None
         self._engine_lines: list[str] = []
         self.link = engine.LinkState()
@@ -462,7 +463,7 @@ class Controller:
     def write_control(self) -> None:
         s = self.settings
         data = {"panic": self._panic, "everyone": s.dress_everyone, "thr_scale": s.sens_scale, "zones": s.zones,
-                "covers": s.covers, "vcrop": s.vcrop or None}  # fmt: skip
+                "covers": s.covers, "vcrop": s.vcrop or None, "allow": self.allow}  # fmt: skip
         f = self.control_file()
         with contextlib.suppress(OSError):
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -494,6 +495,30 @@ class Controller:
         self.settings.zones = [list(z) for z in parse({"zones": zones}).zones]
         self.save_settings()
         self.write_control()
+
+    def release(self, box: list, seconds: float = 60.0) -> None:
+        """Let go of one person cover for a while (the streamer clicked it: a friend, a false cover). Only this
+        session: never saved, and it comes back by itself."""
+        from streamsafe.runtime.control import rects
+
+        r = rects([box])
+        if r:
+            x0, y0, x1, y1 = r[0]
+            pad = 0.02  # the person moves a little
+            self.allow = [
+                *self.live_allow(),
+                [max(0, x0 - pad), max(0, y0 - pad), min(1, x1 + pad), min(1, y1 + pad), time.time() + seconds],
+            ]
+            self.write_control()
+
+    def restore(self, i: int | None = None) -> None:
+        """Cover again: one released cover (its index) or all."""
+        now = self.live_allow()
+        self.allow = [] if i is None else [a for n, a in enumerate(now) if n != i]
+        self.write_control()
+
+    def live_allow(self) -> list:
+        return [a for a in self.allow if a[4] > time.time()]
 
     def set_covers(self, covers: list) -> None:
         """Parts of the picture that are always covered (live)."""

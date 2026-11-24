@@ -156,3 +156,10 @@ body { background:
 .zones.edit .zone:not(.active) { pointer-events: none; opacity: .45; }
 .zones.edit .zone:not(.active) .h, .zones.edit .zone:not(.active) .x { display: none; }
 .zone.cover .h { background: var(--pink); } .zone.tiktok .h { background: var(--warn); }
+.live-boxes { position: absolute; inset: 0; pointer-events: none; }
+.lbox { position: absolute; pointer-events: auto; border: 2px solid transparent; border-radius: 8px; cursor: pointer; background: none; padding: 0; }
+.lbox:hover { border-color: var(--pink); background: rgba(255, 77, 158, .08); }
+.lbox span { position: absolute; inset-block-start: -24px; inset-inline-start: 0; white-space: nowrap; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--pink); color: #fff; opacity: 0; transition: opacity .15s; }
+.lbox:hover span, .lbox.allowed span { opacity: 1; }
+.lbox.allowed { border: 2px dashed var(--ok); } .lbox.allowed span { background: var(--ok); color: #082420; }
+.boxes-hint, #boxes-hint { margin: -4px 0 0; }
