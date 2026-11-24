@@ -112,7 +112,7 @@ def run(page: Page, app: App, out: Path, live: bool) -> None:
         before = app.state()["settings"][key]
         page.locator(sw).click(force=True)
         check(wait_for(lambda k=key, b=before: app.state()["settings"][k] != b), f"switch «{key}» changes in the app")
-        check(page.locator(sw).is_checked() != before, f"switch «{key}» changes on screen")
+        check(wait_for(lambda s=sw, b=before: page.locator(s).is_checked() != b), f"switch «{key}» changes on screen")
         page.locator(sw).click(force=True)
         wait_for(lambda k=key, b=before: app.state()["settings"][k] == b)
     page.fill("#pass", "SSP-not.a-real-key")
@@ -210,6 +210,9 @@ def run(page: Page, app: App, out: Path, live: bool) -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):  # Windows consoles are not UTF-8 by default
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("--self", action="store_true")
     ap.add_argument("--lock", default="")
