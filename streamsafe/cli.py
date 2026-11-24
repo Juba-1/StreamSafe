@@ -36,6 +36,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--input", required=True, help="video file, FFmpeg URL or device:<name|index>")
     p.add_argument("--output", action="append", default=[], help="mp4 file, FFmpeg URL or 'window' (repeatable)")
     p.add_argument("--extra-output", action="append", default=[], help="another platform, best effort (repeatable)")
+    p.add_argument("--extra-vertical", action="store_true", help="the extra platforms get a vertical 9:16 part (TikTok)")
     p.add_argument("--mode", choices=["realtime", "offline"], help="default: realtime")
     p.add_argument("--delay", type=float, help="stream delay in seconds")
     p.add_argument("--secs", type=float, help="stop a file input after this many seconds")
@@ -116,7 +117,10 @@ def main(
             sinks = [open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, crop=crop) for spec in args.output]
             for n, spec in enumerate(args.extra_output, 2):  # extra platforms: one failing does not stop the others
                 tag = str(n)
-                sinks.append(BestEffort(open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag, crop=crop), tag))
+                extra = open_sink(
+                    spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag, crop=crop, vertical=args.extra_vertical
+                )
+                sinks.append(BestEffort(extra, tag))
             sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
             report = run(cfg, source, sink, factory) if factory is not None else run(cfg, source, sink)
             failed = False
@@ -161,17 +165,18 @@ def _finish(args: argparse.Namespace, report: dict | None, fps: float, reason: s
     summary = report.setdefault("summary", {})
     summary["stop_reason"], summary["stop_detail"] = reason, detail[:400]
     summary["input_connections"] = getattr(source, "connections", None)
-    inner = [getattr(s, "sink", s) for s in getattr(sink, "sinks", [sink] if sink is not None else [])]
-    inner = [getattr(s, "sink", s) for s in inner]
-    summary["platform_reconnects"] = sum(getattr(s, "reconnects", 0) for s in inner)
-    summary["unsent_frames"] = sum(getattr(s, "unsent", 0) for s in inner)
+    layers = []  # every wrapper of every output (best effort / thread / vertical cut / FFmpeg): each counts its own
+    for top in getattr(sink, "sinks", [sink] if sink is not None else []):
+        while top is not None:
+            layers.append(top)
+            top = getattr(top, "sink", None)
+    summary["platform_reconnects"] = sum(getattr(s, "reconnects", 0) for s in layers)
+    summary["unsent_frames"] = sum(getattr(s, "unsent", 0) for s in layers)
     # stutter evidence: did the encoder keep up (FFmpeg speed), did frames wait for it, and for how long
-    outer = list(getattr(sink, "sinks", [sink] if sink is not None else []))
-    outer = [getattr(s, "sink", s) if not hasattr(s, "queue_max") else s for s in outer]
-    reports = sum(getattr(s, "speed_reports", 0) for s in inner)
-    summary["encoder_slow_share"] = round(sum(getattr(s, "slow_reports", 0) for s in inner) / reports, 3) if reports else None
-    summary["output_queue_max"] = max((getattr(s, "queue_max", 0) for s in outer), default=0)
-    summary["output_blocked_s"] = round(sum(getattr(s, "blocked_s", 0.0) for s in outer), 2)
+    reports = sum(getattr(s, "speed_reports", 0) for s in layers)
+    summary["encoder_slow_share"] = round(sum(getattr(s, "slow_reports", 0) for s in layers) / reports, 3) if reports else None
+    summary["output_queue_max"] = max((getattr(s, "queue_max", 0) for s in layers), default=0)
+    summary["output_blocked_s"] = round(sum(getattr(s, "blocked_s", 0.0) for s in layers), 2)
     link.status("stopped", reason=reason, detail=detail[:400])
     _write_report(args, report, fps)
 

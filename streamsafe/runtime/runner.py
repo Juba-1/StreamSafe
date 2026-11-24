@@ -81,6 +81,16 @@ class LiveLog:
             self._next, self._worst, self._waiting = self._next + self.every_s, 0.0, 0
 
 
+COVER_BGR = (34, 14, 24)  # the always-covered parts: the window's own night colour, opaque
+
+
+def cover_parts(frame: np.ndarray, parts: tuple) -> None:
+    """Paint the streamer's always-covered parts (fractions 0-1) opaque, in place."""
+    h, w = frame.shape[:2]
+    for x0, y0, x1, y1 in parts:
+        frame[round(y0 * h) : round(y1 * h), round(x0 * w) : round(x1 * w)] = COVER_BGR
+
+
 class Snapper:
     """``snap`` on its own thread: the resize and the PNG never delay a frame of the stream. Busy = skipped."""
 
@@ -264,6 +274,7 @@ def _run_realtime(
     ctl = LiveControl.from_env()  # panic key and webcam zones, changed by the window while live
     preview_file = os.environ.get("PREVIEW_FILE", "")
     preview = Snapper(preview_file) if preview_file else None
+    parts: tuple = ()  # the always-covered parts, from the live control file
     preview_every = max(1, round(2 * cfg.runtime.fps))
     try:
         try:
@@ -294,8 +305,10 @@ def _run_realtime(
                     time.sleep(0.0005)
                 if v % 6 == 0:
                     now_live = ctl.get()
-                    gate.manual, gate.zones = now_live.panic, now_live
+                    gate.manual, gate.zones, parts = now_live.panic, now_live, now_live.covers
                 out = gate.render(v, frame)
+                if parts and out is not gate.slate and out is not gate.card:
+                    cover_parts(out, parts)  # always covered (a map, a code), whatever the analysis said
                 # Arabic text, AFTER the gate and on top of the cover: on a normally composed frame and on the full-scene
                 # cover (card / slate: the dialogue goes on while the picture is covered), never on a held repeat; always
                 # on a copy, so nothing the gate keeps (its slate, card or last frame) ever carries the text

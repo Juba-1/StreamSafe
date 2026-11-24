@@ -461,7 +461,8 @@ class Controller:
 
     def write_control(self) -> None:
         s = self.settings
-        data = {"panic": self._panic, "everyone": s.dress_everyone, "thr_scale": s.sens_scale, "zones": s.zones}
+        data = {"panic": self._panic, "everyone": s.dress_everyone, "thr_scale": s.sens_scale, "zones": s.zones,
+                "covers": s.covers, "vcrop": s.vcrop or None}  # fmt: skip
         f = self.control_file()
         with contextlib.suppress(OSError):
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -491,6 +492,26 @@ class Controller:
         from streamsafe.runtime.control import parse
 
         self.settings.zones = [list(z) for z in parse({"zones": zones}).zones]
+        self.save_settings()
+        self.write_control()
+
+    def set_covers(self, covers: list) -> None:
+        """Parts of the picture that are always covered (live)."""
+        from streamsafe.runtime.control import parse
+
+        self.settings.covers = [list(z) for z in parse({"covers": covers}).covers]
+        self.save_settings()
+        self.write_control()
+
+    def set_vertical(self, on: bool, vcrop: list | None = None) -> None:
+        """The extra platform as a vertical 9:16 picture; ``vcrop`` the part shown (live: it follows at once).
+        Turning it on or off takes effect at the next start."""
+        from streamsafe.runtime.control import parse
+
+        self.settings.vertical2 = on
+        if vcrop is not None:
+            vc = parse({"vcrop": vcrop}).vcrop
+            self.settings.vcrop = list(vc) if vc else []
         self.save_settings()
         self.write_control()
 

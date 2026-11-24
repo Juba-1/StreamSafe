@@ -267,7 +267,7 @@ TEXT: dict[str, tuple[str, str]] = {
     "plat_youtube": ("يوتيوب YouTube", "YouTube"),
     "plat_tiktok": ("تيك توك TikTok", "TikTok"),
     "plat_facebook": ("فيسبوك Facebook", "Facebook"),
-    "plat_custom": ("منصة ثانية (اكتب العنوان)", "Another platform (type the address)"),
+    "plat_custom": ("منصة أخرى (اكتب العنوان)", "Another platform (type the address)"),
     "plat_hint_kick": (
         "من كيك: لوحة التحكم > الإعدادات > Stream URL & Key. الصق المفتاح بس (والعنوان لو يختلف).",
         "On Kick: Dashboard > Settings > Stream URL & Key. Paste the key (and the URL if yours differs).",

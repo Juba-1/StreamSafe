@@ -12,8 +12,12 @@ const W = {
     s_high_t: "تغطي أي شي فيه شك. أمان أكثر، وتغطية بالغلط أكثر.",
     everyone: "لبّس الكل", everyone_sub: "يغطي أي شخص حتى الرجال (للإعلانات واللوحات)",
     full: "غطِّ الشاشة كاملة", full_sub: "بدل تغطية الشخص، تنحجب الشاشة كلها لحظة الخطر",
-    camera: "مكان كاميرتك", camera_sub: "اسحب المربع فوق كاميرتك عشان ما نغطيك أبدًا. تقدر تكبّره وتحركه.",
-    camera_edit: "حدد مكان الكاميرا", camera_done: "تم", camera_add: "أضف منطقة", zone: "كاميرتي",
+    areas: "مناطق الشاشة", camera_sub: "حدد مكان كاميرتك عشان ما نغطيك أبدًا، أو جزء يتغطى دائمًا (خريطة، كود).",
+    camera_edit: "مكان الكاميرا", camera_done: "تم", camera_add: "أضف منطقة", zone: "كاميرتي",
+    cover_edit: "غطِّ جزء دائمًا", cover_zone: "مغطى دائمًا", tiktok_edit: "جزء تيك توك", tiktok_zone: "تيك توك 9:16",
+    edit_cam: "اسحب المربع الأخضر فوق كاميرتك، وكبّره من الزاوية.", edit_cover: "اسحب المربع الوردي فوق الجزء اللي تبيه يتغطى دائمًا.",
+    edit_tiktok: "حرّك الإطار البرتقالي على الجزء اللي يشوفه جمهور تيك توك. يتغيّر وأنت تبث.",
+    vertical: "تيك توك طولي 9:16", vertical_sub: "المنصة الثانية تاخذ جزء طولي من الشاشة (يبدأ من البث الجاي)",
     connection: "الاتصال", obs: "OBS", idle_screen: "اضغط «جرّب بدون بث» عشان تشوف الحماية قبل ما تبث، أو ابدأ البث مباشرة.",
     wait_screen: "ننتظر الصورة من OBS… افتح OBS واضغط Start Streaming.",
     back: "رجوع", next: "التالي", finish: "جاهز، روح للبث", cancel: "إلغاء",
@@ -47,8 +51,12 @@ const W = {
     s_high_t: "Covers anything doubtful. Safer, with more wrong covers.",
     everyone: "Dress everyone", everyone_sub: "Covers every person, men too (ads, billboards)",
     full: "Cover the whole screen", full_sub: "Instead of covering the person, the whole screen hides at the risky moment",
-    camera: "Your webcam", camera_sub: "Drag the box over your webcam so we never cover you. Move and resize it.",
-    camera_edit: "Mark my webcam", camera_done: "Done", camera_add: "Add area", zone: "My webcam",
+    areas: "Screen areas", camera_sub: "Mark your webcam so we never cover you, or a part that is always covered (a map, a code).",
+    camera_edit: "My webcam", camera_done: "Done", camera_add: "Add area", zone: "My webcam",
+    cover_edit: "Always cover a part", cover_zone: "Always covered", tiktok_edit: "TikTok part", tiktok_zone: "TikTok 9:16",
+    edit_cam: "Drag the green box over your webcam; resize from the corner.", edit_cover: "Drag the pink box over the part to always cover.",
+    edit_tiktok: "Move the orange frame to the part TikTok viewers see. Changes while live.",
+    vertical: "Vertical TikTok 9:16", vertical_sub: "The second platform gets a tall part of the screen (from the next start)",
     connection: "Connection", obs: "OBS", idle_screen: "Press “Try without streaming” to see protection before going live, or start streaming.",
     wait_screen: "Waiting for OBS… open OBS and press Start Streaming.",
     back: "Back", next: "Next", finish: "Ready, go live", cancel: "Cancel",
@@ -79,8 +87,9 @@ let S = null; // last state
 let lang = "ar";
 let view = "live";
 let step = 0;
-let editing = false;
-let zones = [];
+let editing = null; // null | "cam" | "cover" | "tiktok"
+const rects = { cam: [], cover: [], tiktok: [] };
+const SAVE = { cam: (r) => act("zones", { zones: r }), cover: (r) => act("covers", { covers: r }), tiktok: (r) => act("vertical", { vcrop: r[0] || [] }) };
 let previewAt = 0;
 const $ = (id) => document.getElementById(id);
 const w = (k, v = {}) => (W[lang][k] || k).replace(/\{(\w+)\}/g, (_, n) => v[n] ?? "");
@@ -172,55 +181,75 @@ function paintLive() {
     row(w("obs"), S.setup.obs_set ? "✓" : "—", S.setup.obs_set ? "ok" : "idle");
     row(s.platforms.find((p) => p.id === s.settings.platform)?.name || "—", s.setup.key_ok ? "✓" : "—", s.setup.key_ok ? "ok" : "idle");
   }
-  if (!editing) { zones = s.settings.zones.map((z) => [...z]); paintZones(); }
+  if (!editing) {
+    rects.cam = s.settings.zones.map((z) => [...z]);
+    rects.cover = s.settings.covers.map((z) => [...z]);
+    rects.tiktok = s.settings.platform2 && s.settings.vertical2 ? [s.settings.vcrop.length ? [...s.settings.vcrop] : defaultTall()] : [];
+    paintZones();
+  }
+  $("tiktok-btn").hidden = !(s.settings.platform2 && s.settings.vertical2);
+  $("vertical-row").hidden = !s.settings.platform2;
+  $("sw-vertical").checked = s.settings.vertical2;
 }
 
-// --- camera zones: drag to move, corner to resize -------------------------------------------------------
+// --- screen areas: webcam (never covered), always-covered parts, the TikTok 9:16 frame ---------------------------
+const tallW = (h) => { const r = $("screen").getBoundingClientRect(); return (h * r.height * 9) / 16 / r.width; };
+function defaultTall() { const w = tallW(1); return [0.5 - w / 2, 0, 0.5 + w / 2, 1]; }
 function paintZones() {
   const box = $("zones");
-  box.classList.toggle("edit", editing);
+  box.classList.toggle("edit", !!editing);
   box.replaceChildren();
-  zones.forEach((z, i) => {
-    const el = document.createElement("div");
-    el.className = "zone";
-    Object.assign(el.style, { left: z[0] * 100 + "%", top: z[1] * 100 + "%", width: (z[2] - z[0]) * 100 + "%", height: (z[3] - z[1]) * 100 + "%" });
-    el.textContent = w("zone");
-    const h = document.createElement("i"); h.className = "h";
-    const x = document.createElement("button"); x.className = "x"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "remove");
-    x.onclick = (e) => { e.stopPropagation(); zones.splice(i, 1); paintZones(); };
-    el.append(h, x);
-    el.onpointerdown = (e) => editing && drag(e, i, e.target === h ? "size" : "move");
-    box.append(el);
-  });
+  for (const kind of ["cover", "tiktok", "cam"]) {
+    rects[kind].forEach((z, i) => {
+      const el = document.createElement("div");
+      el.className = `zone ${kind}` + (editing === kind ? " active" : "");
+      place(el, z);
+      el.textContent = w({ cam: "zone", cover: "cover_zone", tiktok: "tiktok_zone" }[kind]);
+      const h = document.createElement("i"); h.className = "h";
+      el.append(h);
+      if (kind !== "tiktok") {
+        const x = document.createElement("button"); x.className = "x"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "remove");
+        x.onclick = (e) => { e.stopPropagation(); rects[kind].splice(i, 1); paintZones(); };
+        el.append(x);
+      }
+      el.onpointerdown = (e) => editing === kind && drag(e, kind, i, e.target === h ? "size" : "move");
+      box.append(el);
+    });
+  }
 }
-function drag(e, i, mode) {
+function place(el, z) { Object.assign(el.style, { left: z[0] * 100 + "%", top: z[1] * 100 + "%", width: (z[2] - z[0]) * 100 + "%", height: (z[3] - z[1]) * 100 + "%" }); }
+function drag(e, kind, i, mode) {
   e.preventDefault();
   const r = $("screen").getBoundingClientRect();
-  const z0 = [...zones[i]], x0 = e.clientX, y0 = e.clientY;
+  const z0 = [...rects[kind][i]], x0 = e.clientX, y0 = e.clientY;
   const clamp = (v) => Math.min(1, Math.max(0, v));
   const el = e.currentTarget; el.setPointerCapture(e.pointerId);
   el.onpointermove = (m) => {
     const dx = (m.clientX - x0) / r.width, dy = (m.clientY - y0) / r.height;
-    const z = zones[i];
+    const z = rects[kind][i];
+    const ww = z0[2] - z0[0], hh = z0[3] - z0[1];
     if (mode === "move") {
-      const ww = z0[2] - z0[0], hh = z0[3] - z0[1];
       z[0] = Math.min(1 - ww, Math.max(0, z0[0] + dx)); z[1] = Math.min(1 - hh, Math.max(0, z0[1] + dy));
       z[2] = z[0] + ww; z[3] = z[1] + hh;
+    } else if (kind === "tiktok") { // 9:16 kept: the height sets the width, the centre stays
+      const nh = Math.min(1 - z0[1], Math.max(0.2, hh + dy)), nw = tallW(nh), cx = (z0[0] + z0[2]) / 2;
+      z[1] = z0[1]; z[3] = z0[1] + nh; z[0] = Math.max(0, Math.min(1 - nw, cx - nw / 2)); z[2] = z[0] + nw;
     } else { // the handle sits on the bottom corner at the inline-start side
-      const rtl = document.documentElement.dir === "rtl";
-      if (rtl) z[2] = clamp(Math.max(z0[0] + 0.04, z0[2] + dx)); else z[0] = clamp(Math.min(z0[2] - 0.04, z0[0] + dx));
+      if (document.documentElement.dir === "rtl") z[2] = clamp(Math.max(z0[0] + 0.04, z0[2] + dx)); else z[0] = clamp(Math.min(z0[2] - 0.04, z0[0] + dx));
       z[3] = clamp(Math.max(z0[1] + 0.04, z0[3] + dy));
     }
-    Object.assign(el.style, { left: z[0] * 100 + "%", top: z[1] * 100 + "%", width: (z[2] - z[0]) * 100 + "%", height: (z[3] - z[1]) * 100 + "%" });
+    place(el, z);
   };
-  el.onpointerup = () => { el.onpointermove = null; };
+  el.onpointerup = () => { el.onpointermove = null; if (kind === "tiktok") SAVE.tiktok(rects.tiktok); }; // TikTok follows at once
 }
-function toggleZones() {
-  editing = !editing;
-  if (editing && !zones.length) zones.push([0.74, 0.62, 0.98, 0.96]);
-  if (!editing) act("zones", { zones });
-  $("zone-edit").textContent = editing ? w("camera_done") : w("camera_edit");
-  $("zone-add").hidden = !editing;
+function editAreas(kind) {
+  if (editing) SAVE[editing](rects[editing]);
+  editing = kind;
+  if (kind && !rects[kind].length) rects[kind].push(kind === "cam" ? [0.74, 0.62, 0.98, 0.96] : kind === "cover" ? [0.02, 0.62, 0.22, 0.96] : defaultTall());
+  $("area-btns").hidden = !!kind;
+  $("area-edit").hidden = !kind;
+  $("zone-add").hidden = kind === "tiktok";
+  $("areas-text").textContent = kind ? w("edit_" + kind) : w("camera_sub");
   paintZones();
 }
 
@@ -357,8 +386,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("panic-btn").onclick = () => act("panic", { on: !S?.panic });
   $("sw-everyone").onchange = (e) => act("everyone", { on: e.target.checked });
   $("sw-full").onchange = (e) => act("cover_mode", { mode: e.target.checked ? "screen" : "people" });
-  $("zone-edit").onclick = toggleZones;
-  $("zone-add").onclick = () => { zones.push([0.02, 0.62, 0.26, 0.96]); paintZones(); };
+  document.querySelectorAll(".area-btn").forEach((b) => { b.onclick = () => editAreas(b.dataset.kind); });
+  $("zone-done").onclick = () => editAreas(null);
+  $("zone-add").onclick = () => { rects[editing].push([0.4, 0.4, 0.6, 0.6]); paintZones(); };
+  $("sw-vertical").onchange = (e) => act("vertical", { on: e.target.checked });
   $("banner").onclick = () => { step = 0; go("setup"); };
   $("job-cancel").onclick = () => act("cancel");
   $("step-back").onclick = () => { step = Math.max(0, step - 1); paintSetup(); };

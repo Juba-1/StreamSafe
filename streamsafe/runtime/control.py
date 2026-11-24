@@ -1,10 +1,14 @@
 """What the streamer changes while live, without stopping the stream: one small JSON file the window writes and
 the engine re-reads (``CONTROL_FILE``). Missing or unreadable: the defaults, which change nothing.
 
-    {"panic": false, "everyone": false, "thr_scale": 1.4, "zones": [[x0, y0, x1, y1], ...]}
+    {"panic": false, "everyone": false, "thr_scale": 1.4, "zones": [[x0, y0, x1, y1], ...],
+     "covers": [[x0, y0, x1, y1], ...], "vcrop": [x0, y0, x1, y1]}
 
 ``zones``: parts of the picture (fractions 0-1, e.g. the streamer's webcam) where people are never covered by
 person covers; panic and whole-screen covers still cover everything.
+``covers``: parts of the picture that are ALWAYS covered (a map, a phone screen with a code): they win over zones.
+``vcrop``: the part of the picture the vertical (9:16) extra platform shows - its height and centre count, its
+width follows from the 9:16 shape.
 """
 
 from __future__ import annotations
@@ -22,23 +26,31 @@ class Live:
     everyone: bool = False  # dress every person, men too (ads): the brand garment on everyone
     thr_scale: float = 0.0  # 0 = keep the start value
     zones: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
+    covers: tuple[tuple[float, float, float, float], ...] = field(default_factory=tuple)
+    vcrop: tuple[float, float, float, float] | None = None
 
     def in_zone(self, x: float, y: float) -> bool:
         """(x, y) as fractions of the picture."""
         return any(x0 <= x <= x1 and y0 <= y <= y1 for x0, y0, x1, y1 in self.zones)
 
 
-def parse(data: object) -> Live:
-    if not isinstance(data, dict):
-        return Live()
-    zones = []
-    for z in data.get("zones", []) or []:
+def rects(items: object) -> tuple[tuple[float, float, float, float], ...]:
+    """Rectangles as fractions 0-1 (clamped); broken or empty ones are left out."""
+    out = []
+    for z in items if isinstance(items, list) else []:
         try:
             x0, y0, x1, y1 = (min(1.0, max(0.0, float(v))) for v in z)
         except (TypeError, ValueError):
             continue
         if x1 > x0 and y1 > y0:
-            zones.append((x0, y0, x1, y1))
+            out.append((x0, y0, x1, y1))
+    return tuple(out)
+
+
+def parse(data: object) -> Live:
+    if not isinstance(data, dict):
+        return Live()
+    vcrop = rects([data.get("vcrop")]) if data.get("vcrop") else ()
     try:
         k = float(data.get("thr_scale", 0) or 0)
     except (TypeError, ValueError):
@@ -47,7 +59,9 @@ def parse(data: object) -> Live:
         panic=bool(data.get("panic", False)),
         everyone=bool(data.get("everyone", False)),
         thr_scale=k if 0.3 <= k <= 3.0 else 0.0,
-        zones=tuple(zones),
+        zones=rects(data.get("zones")),
+        covers=rects(data.get("covers")),
+        vcrop=vcrop[0] if vcrop else None,
     )
 
 

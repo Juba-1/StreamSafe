@@ -579,6 +579,51 @@ class ThreadedSink:
             raise self._error
 
 
+def vertical_size(size: tuple[int, int]) -> tuple[int, int]:
+    """The 9:16 picture cut from a ``size`` frame at full height (never scaled up). Already tall: unchanged."""
+    w, h = size
+    if h >= w:
+        return size
+    return max(2, round(h * 9 / 16 / 2) * 2), h - h % 2
+
+
+class VerticalSink:
+    """A vertical (9:16) platform such as TikTok: each frame is cut to the part the streamer chose (``vcrop`` in
+    the live control file, moved while live) and sent at a fixed size. Runs on the output thread of its
+    ``ThreadedSink``, so the cut never delays the stream."""
+
+    def __init__(self, sink: FrameSink, out_size: tuple[int, int], control: Any = None) -> None:
+        from streamsafe.runtime.control import LiveControl
+
+        self.sink = sink
+        self.out_size = out_size
+        self.takes_audio = takes_audio(sink)
+        self.control = control or LiveControl.from_env()
+
+    def box(self, w: int, h: int) -> tuple[int, int, int, int]:
+        """(x, y, width, height) in pixels of the part to send, always 9:16 and inside the frame."""
+        r = self.control.get().vcrop
+        ch = h if r is None else max(16, round((r[3] - r[1]) * h))
+        cw = round(ch * 9 / 16)
+        if cw > w:
+            cw, ch = w, round(w * 16 / 9)
+        cx = w / 2 if r is None else (r[0] + r[2]) / 2 * w
+        cy = h / 2 if r is None else (r[1] + r[3]) / 2 * h
+        x = int(min(w - cw, max(0, round(cx - cw / 2))))
+        y = int(min(h - ch, max(0, round(cy - ch / 2))))
+        return x, y, cw, ch
+
+    def write(self, frame: np.ndarray, audio: np.ndarray | None = None) -> None:
+        h, w = frame.shape[:2]
+        x, y, cw, ch = self.box(w, h)
+        part = frame[y : y + ch, x : x + cw]
+        part = cv2.resize(part, self.out_size, interpolation=cv2.INTER_AREA) if (cw, ch) != self.out_size else np.ascontiguousarray(part)
+        _write(self.sink, part, audio)
+
+    def close(self) -> None:
+        self.sink.close()
+
+
 def _write(sink: FrameSink, frame: np.ndarray, audio: np.ndarray | None) -> None:
     if takes_audio(sink):
         sink.write(frame, audio)  # type: ignore[call-arg]
@@ -594,6 +639,7 @@ def open_sink(
     audio: bool = True,
     tag: str = "",
     crop: tuple[int, int, int, int, int, int] | None = None,
+    vertical: bool = False,
 ) -> FrameSink:
     """``window`` -> on-screen window; ``scheme://...`` -> FFmpeg stream (with sound unless ``audio`` is off);
     ``record:<file>`` -> a full-quality recording with sound (``RecordSink``); else an MP4 review file (picture only)."""
@@ -602,9 +648,11 @@ def open_sink(
     if spec.startswith("record:"):
         return ThreadedSink(RecordSink(spec[len("record:") :], size, fps, audio=audio))
     if "://" in spec:
-        return ThreadedSink(
-            FFmpegSink(spec, size, fps, audio=audio, tag=tag, crop=crop), keepalive_fps=fps if spec.startswith(STREAM_SCHEMES) else 0.0
-        )
+        keep = fps if spec.startswith(STREAM_SCHEMES) else 0.0
+        if vertical and crop is None and vertical_size(size) != size:  # a canvas that is already tall stays as OBS made it
+            tall = vertical_size(size)
+            return ThreadedSink(VerticalSink(FFmpegSink(spec, tall, fps, audio=audio, tag=tag), tall), keepalive_fps=keep)
+        return ThreadedSink(FFmpegSink(spec, size, fps, audio=audio, tag=tag, crop=crop), keepalive_fps=keep)
     return ThreadedSink(VideoFileSink(spec, fps, preview_size))
 
 

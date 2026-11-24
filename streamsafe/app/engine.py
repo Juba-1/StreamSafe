@@ -112,6 +112,8 @@ def run_args(settings: Settings, reports: Path, record_file: str = "", fast: boo
     args = ["run", "--input", source, "--output", sink]
     if settings.output == OUTPUT_RTMP and settings.platform2:
         args += ["--extra-output", f"env:{OUTPUT2_ENV}"]
+        if settings.vertical2:
+            args += ["--extra-vertical"]
     args += ["--delay", f"{delay_for(settings, fast):g}", "--report-dir", str(reports)]
     if settings.input == INPUT_FILE:
         args += ["--fps", "auto"]
