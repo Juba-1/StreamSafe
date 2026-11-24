@@ -56,14 +56,16 @@ export BACKEND=onnx ONNX_DIR=/workspace/m/v1 TRT_CACHE=/workspace/trt HEAD_DIR=/
 TRT=1 python -m streamsafe.prepare --models $ONNX_DIR 2>&1 | grep -v "timing cache" | tail -2
 export TRT=1 TRT_BUILD=0 LOGO=$ENG/marketing/logo_rgba.png SCENE_IMAGE=$ENG/marketing/logo.png SLATE_IMAGE=$ENG/marketing/logo.png SCENE_TEXT= SLATE_TEXT=
 echo "== trailer at each sensitivity (realtime-like policy, offline speed)"
-for k in ${KS:-1.0 1.3 1.6 2.0}; do
-  THR_SCALE=$k timeout 1200 python -m streamsafe.cli --input "$TR" --output /workspace/o_$k.mp4 --mode offline --size 1280x720 --fps 30 \
-    --stats $R/stats_$k.json --no-report > $R/eng_$k.txt 2>&1 || echo "ENG_FAIL $k"
+# each run: <mode>-<fps>-<k>; realtime = what a stream does (first-look covers, the speed governor)
+for run in ${RUNS:-offline-30-1.0 realtime-30-1.0 realtime-30-1.3 realtime-30-1.6 realtime-60-1.0}; do
+  IFS=- read mode fps k <<< "$run"
+  THR_SCALE=$k timeout 1200 python -m streamsafe.cli --input "$TR" --output /workspace/o_$run.mp4 --mode $mode --size 1920x1080 --fps $fps \
+    --delay 2 --stats $R/stats_$run.json --no-report > $R/eng_$run.txt 2>&1 || echo "ENG_FAIL $run"
 done
 rows=""
 for t in 8 16 24 32 40 48 56 64 72 80; do
-  cols=""; for k in ${KS:-1.0 1.3 1.6 2.0}; do ffmpeg -hide_banner -loglevel error -ss $t -i /workspace/o_$k.mp4 -frames:v 1 -vf scale=400:225 -y /workspace/f_${k}_$t.png; cols="$cols -i /workspace/f_${k}_$t.png"; done
-  ffmpeg -hide_banner -loglevel error $cols -filter_complex hstack=$(echo ${KS:-1.0 1.3 1.6 2.0} | wc -w) -y /workspace/row_$t.png; rows="$rows -i /workspace/row_$t.png"
+  cols=""; for run in ${RUNS:-offline-30-1.0 realtime-30-1.0 realtime-30-1.3 realtime-30-1.6 realtime-60-1.0}; do ffmpeg -hide_banner -loglevel error -ss $t -i /workspace/o_$run.mp4 -frames:v 1 -vf scale=400:225 -y /workspace/f_${run}_$t.png; cols="$cols -i /workspace/f_${run}_$t.png"; done
+  ffmpeg -hide_banner -loglevel error $cols -filter_complex hstack=$(echo ${RUNS:-offline-30-1.0 realtime-30-1.0 realtime-30-1.3 realtime-30-1.6 realtime-60-1.0} | wc -w) -y /workspace/row_$t.png; rows="$rows -i /workspace/row_$t.png"
 done
 ffmpeg -hide_banner -loglevel error $rows -filter_complex vstack=10 -q:v 4 -y $R/sheet_trailer.jpg && echo SHEET
 python - "$R" <<'P'
@@ -71,7 +73,12 @@ import json, pathlib, sys
 R = pathlib.Path(sys.argv[1]); out = []
 for f in sorted(R.glob("stats_*.json")):
     s = json.loads(f.read_text()); sm = s.get("summary", s)
-    out.append(f.stem + " " + json.dumps({k: v for k, v in sm.items() if not isinstance(v, (list, dict))}))
+    keep = {k: v for k, v in sm.items() if not isinstance(v, (list, dict))}
+    for k in ("plain_decisions", "risky_decisions", "first_look", "plain_covers", "covered_people", "people"):
+        v = s.get(k)
+        if isinstance(v, list): keep[k] = len(v) if v and not isinstance(v[0], (int, float)) else sum(v)
+    keep["list_keys"] = sorted(k for k, v in s.items() if isinstance(v, list))[:60]
+    out.append(f.stem + " " + json.dumps(keep))
 (R / "summary.txt").write_text("\n".join(out) + "\n"); print("\n".join(out))
 P
 echo "== DONE $(date -u)"
