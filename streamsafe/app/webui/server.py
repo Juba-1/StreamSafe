@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.request
 import webbrowser
 from collections.abc import Callable
@@ -42,6 +43,16 @@ STATUS = {  # engine status -> (i18n label, i18n hint, look)
 }
 
 
+def log_line(folder: Path, text: str) -> None:
+    """data folder/webui.log: actions that failed and their traceback (kept small)."""
+    with contextlib.suppress(OSError):
+        f = folder / "webui.log"
+        if f.is_file() and f.stat().st_size > 512_000:
+            f.replace(folder / "webui.old.log")
+        with f.open("a", encoding="utf-8") as out:
+            out.write(time.strftime("%Y-%m-%d %H:%M:%S ") + text.rstrip() + "\n")
+
+
 class WebApp:
     """One window's worth of state on top of the controller (jobs, messages, the panic key)."""
 
@@ -51,6 +62,9 @@ class WebApp:
         self.key = self.ctrl.stored_key()
         self.ctrl.key2 = self.ctrl.stored_key2()
         self.message = ("", "")  # (text, kind: ok / bad / info)
+        self.message_id = 0  # the page shows each message once, in every view
+        self.stopping = False
+        self.started_at = time.time()
         self.job_name = ""
         self.progress = ("", -1.0)
         self.cancel = threading.Event()
@@ -67,15 +81,29 @@ class WebApp:
 
     def say(self, text: str, kind: str = "info") -> None:
         self.message = (text, kind)
+        self.message_id += 1
+
+    def log(self, text: str) -> None:
+        log_line(self.ctrl.preview_file().parent, text)
+
+    def safe(self, what: str, fn: Callable[[], object], default: object) -> object:
+        """One part of the state; a failure there is logged and leaves the rest of the window working."""
+        try:
+            return fn()
+        except Exception:
+            self.log(f"state {what} failed:\n{traceback.format_exc()}")
+            return default
 
     # --- background work -------------------------------------------------------------------------------------
     def _first_checks(self) -> None:
+        with contextlib.suppress(Exception):
+            passkey.sync_clock(self.ctrl.env)  # a supporter's key follows the internet's date, not only the PC clock
         with contextlib.suppress(Exception):
             self.ctrl.run_check()
         with contextlib.suppress(Exception):
             self.ctrl.check_updates()
 
-    def job(self, name: str, work: Callable[[], str], ok_text: str = "") -> dict:
+    def job(self, name: str, work: Callable[[], str], ok_text: str | Callable[[], str] = "") -> dict:
         with self.lock:
             if self.job_name:
                 return {"ok": False, "why": self.tr("test_busy")}
@@ -88,7 +116,9 @@ class WebApp:
                 err = work()
             except Exception as exc:  # a worker must never die silently
                 err = f"{type(exc).__name__}: {exc}"
-            self.say(err or ok_text, "bad" if err else "ok")
+            if err:
+                self.log(f"job {name}: {err}")
+            self.say(err or (ok_text() if callable(ok_text) else ok_text), "bad" if err else "ok")
             with self.lock:
                 self.job_name = ""
             with contextlib.suppress(Exception):
@@ -141,8 +171,10 @@ class WebApp:
             "running": running,
             "preview_mode": c.preview,
             "preview_at": pf.stat().st_mtime if running and pf.is_file() else 0,
-            "link": self.link_view() if running or lk.stopped else None,
-            "message": {"text": self.message[0], "kind": self.message[1]},
+            "link": self.safe("link", self.link_view, None) if running or lk.stopped else None,
+            "message": {"text": self.message[0], "kind": self.message[1], "id": self.message_id},
+            "stopping": self.stopping,
+            "report": self.safe("report", self.report_view, None),
             "job": {"name": self.job_name, "text": self.progress[0], "pct": self.progress[1]} if self.job_name else None,
             "test": {"text": self.test_result[0], "kind": self.test_result[1]},
             "setup": {
@@ -173,7 +205,7 @@ class WebApp:
                 "translate": s.translate_ar,
             },
             "panic": c.panic,
-            "boxes": self.live_boxes() if running else [],
+            "boxes": self.safe("boxes", self.live_boxes, []) if running else [],
             "pictures": [{k: i[k] for k in ("id", "game", "name", "rect", "full", "on")} for i in c.pictures.items],
             "allow": [[*a[:4], round(a[4] - time.time())] for a in c.live_allow()],
             "platforms": [{"id": p, "name": self.tr("plat_" + p)} for p in ingest.PLATFORMS],
@@ -182,12 +214,20 @@ class WebApp:
             "update": {"app": app_new, "data": data_new, "version": u.app_version if u else "", "one_click": bool(u and u.app_sha256)}
             if (data_new or app_new)
             else None,
-            "check": {"verdict": r.verdict, "error": r.error, "items": self.check_items(r)},
-            "plan": self.plan_view(),
+            "check": {"verdict": r.verdict, "error": r.error, "items": self.safe("check", lambda: self.check_items(r), [])},
+            "plan": self.safe("plan", self.plan_view, {"pro": False}),
             "brand": {"pro": plan.allows("custom_brand", c.env), "set": bool(s.brand_image)},
             "days_left": c.days_left(),
             "tab": os.environ.get("STREAMSAFE_TAB", ""),
         }
+
+    def report_view(self) -> dict | None:
+        """The newest session report: when, and its text (the window shows it after a stop)."""
+        f = self.ctrl.last_report()
+        if f is None:
+            return None
+        text = f.read_text(encoding="utf-8", errors="replace")
+        return {"name": f.name, "at": f.stat().st_mtime, "new": f.stat().st_mtime >= self.started_at, "text": text[:6000]}
 
     def live_boxes(self) -> list:
         """Where the person covers are on the latest preview (fresh only)."""
@@ -241,20 +281,46 @@ class WebApp:
         return out
 
     def plan_view(self) -> dict:
-        try:
-            p = passkey.load(self.ctrl.env)
-        except Exception:
-            p = None
-        if p:
-            return {"pro": True, "who": getattr(p, "who", ""), "until": str(getattr(p, "expires", ""))}
-        return {"pro": False}
+        """The same words as the classic window's subscription line (pass, licence, or free)."""
+        from streamsafe.app import license as lic
+
+        env = self.ctrl.env
+        held, sp = lic.load(env), passkey.load(env)
+        if held is None and sp is not None:  # a supporter's pass: Pro until its last day
+            why = passkey.why_off(env)
+            if not why:
+                return {"pro": True, "text": self.tr("pass_on", date=sp.expires.isoformat(), who=sp.who or "-"), "look": "ok"}
+            return {"pro": False, "text": self.pass_reason(why, sp.expires.isoformat()), "look": "warn"}
+        if held is not None:
+            st = self.ctrl.license_status
+            text = self.tr("license_on", plan=self.tr("plan_" + held.plan), key=lic.masked(held.key))
+            return {"pro": held.plan == "pro", "text": text + (self.tr("license_grace") if st.grace else ""), "look": "ok"}
+        if release.LICENSE_REQUIRED:
+            return {"pro": False, "text": self.tr("license_needed"), "look": "bad"}
+        return {"pro": False, "text": self.tr("license_beta"), "look": "idle"}
+
+    def pass_reason(self, why: str, date: str) -> str:
+        return {
+            "invalid": self.tr("pass_invalid"),
+            "clock": self.tr("pass_clock"),
+            "expired": self.tr("pass_ended", date=date) if date else self.tr("pass_expired"),
+        }.get(why, self.tr("pass_invalid"))
 
     # --- actions from the page -------------------------------------------------------------------------------
     def act(self, name: str, a: dict) -> dict:
         fn = getattr(self, "do_" + name, None)
         if fn is None:
             return {"ok": False, "why": "unknown action"}
-        return fn(a) or {"ok": True}
+        try:
+            out = fn(a) or {"ok": True}
+        except Exception as exc:
+            self.log(f"action {name} failed:\n{traceback.format_exc()}")
+            why = f"{type(exc).__name__}: {exc}"
+            self.say(why, "bad")
+            return {"ok": False, "why": why}
+        if not out.get("ok", True) and out.get("why"):
+            self.say(str(out["why"]), "bad")
+        return out
 
     def do_lang(self, a: dict) -> None:
         self.lang = "en" if self.lang == "ar" else "ar"
@@ -339,7 +405,21 @@ class WebApp:
         )
 
     def do_stop(self, a: dict) -> None:
-        self.ctrl.stop()
+        if self.stopping or not self.ctrl.engine.running:
+            return
+        self.stopping = True
+        self.say(self.tr("stopping") if "stopping" in i18n.TEXT else "…", "info")
+
+        def run() -> None:
+            try:
+                self.ctrl.stop()
+            except Exception:
+                self.log(f"stop failed:\n{traceback.format_exc()}")
+            finally:
+                self.stopping = False
+                self.say(self.tr("stopped_report") if "stopped_report" in i18n.TEXT else "", "ok")
+
+        threading.Thread(target=run, name="stop", daemon=True).start()
 
     def do_panic(self, a: dict) -> None:
         self.ctrl.set_panic(bool(a.get("on", not self.ctrl.panic)))
@@ -489,13 +569,18 @@ class WebApp:
         key = str(a.get("key", "")).strip()
 
         def work() -> str:
-            if passkey.is_pass(key):
+            if not key:
+                return self.tr("pass_invalid")
+            if passkey.is_pass(key):  # a supporter's pass: checked here (and the internet's date)
                 why = passkey.activate(key, self.ctrl.env)
-                return {"clock": self.tr("pass_clock"), "expired": self.tr("pass_expired")}.get(why, self.tr("pass_invalid")) if why else ""
+                return self.pass_reason(why, "") if why else ""
             st = self.ctrl.activate_license(key)
             return "" if st.ok else self.tr("why_license_" + (st.reason or "invalid"))
 
-        return self.job("license", work, self.tr("license_ok") if "license_ok" in i18n.TEXT else "✓")
+        def done() -> str:
+            return str(self.plan_view()["text"])
+
+        return self.job("license", work, done)
 
     def do_open(self, a: dict) -> None:
         what = str(a.get("what"))
@@ -552,7 +637,12 @@ def make_handler(app: WebApp, token: str, seen: list[float]) -> type[BaseHTTPReq
                 self._send(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"), "max-age=60")
             elif path == "/api/state":
                 if self._ok():
-                    self._send(200, json.dumps(app.state()).encode(), "application/json")
+                    try:
+                        body, code = json.dumps(app.state(), default=str).encode(), 200
+                    except Exception as exc:
+                        app.log(f"state failed:\n{traceback.format_exc()}")
+                        body, code = json.dumps({"error": f"{type(exc).__name__}: {exc}"}).encode(), 500
+                    self._send(code, body, "application/json")
             elif path == "/api/picture":
                 if not self._ok():
                     return
@@ -569,6 +659,10 @@ def make_handler(app: WebApp, token: str, seen: list[float]) -> type[BaseHTTPReq
                     self._send(200, f.read_bytes(), "image/png")
                 else:
                     self._send(404, b"", "text/plain")
+            elif path == "/api/report_open":
+                if self._ok():
+                    app.do_open({"what": "report"})
+                    self._send(200, b"{}", "application/json")
             elif path == "/api/preview":
                 if not self._ok():
                     return
@@ -587,14 +681,14 @@ def make_handler(app: WebApp, token: str, seen: list[float]) -> type[BaseHTTPReq
             n = int(self.headers.get("Content-Length", "0") or 0)
             if path == "/api/brand_upload":  # the streamer's logo (Pro): raw image bytes
                 out = app.brand_upload(self.rfile.read(n) if 0 < n <= 8_000_000 else b"")
-                self._send(200, json.dumps(out).encode(), "application/json")
+                self._send(200, json.dumps(out, default=str).encode(), "application/json")
                 return
             try:
                 a = json.loads(self.rfile.read(min(n, 65536)) or b"{}")
                 out = app.act(path[len("/api/") :], a if isinstance(a, dict) else {})
             except Exception as exc:
                 out = {"ok": False, "why": f"{type(exc).__name__}: {exc}"}
-            self._send(200, json.dumps(out).encode(), "application/json")
+            self._send(200, json.dumps(out, default=str).encode(), "application/json")
 
     return Handler
 

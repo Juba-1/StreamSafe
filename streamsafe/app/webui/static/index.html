@@ -51,6 +51,11 @@
           </div>
           <p id="boxes-hint" class="muted small" hidden data-w="boxes_hint"></p>
           <div id="msg" class="msg" hidden></div>
+          <div id="report" class="card report" hidden>
+            <div class="card-head"><h2 data-w="report_title"></h2><span id="report-at" class="muted small"></span></div>
+            <pre id="report-text" class="report-text"></pre>
+            <div class="row-btns"><button id="report-open" class="secondary" type="button" data-w="report_open"></button><button id="report-copy" class="ghost" type="button" data-w="report_copy"></button><button id="report-hide" class="ghost" type="button" data-w="report_hide"></button></div>
+          </div>
           <div class="actions">
             <button id="main-btn" class="primary big" type="button"></button>
             <button id="trial-btn" class="secondary big" type="button" data-w="trial"></button>
@@ -142,6 +147,7 @@
           <div class="card">
             <h2 data-w="plan"></h2>
             <p id="plan-text" class="explain"></p>
+            <p id="plan-result" class="msg" hidden></p>
             <div class="inline"><input id="pass" class="field" type="text" dir="ltr" autocomplete="off"><button id="pass-btn" class="secondary" type="button" data-w="activate"></button></div>
             <div class="row-btns"><button id="support" class="ghost" type="button" data-w="support"></button></div>
           </div>
@@ -172,5 +178,7 @@
     </main>
   </div>
 </div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="offline" class="offline" hidden></div>
 </body>
 </html>

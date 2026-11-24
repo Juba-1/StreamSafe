@@ -275,6 +275,20 @@ Shot "ar" "check" "ui_ar_check" 20
 Shot "ar" "settings" "ui_ar_settings" 6
 Shot "en" "home" "ui_en_home" 6
 Shot "en" "check" "ui_en_check" 6
+
+Step "window, every control: pressed like a streamer would, checked on the screen and in the app (tools/ui_e2e.py)"
+$w = Start-Process $gui -PassThru
+$lock = Join-Path $dataDir "window.json"
+$end = (Get-Date).AddSeconds(40)
+while ((Get-Date) -lt $end -and -not (Test-Path $lock)) { Start-Sleep -Milliseconds 500 }
+Check (Test-Path $lock) "the window's address file exists"
+python tools/ui_e2e.py --lock $lock --channel msedge --out (Join-Path $OutDir "ui_e2e") 2>&1 | Tee-Object -FilePath (Join-Path $OutDir "ui_e2e.txt")
+Check ($LASTEXITCODE -eq 0) "every window control works (see ui_e2e.txt)"
+$log = Join-Path $dataDir "webui.log"
+if (Test-Path $log) { Copy-Item $log (Join-Path $OutDir "webui.log") }
+Check (-not ((Test-Path $log) -and (Select-String -Path $log -Pattern "Traceback" -Quiet))) "no crash inside the window's app (webui.log)"
+Get-Process -Name msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq $Product } | ForEach-Object { $null = $_.CloseMainWindow() }
+if (-not $w.WaitForExit(20000)) { $w.Kill() }
 Check (Test-Path (Join-Path $dataDir "settings.json")) "settings are in the per-user data folder"
 
 Step "silent uninstall"

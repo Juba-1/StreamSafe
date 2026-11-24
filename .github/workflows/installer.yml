@@ -82,6 +82,8 @@ jobs:
           path: dist-installer/*.exe
           retention-days: 30
           if-no-files-found: error
+      - name: "window test driver (Playwright drives the installed window through Microsoft Edge)"
+        run: pip install "playwright>=1.47"
       - name: "smoke: silent install, installed program, window, silent uninstall"
         shell: pwsh
         run: >

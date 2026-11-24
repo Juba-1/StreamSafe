@@ -11,7 +11,7 @@ const W = {
     pic_need: "عشان نصوّر الشاشة لازم الحماية تكون شغالة: اضغط «جرّب بدون بث»، افتح الشي في اللعبة، وارجع هنا.",
     pics_empty: "ما أضفت صور للحين. اضغط «أضف صورة» وأنت فاتح الشي اللي تبيه يتغطى في اللعبة.",
     pic_on_all: "شغّل الكل", pic_off_all: "طفّ الكل", pic_area: "مكانها فقط", pic_screen: "الشاشة كاملة", pic_del: "احذف", nav_settings: "الإعدادات", nav_check: "الفحص",
-    viewers_see: "هذا اللي يشوفه جمهورك", trial: "جرّب بدون بث", start: "ابدأ الحماية والبث", stop: "أوقف",
+    viewers_see: "هذا اللي يشوفه جمهورك", trial: "جرّب بدون بث", start: "ابدأ الحماية والبث", stop: "أوقف", stopping: "يوقف…",
     starting: "يجهّز…", panic: "غطِّ الكل", panic_off: "ارجع للعرض", panic_on_title: "البث مغطّى بالكامل",
     sens: "قوة التغطية", live_change: "تتغير وأنت تبث", s_light: "خفيفة", s_mid: "متوازنة", s_high: "عالية",
     s_light_t: "تغطي الواضح فقط. أقل تغطية بالغلط، وتناسب اللي يتجنب المشاهد بنفسه.",
@@ -49,7 +49,9 @@ const W = {
     brand_free: "هذي ميزة برو. بالنسخة المجانية يطلع شعار StreamSafe. لو انتهى الاشتراك يرجع شعارنا تلقائيًا.",
     updates: "التحديثات", update_now: "حدّث الآن", up_to_date: "عندك آخر نسخة", update_ready: "نسخة جديدة جاهزة",
     recheck: "افحص مرة ثانية", open_report: "افتح آخر تقرير", check_ok: "كل شي سليم", check_bad: "فيه شي يحتاج انتباه",
-    leave_live: "البث شغّال. إذا سكّرت النافذة يوقف البث.", days_left: "باقي {n} يوم على النسخة التجريبية",
+    leave_live: "البث شغّال. إذا سكّرت النافذة يوقف البث.",
+    no_answer: "التطبيق ما رد على الضغطة.", offline: "النافذة فقدت الاتصال بالتطبيق… نحاول مرة ثانية. لو طوّل سكّر StreamSafe وافتحه.",
+    report_title: "تقرير آخر جلسة", report_open: "افتح التقرير", report_copy: "انسخ", report_hide: "إخفاء", copied: "انسخ ✓", days_left: "باقي {n} يوم على النسخة التجريبية",
   },
   en: {
     nav_live: "Live", nav_setup: "Setup", nav_pictures: "Always cover",
@@ -60,7 +62,7 @@ const W = {
     pic_need: "To take a snapshot, protection must be running: press “Try without streaming”, open it in the game, and come back here.",
     pics_empty: "No pictures yet. Press “Add picture” while the thing to cover is open in the game.",
     pic_on_all: "All on", pic_off_all: "All off", pic_area: "Its place only", pic_screen: "Whole screen", pic_del: "Delete", nav_settings: "Settings", nav_check: "Check",
-    viewers_see: "What your viewers see", trial: "Try without streaming", start: "Start protection & stream", stop: "Stop",
+    viewers_see: "What your viewers see", trial: "Try without streaming", start: "Start protection & stream", stop: "Stop", stopping: "Stopping…",
     starting: "Starting…", panic: "Cover everything", panic_off: "Back to stream", panic_on_title: "Stream fully covered",
     sens: "Cover strength", live_change: "Changes while live", s_light: "Light", s_mid: "Balanced", s_high: "High",
     s_light_t: "Covers only the obvious. Fewest wrong covers; for streamers who avoid scenes themselves.",
@@ -98,7 +100,9 @@ const W = {
     brand_free: "A Pro feature. The free version shows the StreamSafe logo, and it comes back by itself when Pro ends.",
     updates: "Updates", update_now: "Update now", up_to_date: "You have the latest version", update_ready: "A new version is ready",
     recheck: "Check again", open_report: "Open last report", check_ok: "Everything looks good", check_bad: "Something needs attention",
-    leave_live: "You are live. Closing the window stops the stream.", days_left: "{n} days left in this beta",
+    leave_live: "You are live. Closing the window stops the stream.",
+    no_answer: "The app did not answer that press.", offline: "The window lost the app… retrying. If it lasts, close StreamSafe and open it again.",
+    report_title: "Last session report", report_open: "Open report", report_copy: "Copy", report_hide: "Hide", copied: "Copied ✓", days_left: "{n} days left in this beta",
   },
 };
 
@@ -117,10 +121,42 @@ const w = (k, v = {}) => (W[lang][k] || k).replace(/\{(\w+)\}/g, (_, n) => v[n] 
 async function api(path, body) {
   const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
   opt.headers = { ...(opt.headers || {}), "X-Token": window.TOKEN };
+  opt.signal = AbortSignal.timeout(path === "state" ? 8000 : 30000);
   const r = await fetch("/api/" + path, opt);
+  if (!r.ok && r.status !== 404) {
+    const why = await r.json().catch(() => ({}));
+    throw new Error(why.error || "HTTP " + r.status);
+  }
   return r.headers.get("Content-Type")?.includes("json") ? r.json() : r;
 }
-const act = async (name, body = {}) => { const out = await api(name, body); await tick(); return out; };
+// every press: the button shows it is working until the app answers; any failure is shown, never swallowed
+async function act(name, body = {}) {
+  const btn = document.activeElement?.tagName === "BUTTON" ? document.activeElement : null;
+  btn?.classList.add("busy");
+  try {
+    const out = await api(name, body);
+    if (out && out.ok === false && out.why && !out.shown) toast(out.why, "bad");
+    await tick();
+    return out || {};
+  } catch (e) {
+    toast(w("no_answer") + "\n" + (e?.message || e), "bad");
+    return { ok: false };
+  } finally {
+    btn?.classList.remove("busy");
+  }
+}
+
+function toast(text, kind = "info", stay = kind === "bad") {
+  if (!text) return;
+  const t = document.createElement("div");
+  t.className = "toast " + kind;
+  const x = document.createElement("button"); x.type = "button"; x.textContent = "×"; x.onclick = () => t.remove();
+  const span = document.createElement("span"); span.textContent = text;
+  t.append(span, x);
+  $("toasts").append(t);
+  while ($("toasts").childElementCount > 3) $("toasts").firstChild.remove();
+  if (!stay) setTimeout(() => t.remove(), 7000);
+}
 
 // --- words ------------------------------------------------------------------------------------------------
 function paintWords() {
@@ -146,9 +182,10 @@ function paintLive() {
   const live = s.running;
   $("ring").classList.toggle("on", live && st.look === "ok");
   const mb = $("main-btn");
-  mb.textContent = live ? w("stop") : w("start");
+  mb.textContent = s.stopping ? w("stopping") : live ? w("stop") : w("start");
   mb.classList.toggle("stop", live);
-  mb.disabled = !live && (!!s.job || !!s.setup.models);
+  mb.disabled = !!s.stopping || (!live && (!!s.job || !!s.setup.models));
+  paintReport(s);
   $("trial-btn").hidden = live;
   mb.parentElement.classList.toggle("live", live);
   $("trial-btn").disabled = !!s.job || !!s.setup.models;
@@ -211,6 +248,16 @@ function paintLive() {
 
 }
 
+// --- the last session report, right under the picture after a stop --------------------------------------
+function paintReport(s) {
+  const r = s.report, box = $("report");
+  const show = !s.running && r && r.new && reportHidden !== r.name;
+  box.hidden = !show;
+  if (!show) return;
+  $("report-at").textContent = new Date(r.at * 1000).toLocaleTimeString(lang === "ar" ? "ar" : "en");
+  if ($("report-text").textContent !== r.text) $("report-text").textContent = r.text;
+}
+
 // --- covers on the live picture: click to lift one for a minute, click again to bring it back ------------
 function paintLiveBoxes(s) {
   const box = $("live-boxes");
@@ -244,7 +291,7 @@ function paintZones() {
       const x = document.createElement("button"); x.className = "x"; x.type = "button"; x.textContent = "×"; x.setAttribute("aria-label", "remove");
       x.onclick = (e) => { e.stopPropagation(); rects[kind].splice(i, 1); paintZones(); };
       el.append(x);
-      el.onpointerdown = (e) => editing === kind && drag(e, kind, i, e.target === h ? "size" : "move");
+      el.onpointerdown = (e) => editing === kind && e.target !== x && drag(e, kind, i, e.target === h ? "size" : "move");
       box.append(el);
     });
   }
@@ -327,13 +374,19 @@ function paintSetupLight() {
   if (sig !== setupSig) { setupSig = sig; paintSetup(); }
 }
 
+// the platform cards live in two places (setup wizard and settings): redraw whichever is on screen
+function redrawForms() {
+  if (view === "settings") paintSettings(true);
+  if (view === "setup") paintSetup();
+}
+
 function platformForm(second) {
   const set = S.settings;
   const cur = second ? set.platform2 : set.platform;
   const box = el("div");
   const grid = el("div", { class: "plats", role: "radiogroup" });
   const list = second ? [{ id: "", name: w("none") }, ...S.platforms] : S.platforms;
-  list.forEach((p) => grid.append(el("button", { class: "plat", type: "button", role: "radio", "aria-checked": String(p.id === cur), text: p.name, onclick: () => act(second ? "platform2" : "platform", second ? { platform2: p.id } : { platform: p.id }).then(() => (second ? paintSettings(true) : paintSetup())) })));
+  list.forEach((p) => grid.append(el("button", { class: "plat", type: "button", role: "radio", "aria-checked": String(p.id === cur), text: p.name, onclick: () => act(second ? "platform2" : "platform", second ? { platform2: p.id } : { platform: p.id }).then(redrawForms) })));
   box.append(grid);
   if (second && !cur) return box;
   if (cur === "tiktok") box.append(el("p", { class: "note", text: w("tiktok_note") }));
@@ -349,7 +402,7 @@ function platformForm(second) {
     return act(second ? "platform2" : "platform", body);
   };
   const result = el("span", { class: "result " + (S.test.kind || ""), text: S.test.text });
-  const row = el("div", { class: "row-btns" }, el("button", { class: "secondary", type: "button", text: w("save"), onclick: () => save().then(() => (second ? paintSettings(true) : paintSetup())) }));
+  const row = el("div", { class: "row-btns" }, el("button", { class: "secondary", type: "button", text: w("save"), onclick: () => save().then((out) => { redrawForms(); if (out.ok !== false) toast(w("saved"), "ok"); }) }));
   if (!second) row.append(el("button", { class: "ghost", type: "button", text: w("test"), onclick: () => save().then(() => act("test")) }), result);
   box.append(row);
   return box;
@@ -436,7 +489,7 @@ function paintSettings(full) {
   }
   $("sw-follow").checked = s.follow_obs;
   $("sw-remember").checked = s.remember;
-  $("plan-text").textContent = S.plan.pro ? `${w("pro")} ${S.plan.until ? "· " + S.plan.until : ""}` : w("free") + (S.days_left != null && S.days_left >= 0 ? " — " + w("days_left", { n: S.days_left }) : "");
+  $("plan-text").textContent = S.plan.text || "";
   $("update-text").textContent = S.update ? `${w("update_ready")} ${S.update.version || ""}` : w("up_to_date");
   $("update-btn").hidden = !S.update;
   $("brand-text").textContent = S.brand.pro ? w("brand_pro") : w("brand_free");
@@ -453,7 +506,16 @@ function paintCheck() {
 
 // --- loop ---------------------------------------------------------------------------------------------------
 async function tick() {
-  try { S = await api("state"); } catch { return; }
+  try {
+    S = await api("state");
+    fails = 0;
+    $("offline").hidden = true;
+  } catch (e) {
+    fails += 1;
+    if (fails >= 3) { $("offline").hidden = false; $("offline").textContent = w("offline") + "\n\n" + (e?.message || ""); }
+    return;
+  }
+  if (S.message.id !== lastMsg) { if (lastMsg !== null && S.message.text) toast(S.message.text, S.message.kind); lastMsg = S.message.id; }
   if (S.lang !== lang) { lang = S.lang; paintWords(); if (view === "setup") paintSetup(); if (view === "settings") paintSettings(true); }
   $("version").textContent = S.version;
   const chip = $("status-chip");
@@ -478,6 +540,9 @@ async function tick() {
   if (view === "setup" && !document.activeElement?.matches("input")) paintSetupLight();
 }
 let timer = null;
+let fails = 0;
+let lastMsg = null;
+let reportHidden = "";
 function loop() { clearTimeout(timer); tick().finally(() => { timer = setTimeout(loop, document.hidden ? 3000 : S?.running ? 700 : 1500); }); }
 
 // --- wiring ---------------------------------------------------------------------------------------------------
@@ -490,6 +555,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("sw-everyone").onchange = (e) => act("everyone", { on: e.target.checked });
   $("sw-full").onchange = (e) => act("cover_mode", { mode: e.target.checked ? "screen" : "people" });
   document.querySelectorAll(".area-btn").forEach((b) => { b.onclick = () => editAreas(b.dataset.kind); });
+  $("report-open").onclick = () => act("open", { what: "report" });
+  $("report-copy").onclick = async () => { try { await navigator.clipboard.writeText(S.report.text); toast(w("copied"), "ok"); } catch (e) { toast(String(e), "bad"); } };
+  $("report-hide").onclick = () => { reportHidden = S.report?.name || ""; paintReport(S); };
   $("brand-pick").onclick = () => $("brand-file").click();
   $("brand-file").onchange = async (e) => {
     const f = e.target.files[0]; e.target.value = "";
@@ -515,7 +583,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("sw-follow").onchange = (e) => act("toggle", { name: "follow_obs", on: e.target.checked });
   $("sw-remember").onchange = (e) => act("toggle", { name: "remember_key", on: e.target.checked });
   $("obs-restore").onclick = () => act("obs_restore");
-  $("pass-btn").onclick = () => { const v = $("pass").value; $("pass").value = ""; act("pass", { key: v }); };
+  $("pass-btn").onclick = async () => {
+    const v = $("pass").value.trim();
+    const btn = $("pass-btn"); btn.classList.add("busy");
+    const out = await api("pass", { key: v }).catch((e) => ({ ok: false, why: String(e) }));
+    if (!out.ok) { btn.classList.remove("busy"); toast(out.why || w("no_answer"), "bad"); return; }
+    // the check runs in the background (it asks the internet for the date): wait for its answer here
+    for (let i = 0; i < 40; i += 1) { await new Promise((r) => setTimeout(r, 300)); await tick(); if (!S.job) break; }
+    btn.classList.remove("busy");
+    const res = $("plan-result");
+    res.hidden = false; res.textContent = S.message.text; res.className = "msg " + S.message.kind;
+    if (S.message.kind === "ok") $("pass").value = "";
+  };
   $("support").onclick = () => act("open", { what: "support" });
   $("update-btn").onclick = () => act("update");
   $("recheck").onclick = () => act("recheck");
