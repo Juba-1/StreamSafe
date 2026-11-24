@@ -244,25 +244,29 @@ function Shot([string]$lang, [string]$tab, [string]$name, [int]$waitS) {
   $env:STREAMSAFE_TAB = $tab
   $w = Start-Process $gui -PassThru
   Remove-Item Env:STREAMSAFE_TAB
+  # the window is a page in Microsoft Edge's app mode (streamsafe/app/webui): find it by its title
+  $win = $null
   $end = (Get-Date).AddSeconds(40)
-  while ((Get-Date) -lt $end -and $w.MainWindowHandle -eq 0 -and -not $w.HasExited) { Start-Sleep -Milliseconds 300; $w.Refresh() }
-  Check (-not $w.HasExited -and $w.MainWindowHandle -ne 0) "$name`: window opened"
-  if ($w.HasExited) { return }
-  Check ($w.MainWindowTitle -eq $Product) "$name`: title is '$($w.MainWindowTitle)'"
-  [Win]::ShowWindow($w.MainWindowHandle, 9) | Out-Null
-  [Win]::SetForegroundWindow($w.MainWindowHandle) | Out-Null
+  while ((Get-Date) -lt $end -and -not $win -and -not $w.HasExited) {
+    Start-Sleep -Milliseconds 500
+    $win = Get-Process -Name msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq $Product } | Select-Object -First 1
+  }
+  Check (-not $w.HasExited -and $win) "$name`: window opened"
+  if ($w.HasExited -or -not $win) { if (-not $w.HasExited) { $w.Kill() }; return }
+  [Win]::ShowWindow($win.MainWindowHandle, 3) | Out-Null
+  [Win]::SetForegroundWindow($win.MainWindowHandle) | Out-Null
   Start-Sleep -Seconds $waitS   # the system check runs in the background and fills the list
-  $w.Refresh()
-  Check ($w.Responding) "$name`: window answers"
+  $win.Refresh()
+  Check ($win.Responding -and -not $w.HasExited) "$name`: window answers"
   $b = [Windows.Forms.Screen]::PrimaryScreen.Bounds
   $bmp = New-Object Drawing.Bitmap $b.Width, $b.Height
   $g = [Drawing.Graphics]::FromImage($bmp)
   $g.CopyFromScreen($b.Location, [Drawing.Point]::Empty, $b.Size)
   $bmp.Save((Join-Path $OutDir "$name.png"), [Drawing.Imaging.ImageFormat]::Png)
   $g.Dispose(); $bmp.Dispose()
-  $null = $w.CloseMainWindow()
+  $null = $win.CloseMainWindow()
   $closed = $w.WaitForExit(20000)
-  Check $closed "$name`: window closes when asked"
+  Check $closed "$name`: app ends when its window closes"
   if (-not $closed) { $w.Kill() }
   Check ((Get-Process -Name $CliExe, $GuiExe -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0) "$name`: no process left behind"
 }

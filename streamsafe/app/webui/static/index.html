@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StreamSafe</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ff4d9e' d='M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/fonts/readex.css">
+<link rel="stylesheet" href="/static/app.css">
+<script>window.TOKEN = "__TOKEN__";</script>
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/></svg></span>
+      <b>StreamSafe</b><small id="version"></small>
+    </div>
+    <div class="top-end">
+      <span id="status-chip" class="chip"></span>
+      <button id="lang" class="ghost small" type="button">English</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="side" aria-label="sections">
+      <button class="nav on" data-view="live" type="button"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span data-w="nav_live"></span></button>
+      <button class="nav" data-view="setup" type="button"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/></svg><span data-w="nav_setup"></span></button>
+      <button class="nav" data-view="settings" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span data-w="nav_settings"></span></button>
+      <button class="nav" data-view="check" type="button"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10"/></svg><span data-w="nav_check"></span></button>
+    </nav>
+
+    <main id="main">
+      <div id="banner" class="banner" hidden></div>
+      <div id="job" class="job" hidden><div class="job-row"><span id="job-text"></span><button id="job-cancel" class="ghost small" type="button" data-w="cancel"></button></div><div class="bar"><i id="job-bar"></i></div></div>
+
+      <!-- LIVE -->
+      <section id="view-live" class="view live">
+        <div class="stage">
+          <div class="stage-head"><h1 data-w="viewers_see"></h1><span id="stage-meta" class="muted"></span></div>
+          <div id="ring" class="ring">
+            <div id="screen" class="screen">
+              <img id="preview" alt="" hidden>
+              <div id="screen-empty" class="screen-empty"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/></svg><p id="screen-empty-text"></p></div>
+              <div id="zones" class="zones"></div>
+              <div id="panic-veil" class="panic-veil" hidden><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/></svg><b data-w="panic_on_title"></b><span id="panic-hint"></span></div>
+            </div>
+          </div>
+          <div id="msg" class="msg" hidden></div>
+          <div class="actions">
+            <button id="main-btn" class="primary big" type="button"></button>
+            <button id="trial-btn" class="secondary big" type="button" data-w="trial"></button>
+            <button id="panic-btn" class="panic big" type="button"></button>
+          </div>
+        </div>
+
+        <aside class="controls">
+          <div class="card">
+            <div class="card-head"><h2 data-w="sens"></h2><span class="muted small" data-w="live_change"></span></div>
+            <div id="sens" class="segmented" role="radiogroup"></div>
+            <p id="sens-text" class="explain"></p>
+          </div>
+          <div class="card list">
+            <label class="switch-row"><span><b data-w="everyone"></b><small data-w="everyone_sub"></small></span><input id="sw-everyone" type="checkbox"></label>
+            <label class="switch-row"><span><b data-w="full"></b><small data-w="full_sub"></small></span><input id="sw-full" type="checkbox"></label>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2 data-w="camera"></h2></div>
+            <p class="explain small" data-w="camera_sub"></p>
+            <div class="row-btns"><button id="zone-edit" class="secondary" type="button" data-w="camera_edit"></button><button id="zone-add" class="ghost" type="button" data-w="camera_add" hidden></button></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2 data-w="connection"></h2></div>
+            <div id="health" class="health"></div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- SETUP -->
+      <section id="view-setup" class="view setup" hidden>
+        <ol id="steps" class="steps"></ol>
+        <div id="step-body" class="step-body"></div>
+        <div class="step-nav"><button id="step-back" class="ghost" type="button" data-w="back"></button><button id="step-next" class="primary" type="button"></button></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="view-settings" class="view settings" hidden>
+        <div class="grid2">
+          <div class="card">
+            <h2 data-w="platform_main"></h2>
+            <div id="set-plat1"></div>
+          </div>
+          <div class="card">
+            <h2 data-w="platform_second"></h2>
+            <p class="explain small" data-w="second_sub"></p>
+            <div id="set-plat2"></div>
+          </div>
+          <div class="card">
+            <h2 data-w="panic_key"></h2>
+            <p class="explain small" data-w="panic_sub"></p>
+            <select id="panic-key" class="field"></select>
+          </div>
+          <div class="card list">
+            <h2 data-w="more"></h2>
+            <label class="switch-row"><span><b data-w="follow_obs"></b><small data-w="follow_obs_sub"></small></span><input id="sw-follow" type="checkbox"></label>
+            <label class="switch-row"><span><b data-w="remember"></b><small data-w="remember_sub"></small></span><input id="sw-remember" type="checkbox"></label>
+            <div class="row-btns"><button id="obs-restore" class="ghost" type="button" data-w="obs_restore"></button></div>
+          </div>
+          <div class="card">
+            <h2 data-w="plan"></h2>
+            <p id="plan-text" class="explain"></p>
+            <div class="inline"><input id="pass" class="field" type="text" dir="ltr" autocomplete="off"><button id="pass-btn" class="secondary" type="button" data-w="activate"></button></div>
+            <div class="row-btns"><button id="support" class="ghost" type="button" data-w="support"></button></div>
+          </div>
+          <div class="card">
+            <h2 data-w="updates"></h2>
+            <p id="update-text" class="explain"></p>
+            <button id="update-btn" class="primary" type="button" data-w="update_now" hidden></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- CHECK -->
+      <section id="view-check" class="view check" hidden>
+        <div class="card">
+          <div class="card-head"><h2 id="verdict"></h2><button id="recheck" class="ghost small" type="button" data-w="recheck"></button></div>
+          <ul id="checks" class="checks"></ul>
+          <div class="row-btns"><button id="open-report" class="ghost" type="button" data-w="open_report"></button></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

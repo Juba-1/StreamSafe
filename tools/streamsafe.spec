@@ -19,7 +19,7 @@ a = Analysis(  # noqa: F821
     [os.path.join(ROOT, "tools", "win_entry.py")],
     pathex=[ROOT],
     binaries=collect_dynamic_libs("onnxruntime") + collect_dynamic_libs("ctranslate2"),  # ctranslate2: the Arabic translation (docs/TRANSLATE.md)
-    datas=[],
+    datas=[(os.path.join(ROOT, "streamsafe", "app", "webui", "static"), os.path.join("streamsafe", "app", "webui", "static"))],  # the window (webui)
     hiddenimports=collect_submodules("streamsafe") + ["ctranslate2", "sentencepiece", "arabic_reshaper"],
     runtime_hooks=[os.path.join(ROOT, "tools", "pyi_rth_streamsafe.py")],
     # research / export packages are not part of the product (the product runs on ONNX Runtime)

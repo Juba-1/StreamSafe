@@ -140,9 +140,16 @@ def main(argv: list[str] | None = None) -> int:
     paths.use_bundled_ffmpeg()
     product = paths.is_frozen() or os.environ.get("STREAMSAFE_PRODUCT") == "1"
     if cmd == "ui":
+        if "--classic" not in rest and os.environ.get("STREAMSAFE_CLASSIC_UI") != "1":
+            try:
+                from streamsafe.app.webui.server import main as web
+            except Exception as exc:
+                print(f"web window unavailable: {exc}", file=sys.stderr, flush=True)
+            else:
+                return web(rest)
         from streamsafe.app.ui import main as m
 
-        return m(rest)
+        return m([a for a in rest if a != "--classic"])
     if cmd in ("check", "prepare", "run", "gpu-probe") and product:
         models, rest = take_option(rest, "--models")
         product_defaults(os.environ, models)
