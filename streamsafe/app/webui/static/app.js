@@ -146,7 +146,7 @@ async function act(name, body = {}) {
   }
 }
 
-function toast(text, kind = "info", stay = kind === "bad") {
+function toast(text, kind = "info") {
   if (!text) return;
   const t = document.createElement("div");
   t.className = "toast " + kind;
@@ -155,7 +155,7 @@ function toast(text, kind = "info", stay = kind === "bad") {
   t.append(span, x);
   $("toasts").append(t);
   while ($("toasts").childElementCount > 3) $("toasts").firstChild.remove();
-  if (!stay) setTimeout(() => t.remove(), 7000);
+  setTimeout(() => t.remove(), kind === "bad" ? 15000 : 7000);  // an error stays longer, never for ever
 }
 
 // --- words ------------------------------------------------------------------------------------------------
