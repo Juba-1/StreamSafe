@@ -41,7 +41,7 @@ T=os.environ['HF_TOKEN']; R='juba-1/streamsafe-work'
 for i in range(5):
     try:
         hf_hub_download(R,'data/gta6_v1.tar',repo_type='dataset',token=T,local_dir='/workspace/vt')
-        snapshot_download(R,repo_type='dataset',token=T,local_dir='/workspace/h',allow_patterns=['runs/run48_lucia_runner/heads_lucia/ali/*.txt','runs/run48_lucia_runner/lucia.npz','runs/run37_ali_labels_photos/labeled37.npz','runs/run37_ali_labels_photos/oi/photos_emb.npz','runs/run30_hard_mining/hard/meta.csv','runs/run30_hard_mining/hard/emb.npy','runs/mine_g6_r1/g6/meta.csv','runs/mine_g6_r1/g6/emb.npy'])
+        snapshot_download(R,repo_type='dataset',token=T,local_dir='/workspace/h',allow_patterns=['runs/run48_lucia_runner/heads_lucia/ali/*.txt','runs/run48_lucia_runner/lucia.npz','runs/run37_ali_labels_photos/labeled37.npz','runs/run37_ali_labels_photos/oi/photos_emb.npz','runs/run30_hard_mining/hard/meta.csv','runs/run30_hard_mining/hard/emb.npy','runs/mine_g6_r1/g6/meta.csv','runs/mine_g6_r1/g6/emb.npy','runs/mine_g6_r2/g6/meta.csv','runs/mine_g6_r2/g6/emb.npy','runs/train_g6_r1/heads_w1/ali/*.txt'])
         snapshot_download('juba-1/streamsafe-models',local_dir='/workspace/m',allow_patterns=['v1/*'],ignore_patterns=['v1/translate/*'])
         break
     except Exception as e: print('retry', e)
@@ -62,17 +62,23 @@ export TRT=1 TRT_BUILD=0 LOGO=$ENG/marketing/logo_rgba.png SCENE_IMAGE=$ENG/mark
 pip install -q scikit-learn 2>&1 | tail -1
 H=/workspace/h/runs; OLD=$HEAD_DIR; LABELS=${LABELS:-g6_r1_claude.csv}
 echo "== g6 examples"
-python - $H $ENG/bench/labels/$LABELS <<'P'
+python - $H $ENG/bench/labels <<'P'
 import csv, sys, numpy as np
-H, lab = sys.argv[1], sys.argv[2]
-L = {int(r["id"]): r["label"].strip().upper() for r in csv.DictReader(open(lab))}
-meta = list(csv.DictReader(open(f"{H}/mine_g6_r1/g6/meta.csv"))); E = np.load(f"{H}/mine_g6_r1/g6/emb.npy").astype(np.float32)
-E /= np.linalg.norm(E, axis=1, keepdims=True) + 1e-9
-for split in ("train", "test"):
-    rows = [r for r in meta if r["split"] == split and L.get(int(r["id"]), "U") in ("R", "S", "M")]
-    X = np.stack([E[int(r["id"])] for r in rows]).astype(np.float16)
-    C = np.array([L[int(r["id"])] for r in rows]); G = np.array(["gta6_" + r["video"].split("_")[0] for r in rows])
-    np.savez(f"/workspace/g6_{split}.npz", X=X, C=C, G=G, H=np.array([float(r["h"]) for r in rows]))
+H, LB = sys.argv[1], sys.argv[2]
+# rounds: (mining run, labels); round 2 = Ali's labels, its test split is the GTA 6 test set
+rounds = [("mine_g6_r1", "g6_r1_claude.csv"), ("mine_g6_r2", "g6_r2_ali.csv")]
+parts = {"train": [], "test": []}
+for run, lab in rounds:
+    L = {int(r["id"]): r["label"].strip().upper() for r in csv.DictReader(open(f"{LB}/{lab}"))}
+    meta = list(csv.DictReader(open(f"{H}/{run}/g6/meta.csv"))); E = np.load(f"{H}/{run}/g6/emb.npy").astype(np.float32)
+    E /= np.linalg.norm(E, axis=1, keepdims=True) + 1e-9
+    for r in meta:
+        c = L.get(int(r["id"]), "U")
+        if c in ("R", "S", "M") and not (r["split"] == "test" and run != "mine_g6_r2"):
+            parts[r["split"]].append((E[int(r["id"])], c, "gta6_" + r["video"].split("_")[0], float(r["h"])))
+for split, rows in parts.items():
+    X = np.stack([x for x, *_ in rows]).astype(np.float16); C = np.array([c for _, c, *_ in rows])
+    np.savez(f"/workspace/g6_{split}.npz", X=X, C=C, G=np.array([g for *_, g, _ in rows]), H=np.array([h for *_, h in rows]))
     print(split, {c: int((C == c).sum()) for c in "RSM"})
 P
 for v in base:lucia w1:lucia,g6 w2:lucia,g6; do
@@ -87,7 +93,7 @@ import sys, json, numpy as np
 from streamsafe.models.heads import RiskHeads
 R, old = sys.argv[1], sys.argv[2]; d = np.load("/workspace/g6_test.npz"); X = d["X"].astype(np.float32); C = d["C"]
 out = {}
-for name, path in [("product", old)] + [(n, f"{R}/heads_{n}/ali") for n in ("base", "w1", "w2")]:
+for name, path in [("v1", old), ("v2_product", "/workspace/h/runs/train_g6_r1/heads_w1/ali")] + [(n, f"{R}/heads_{n}/ali") for n in ("base", "w1", "w2")]:
     h = RiskHeads.load(path); cov = h.prisk(X) >= h.thr
     out[name] = {"thr": round(float(h.thr), 4), **{c: f"{int(cov[C == c].sum())}/{int((C == c).sum())}" for c in "RSM"}}
 txt = json.dumps(out, indent=1); print(txt); open(f"{R}/heldout.json", "w").write(txt)
@@ -97,7 +103,7 @@ mkdir -p $R/sheets
 for c in nightclub_09 beach_13 street_30 npc_21 drive_23; do
   ffmpeg -hide_banner -loglevel error -ss 30 -i /workspace/v/gta6/$c.mp4 -t 60 -an -c:v libx264 -preset veryfast -crf 20 -y /workspace/in_$c.mp4
   for n in product w1 w2; do
-    hd=$OLD; [ $n != product ] && hd=$R/heads_$n/ali
+    hd=/workspace/h/runs/train_g6_r1/heads_w1/ali; [ $n != product ] && hd=$R/heads_$n/ali
     HEAD_DIR=$hd timeout 900 python -m streamsafe.cli --input /workspace/in_$c.mp4 --output /workspace/o_${c}_$n.mp4 --mode offline \
       --size 1280x720 --fps 15 --diag /workspace/d_${c}_$n.json --no-report > /workspace/e_${c}_$n.txt 2>&1 || echo "ENG_FAIL $c $n"
     python -c "import json;d=json.load(open('/workspace/d_${c}_$n.json'))['dec'];a=sum(len(x[1]) for x in d);b=sum(1 for x in d for y in x[1] if y[3]);print('$c $n persons',a,'covered',b)" | tee -a $R/clips.txt
