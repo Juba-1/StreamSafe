@@ -81,7 +81,7 @@ for split, rows in parts.items():
     np.savez(f"/workspace/g6_{split}.npz", X=X, C=C, G=np.array([g for *_, g, _ in rows]), H=np.array([h for *_, h in rows]))
     print(split, {c: int((C == c).sum()) for c in "RSM"})
 P
-for v in base:lucia w1:lucia,g6 w2:lucia,g6; do
+for v in ${VARIANTS:-base:lucia w1:lucia,g6 w2:lucia,g6}; do
   n=${v%%:*}; ex=$(echo ${v##*:} | sed "s#lucia#$H/run48_lucia_runner/lucia.npz#; s#g6#/workspace/g6_train.npz#")
   W=1; [ $n = w2 ] && W=2
   EXTRA=$ex EXTRA_WEIGHT=$W RECIPES=ali python -m training.compare_heads $R/heads_$n $H/run37_ali_labels_photos/labeled37.npz \
@@ -89,15 +89,16 @@ for v in base:lucia w1:lucia,g6 w2:lucia,g6; do
 done
 echo "== held-out GTA 6 crops"
 python - $R $OLD <<'P'
-import sys, json, numpy as np
+import os, sys, json, numpy as np
 from streamsafe.models.heads import RiskHeads
 R, old = sys.argv[1], sys.argv[2]; d = np.load("/workspace/g6_test.npz"); X = d["X"].astype(np.float32); C = d["C"]
 out = {}
-for name, path in [("v1", old), ("v2_product", "/workspace/h/runs/train_g6_r1/heads_w1/ali")] + [(n, f"{R}/heads_{n}/ali") for n in ("base", "w1", "w2")]:
+for name, path in [("v1", old), ("v2_product", "/workspace/h/runs/train_g6_r1/heads_w1/ali")] + [(n, f"{R}/heads_{n}/ali") for n in ("base", "w1", "w2") if os.path.isdir(f"{R}/heads_{n}/ali")]:
     h = RiskHeads.load(path); cov = h.prisk(X) >= h.thr
     out[name] = {"thr": round(float(h.thr), 4), **{c: f"{int(cov[C == c].sum())}/{int((C == c).sum())}" for c in "RSM"}}
 txt = json.dumps(out, indent=1); print(txt); open(f"{R}/heldout.json", "w").write(txt)
 P
+if [ -n "$SKIP_CLIPS" ]; then echo "== DONE $(date -u)"; exit 0; fi
 echo "== held-out clips: product vs w2"
 mkdir -p $R/sheets
 for c in nightclub_09 beach_13 street_30 npc_21 drive_23; do
