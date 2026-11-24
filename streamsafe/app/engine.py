@@ -372,7 +372,9 @@ class EngineProcess:
                 self._log = open(log_path, "a", encoding="utf-8")  # noqa: SIM115 - closed when the output ends
         self._proc = subprocess.Popen(
             cmd,
-            env=dict(env),
+            # the Stop button closes stdin: the engine must be told to watch it, or every Stop waits STOP_WAIT_S and
+            # kills it (no clean close, a report that says it never started)
+            env={**env, STOP_ENV: "1"},
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
