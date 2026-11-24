@@ -1,0 +1,17 @@
+name: review-pull
+on:
+  push:
+    branches: [review-pull]
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - name: the labeling batch from the private HF store, as a run artifact
+        env:
+          HF: ${{ secrets.HF_HEADS_TOKEN }}
+        run: curl -sSfL -H "Authorization: Bearer $HF" -o g6_review.tar "https://huggingface.co/datasets/juba-1/streamsafe-work/resolve/main/runs/mine_g6_r2/g6_review.tar" && ls -l g6_review.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: g6_review
+          path: g6_review.tar
+          retention-days: 3
