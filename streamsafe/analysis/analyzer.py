@@ -32,7 +32,7 @@ from streamsafe.runtime.control import LiveControl
 from streamsafe.runtime.threads import usable_cpus
 from streamsafe.types import ANALYSIS_SIZE, Decision, Layer, Person
 
-LIGHT_K = 1.7  # the slider's "light" end: only the score decides (risk.RiskPolicy.light)
+LIGHT_K = 1.3  # the slider's "light" end: only the score decides (risk.RiskPolicy.light)
 SWIM_SHIFT = 0.05  # beach / pool scenes lower the threshold by up to this (x score scale)
 SCENE_EVERY_S = 1.0  # scene model period when only the beach prior needs it (and on every cut)
 MIN_W = 12

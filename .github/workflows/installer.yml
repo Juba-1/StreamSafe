@@ -48,7 +48,7 @@ jobs:
       - name: "fetch the real risk heads from the private HF store (needs repo secret HF_HEADS_TOKEN, read-only)"
         if: env.HF_HEADS_TOKEN != ''
         env:
-          HEADS_PATH: ${{ vars.HEADS_PATH || 'runs/train_g6_r1/heads_w1/ali' }}
+          HEADS_PATH: ${{ vars.HEADS_PATH || 'runs/train_g6_r2/heads_w1/ali' }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force installer/heads | Out-Null

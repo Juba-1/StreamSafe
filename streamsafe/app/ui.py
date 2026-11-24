@@ -1165,7 +1165,7 @@ class App(tk.Tk):
 
     def show_sens(self) -> None:
         k = float(self.sens.get())
-        self.sens_word.configure(text=self.tr("sens_light" if k >= 1.7 else "sens_mid" if k >= 1.15 else "sens_high"))
+        self.sens_word.configure(text=self.tr("sens_light" if k >= 1.3 else "sens_mid" if k >= 0.9 else "sens_high"))
 
     def on_zones(self) -> None:
         """The streamer marks the webcam (or any part of the picture) where people are never dressed."""

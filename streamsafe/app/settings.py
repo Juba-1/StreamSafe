@@ -14,7 +14,10 @@ RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "1440p": (2560, 1440)
 FPS_CHOICES = (30, 60)
 OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
 COVER_PEOPLE, COVER_SCREEN = "people", "screen"
-SENS_MIN, SENS_MAX, SENS_DEFAULT = 0.6, 2.2, 1.4  # the sensitivity slider (a threshold scale): higher = fewer covers
+# the sensitivity slider (a threshold scale; higher = fewer covers). Measured 24 Nov on 183 held-out GTA 6 crops
+# (Ali's labels): 1.4 caught only 1-2 of 28 borderline revealing women, so 1.0 is the default and 1.5 the light end
+SENS_MIN, SENS_MAX, SENS_DEFAULT = 0.7, 1.5, 1.0
+OLD_DEFAULT = 1.4  # the default until 3.0.0.37: such saved settings move to the new default
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
@@ -107,7 +110,7 @@ def load(path: Path) -> Settings:
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_RTMP
     try:
-        s.sens_scale = min(SENS_MAX, max(SENS_MIN, float(s.sens_scale)))
+        s.sens_scale = SENS_DEFAULT if float(s.sens_scale) == OLD_DEFAULT else min(SENS_MAX, max(SENS_MIN, float(s.sens_scale)))
     except (TypeError, ValueError):
         s.sens_scale = SENS_DEFAULT
     from streamsafe.runtime.control import parse
