@@ -116,3 +116,18 @@ def test_make_pass_tool_round_trip(k, env, monkeypatch, tmp_path):
     assert passkey.activate(out[0], env) == ""
     p = passkey.active(env)
     assert p is not None and p.who == "Sara" and p.expires == dt.date.today() + dt.timedelta(days=30)
+
+
+def test_streamer_logo_goes_back_to_ours_when_the_pass_ends(k, env, monkeypatch, tmp_path):
+    from streamsafe.app import engine, settings
+
+    logo = tmp_path / "mine.png"
+    logo.write_bytes(b"png")
+    s = settings.Settings(brand_image=str(logo))
+    monkeypatch.setattr(passkey, "_local_today", lambda: D(2026, 11, 20))
+    passkey.activate(make(k), env)
+    on = engine.engine_env(dict(env), False, "", env, brand_image=s.brand_image)
+    assert on["LOGO"] == str(logo) and on["SCENE_IMAGE"] == str(logo)
+    monkeypatch.setattr(passkey, "_local_today", lambda: D(2027, 1, 1))  # the month is over: next start
+    off = engine.engine_env(dict(env), False, "", env, brand_image=s.brand_image)
+    assert off.get("LOGO") != str(logo) and off.get("SCENE_IMAGE") != str(logo)

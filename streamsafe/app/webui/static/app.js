@@ -44,6 +44,9 @@ const W = {
     more: "خيارات", follow_obs: "اتبع إعدادات OBS", follow_obs_sub: "نفس الدقة والجودة اللي في OBS",
     remember: "تذكّر المفتاح", remember_sub: "يُحفظ مشفّر في جهازك", obs_restore: "رجّع OBS زي ما كان",
     plan: "الاشتراك", activate: "فعّل", support: "ادعمنا", pro: "Pro مفعّل", free: "النسخة المجانية",
+    brand: "شعارك على التغطية", brand_pick: "اختر صورة", brand_clear: "رجّع شعارنا",
+    brand_pro: "مع برو: شعارك أو شعار الراعي يطلع على الملابس والشاشة الكاملة بدل شعار StreamSafe.",
+    brand_free: "هذي ميزة برو. بالنسخة المجانية يطلع شعار StreamSafe. لو انتهى الاشتراك يرجع شعارنا تلقائيًا.",
     updates: "التحديثات", update_now: "حدّث الآن", up_to_date: "عندك آخر نسخة", update_ready: "نسخة جديدة جاهزة",
     recheck: "افحص مرة ثانية", open_report: "افتح آخر تقرير", check_ok: "كل شي سليم", check_bad: "فيه شي يحتاج انتباه",
     leave_live: "البث شغّال. إذا سكّرت النافذة يوقف البث.", days_left: "باقي {n} يوم على النسخة التجريبية",
@@ -90,6 +93,9 @@ const W = {
     more: "Options", follow_obs: "Follow OBS settings", follow_obs_sub: "Same resolution and quality as OBS",
     remember: "Remember key", remember_sub: "Stored encrypted on this PC", obs_restore: "Restore OBS as it was",
     plan: "Plan", activate: "Activate", support: "Support us", pro: "Pro active", free: "Free version",
+    brand: "Your logo on the covers", brand_pick: "Choose image", brand_clear: "Use our logo",
+    brand_pro: "With Pro: your or your sponsor's logo shows on the clothing and the full-screen cover instead of StreamSafe's.",
+    brand_free: "A Pro feature. The free version shows the StreamSafe logo, and it comes back by itself when Pro ends.",
     updates: "Updates", update_now: "Update now", up_to_date: "You have the latest version", update_ready: "A new version is ready",
     recheck: "Check again", open_report: "Open last report", check_ok: "Everything looks good", check_bad: "Something needs attention",
     leave_live: "You are live. Closing the window stops the stream.", days_left: "{n} days left in this beta",
@@ -350,6 +356,7 @@ function platformForm(second) {
 }
 
 // --- pictures always covered -------------------------------------------------------------------------------
+let brandV = 0;
 let picRect = null;
 let picSig = "";
 const tok = () => window.TOKEN;
@@ -432,6 +439,11 @@ function paintSettings(full) {
   $("plan-text").textContent = S.plan.pro ? `${w("pro")} ${S.plan.until ? "· " + S.plan.until : ""}` : w("free") + (S.days_left != null && S.days_left >= 0 ? " — " + w("days_left", { n: S.days_left }) : "");
   $("update-text").textContent = S.update ? `${w("update_ready")} ${S.update.version || ""}` : w("up_to_date");
   $("update-btn").hidden = !S.update;
+  $("brand-text").textContent = S.brand.pro ? w("brand_pro") : w("brand_free");
+  $("brand-pick").disabled = !S.brand.pro;
+  $("brand-clear").hidden = !S.brand.set;
+  const bi = $("brand-img"), want = S.brand.set ? `url("/api/brand?t=${window.TOKEN}&v=${brandV}")` : "";
+  if (bi.style.backgroundImage !== want) bi.style.backgroundImage = want;
 }
 function paintCheck() {
   const c = S.check;
@@ -478,6 +490,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("sw-everyone").onchange = (e) => act("everyone", { on: e.target.checked });
   $("sw-full").onchange = (e) => act("cover_mode", { mode: e.target.checked ? "screen" : "people" });
   document.querySelectorAll(".area-btn").forEach((b) => { b.onclick = () => editAreas(b.dataset.kind); });
+  $("brand-pick").onclick = () => $("brand-file").click();
+  $("brand-file").onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const r = await fetch("/api/brand_upload", { method: "POST", headers: { "X-Token": window.TOKEN }, body: f }).then((x) => x.json());
+    $("brand-err").hidden = r.ok; $("brand-err").textContent = r.why || "";
+    brandV = Date.now(); await tick(); paintSettings(false);
+  };
+  $("brand-clear").onclick = () => act("brand_clear").then(() => { brandV = Date.now(); paintSettings(false); });
   $("pic-new").onclick = picStart;
   $("pic-retake").onclick = picStart;
   $("pic-cancel").onclick = () => { $("pic-add").hidden = true; };

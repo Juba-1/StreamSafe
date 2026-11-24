@@ -27,7 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from streamsafe.app import controller, engine, hotkey, i18n, ingest, modelpack, obs_setup, passkey, preflight, release, updates
+from streamsafe.app import controller, engine, hotkey, i18n, ingest, modelpack, obs_setup, passkey, plan, preflight, release, updates
 from streamsafe.app import settings as cfg
 
 STATIC = Path(__file__).with_name("static")
@@ -184,6 +184,7 @@ class WebApp:
             else None,
             "check": {"verdict": r.verdict, "error": r.error, "items": self.check_items(r)},
             "plan": self.plan_view(),
+            "brand": {"pro": plan.allows("custom_brand", c.env), "set": bool(s.brand_image)},
             "days_left": c.days_left(),
             "tab": os.environ.get("STREAMSAFE_TAB", ""),
         }
@@ -386,6 +387,21 @@ class WebApp:
             self.ctrl.pictures.set(str(a.get("id", "")), **values)
         self.ctrl.write_control()
 
+    def brand_upload(self, data: bytes) -> dict:
+        if not plan.allows("custom_brand", self.ctrl.env):
+            return {"ok": False, "why": "Pro"}
+        if not data:
+            return {"ok": False, "why": self.tr("brand_bad")}
+        tmp = self.ctrl.preview_file().parent / "upload_logo.bin"
+        tmp.write_bytes(data)
+        why = self.ctrl.set_brand_image(str(tmp))
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        return {"ok": not why, "why": self.tr(why) if why else ""}
+
+    def do_brand_clear(self, a: dict) -> None:
+        self.ctrl.set_brand_image("")
+
     def do_covers(self, a: dict) -> None:
         self.ctrl.set_covers(list(a.get("covers", [])))
 
@@ -545,6 +561,14 @@ def make_handler(app: WebApp, token: str, seen: list[float]) -> type[BaseHTTPReq
                     self._send(404, b"", "text/plain")
                 else:
                     self._send(200, f.read_bytes(), "image/png")
+            elif path == "/api/brand":
+                if not self._ok():
+                    return
+                f = Path(app.ctrl.settings.brand_image) if app.ctrl.settings.brand_image else None
+                if f is not None and f.is_file():
+                    self._send(200, f.read_bytes(), "image/png")
+                else:
+                    self._send(404, b"", "text/plain")
             elif path == "/api/preview":
                 if not self._ok():
                     return
@@ -561,6 +585,10 @@ def make_handler(app: WebApp, token: str, seen: list[float]) -> type[BaseHTTPReq
             if not path.startswith("/api/") or not self._ok():
                 return
             n = int(self.headers.get("Content-Length", "0") or 0)
+            if path == "/api/brand_upload":  # the streamer's logo (Pro): raw image bytes
+                out = app.brand_upload(self.rfile.read(n) if 0 < n <= 8_000_000 else b"")
+                self._send(200, json.dumps(out).encode(), "application/json")
+                return
             try:
                 a = json.loads(self.rfile.read(min(n, 65536)) or b"{}")
                 out = app.act(path[len("/api/") :], a if isinstance(a, dict) else {})

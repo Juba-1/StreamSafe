@@ -185,3 +185,5 @@ body { background:
 .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
 @media (max-width: 900px) { .pic-add-grid { grid-template-columns: 1fr; } }
 .pic-add:not([hidden]) ~ #pic-list .empty { display: none; }
+.brand-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.brand-img { width: 84px; height: 84px; flex: none; border-radius: 12px; background: rgba(8, 5, 18, .6) center / contain no-repeat; border: 1px solid rgba(255, 255, 255, .08); }

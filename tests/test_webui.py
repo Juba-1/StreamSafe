@@ -60,3 +60,11 @@ def test_page_and_files(web):
     with pytest.raises(urllib.error.HTTPError) as e:
         call(base, "/static/..%2fserver.py")
     assert e.value.code == 404
+
+
+def test_logo_upload_is_pro_only(web):
+    _, base = web
+    req = urllib.request.Request(base + "/api/brand_upload", data=b"x", headers={"X-Token": "tok"})
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert json.loads(r.read())["ok"] is False  # free plan: refused
+    assert json.loads(call(base, "/api/state"))["brand"] == {"pro": False, "set": False}
