@@ -359,6 +359,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("sw-full").onchange = (e) => act("cover_mode", { mode: e.target.checked ? "screen" : "people" });
   $("zone-edit").onclick = toggleZones;
   $("zone-add").onclick = () => { zones.push([0.02, 0.62, 0.26, 0.96]); paintZones(); };
+  $("banner").onclick = () => { step = 0; go("setup"); };
   $("job-cancel").onclick = () => act("cancel");
   $("step-back").onclick = () => { step = Math.max(0, step - 1); paintSetup(); };
   $("step-next").onclick = () => { if (step === 3) go("live"); else { step += 1; paintSetup(); } };
