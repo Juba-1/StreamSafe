@@ -35,7 +35,7 @@ OUTPUT2_ENV = "STREAMSAFE_OUTPUT_URL_2"  # the extra platform (multistream throu
 STOP_ENV = "STREAMSAFE_STOP_ON_STDIN"
 PRODUCT_ENV = "STREAMSAFE_PRODUCT"
 STALE_S = 1.5  # the frame counter not moving for this long while the process lives: shown as "not answering"
-STOP_WAIT_S = 20.0
+STOP_WAIT_S = 40.0  # a clean stop: analyzer grace + outputs closed + report written
 
 STOPPED, STARTING, PROTECTED, COVERED, STALLED, FAILED = "stopped", "starting", "protected", "covered", "stalled", "failed"
 

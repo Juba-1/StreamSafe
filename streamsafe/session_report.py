@@ -119,6 +119,7 @@ AR_REASONS = {
     "platform_failed": "المنصة ما قبلت البث (العنوان أو المفتاح غلط، أو ما فيه إنترنت)",
     "error": "خطأ داخل البرنامج",
     "start_failed": "المحرك توقف قبل ما يبدأ",
+    "stop_timeout": "أوقفته أنت، بس المحرك طوّل يقفل فانقفل بالقوة (الأرقام ناقصة)",
 }
 
 
@@ -216,7 +217,9 @@ def add_log(path: Path, lines: list[str], keep: int = 40) -> None:
         pass
 
 
-def write_failure(reason: str, detail: str, lines: list[str], folder: str | os.PathLike | None = None) -> Path:
-    """The report of an engine that ended without writing one (it was refused at start, crashed or was killed)."""
-    summary = {"frames_out": 0, "seconds": 0, "analyzer_errors": 0, "stop_reason": reason, "stop_detail": detail[:400]}
+def write_failure(reason: str, detail: str, lines: list[str], folder: str | os.PathLike | None = None, seconds: float = 0.0) -> Path:
+    """The report of an engine that ended without writing one (it was refused at start, crashed or was killed).
+    ``seconds``: how long it streamed, when it did (a Stop that had to end the engine)."""
+    frames = round(seconds * 30)
+    summary = {"frames_out": frames, "seconds": round(seconds, 1), "analyzer_errors": 0, "stop_reason": reason, "stop_detail": detail[:400]}
     return write({"summary": summary}, 30.0, folder, lines)

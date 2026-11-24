@@ -226,9 +226,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     elif cmd == "selftest-stream":  # CI / support: the whole live path without models (every frame fully covered)
         from streamsafe import cli
+        from streamsafe.app import engine
         from streamsafe.runtime.cover_all import cover_all_analyzer
 
         rest = resolve_env_outputs(rest, os.environ)
+        if os.environ.get(engine.STOP_ENV) == "1":  # the same clean stop as a real run (tests the Stop button)
+            engine.stop_on_stdin_close()
         if product:
             from streamsafe.app import encoders
 

@@ -87,6 +87,10 @@ class AnalyzerWorker:
                 return
             yield item
 
+    def signal_stop(self) -> None:
+        """Tell the analyzer to finish: it sends its final stats, then ends (``stop`` waits for that)."""
+        self._done.set()
+
     def stop(self, timeout: float = 30.0) -> None:
         self._done.set()
         self._proc.join(timeout=timeout)

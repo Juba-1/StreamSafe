@@ -85,6 +85,7 @@ class Controller:
         self.port_moved_from = 0  # the port that was busy when the last start picked another one (0: it was free)
         self._report_line = ""  # the engine's own report of this run
         self._closed_out = True  # the end of the last run has been written up
+        self._started_at = 0.0  # when the last run started (a report of a Stop that had to end the engine)
 
     # --- settings and key ---------------------------------------------------------------------------------
     def save_settings(self) -> None:
@@ -567,6 +568,7 @@ class Controller:
         self._engine_lines = []
         self.link = engine.LinkState()
         self._report_line, self._closed_out = "", False
+        self._started_at = time.monotonic()
         record = self.record_file() if s.output == OUTPUT_RECORD else ""
         self.engine.start(
             engine.exe_command(engine.run_args(s, paths.reports_dir(self.env), record, fast=self.use_nvidia)), env, self._new_log()
@@ -600,8 +602,12 @@ class Controller:
                     session_report.add_log(path, lines)
                 return path
             reason = self.link.stopped if self.link.stopped in session_report.FAILED_REASONS else "start_failed"
+            seconds = 0.0
+            if self.engine.stop_requested and self.link.input == "connected" and self._started_at:
+                # it streamed, the streamer pressed Stop, and the engine had to be ended: say that, not "never started"
+                reason, seconds = "stop_timeout", time.monotonic() - self._started_at
             detail = f"exit code {code}: {self.exit_reason()} {self.link.detail}".strip()
-            return session_report.write_failure(reason, detail, lines, paths.reports_dir(self.env))
+            return session_report.write_failure(reason, detail, lines, paths.reports_dir(self.env), seconds)
         except OSError as exc:
             self.log(f"report not written: {exc}")
             return None

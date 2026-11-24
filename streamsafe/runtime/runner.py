@@ -407,8 +407,11 @@ class _Workers:
     def shutdown(self, receiver: threading.Thread) -> None:
         self.stopping.set()
         stopped = self.current
-        stopped.stop()
-        receiver.join(timeout=60)  # it collects the analyzer's final stats
+        # the final stats come right after the analyzer's loop ends; its process exit (freeing the GPU models) can
+        # take long on a busy card, and nothing waits for that: after a short grace it is ended
+        stopped.signal_stop()
+        receiver.join(timeout=10)
+        stopped.stop(timeout=3.0)
         with self._lock:
             self._accepting = False
         if self.current is not stopped:  # a replacement finished loading while we were stopping
