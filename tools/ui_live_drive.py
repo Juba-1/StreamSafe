@@ -58,10 +58,13 @@ def main() -> int:
         say("downloading the models through the app")
         app.do_models({})
         say("models: " + job_done(app, 3600))
-    c.check_updates()
+    c.check_updates()  # the decision files (heads) come through the app's own signed update channel
     if c.update_wanted()[0]:
-        app.do_update({})
-        say("heads update: " + job_done(app, 600))
+        try:
+            c.apply_update(lambda *a: None, threading.Event())  # data only: this dev copy cannot run the Windows installer
+            say("heads updated through the update channel")
+        except Exception as exc:  # noqa: BLE001
+            say(f"heads update failed: {type(exc).__name__}: {exc}")
     app.do_platform({"platform": "kick", "key": os.environ["STREAM_URL"].strip()})
     c.settings.follow_obs = False  # FFmpeg plays OBS here: no OBS settings files on the pod
     c.save_settings()
