@@ -3,7 +3,8 @@ small saved picture at a fixed place on the screen. Every shown frame is compare
 person covers are drawn; when it matches, that place (or the whole screen) is covered opaque for as long as it
 shows, plus ``HOLD_S`` so it never flickers.
 
-One picture costs a crop, a resize to at most ``SIDE`` px and one correlation: well under a millisecond.
+Per frame: one resize to the preview size (~1 ms at 1080p), then per picture a crop, a resize to at most ``SIDE``
+px and one correlation (a few hundredths of a millisecond).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ SIDE = 96  # templates are compared at this width at most (fast, and blind to sm
 MATCH = 0.80  # correlation of a picture with detail
 MATCH_FLAT = 0.93  # 1 - mean difference, for a nearly plain picture (correlation means nothing there)
 HOLD_S = 0.6
+BASE_W = 640  # the window's preview width: pictures are taken from it and compared at it
 FULL = (0.0, 0.0, 1.0, 1.0)
 
 
@@ -56,7 +58,13 @@ class PictureWatch:
     def __call__(self, frame: np.ndarray, pictures: tuple) -> list[tuple[float, float, float, float]]:
         if not pictures:
             return []
-        h, w = frame.shape[:2]
+        # one small gray copy per frame (the size the pictures were taken at), then every picture is cut from it:
+        # the cost stays flat however many pictures are on
+        fh, fw = frame.shape[:2]
+        small = cv2.resize(
+            cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (BASE_W, max(2, round(BASE_W * fh / fw))), interpolation=cv2.INTER_LINEAR
+        )
+        h, w = small.shape
         now = self._clock()
         out = []
         for x0, y0, x1, y1, file, full in pictures:
@@ -68,7 +76,7 @@ class PictureWatch:
             a, b, c, d = round(x0 * w), round(y0 * h), round(x1 * w), round(y1 * h)
             if c - a < 2 or d - b < 2:
                 continue
-            region = _gray(frame[b:d, a:c], (tpl.shape[1], tpl.shape[0]))
+            region = _gray(small[b:d, a:c], (tpl.shape[1], tpl.shape[0]))
             s, flat = score(region, tpl)
             if s >= (MATCH_FLAT if flat else MATCH):
                 self._until[file] = now + HOLD_S
