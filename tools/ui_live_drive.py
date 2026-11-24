@@ -226,7 +226,14 @@ def main() -> int:
         obs.wait(10)
         say("part 2: the trailer, once")
         obs = ffmpeg_obs(["-re", "-i", os.environ["TRAILER"]], port)
-        obs.wait()
+        n = 0
+        while obs.poll() is None:  # what the viewers saw: the engine's own preview of the protected picture
+            time.sleep(2)
+            pf = c.preview_file()
+            if pf.is_file():
+                n += 1
+                (OUT / "viewers").mkdir(exist_ok=True)
+                (OUT / "viewers" / f"v{n:03d}.png").write_bytes(pf.read_bytes())
         say("trailer finished")
         page.wait_for_timeout(5000)
 

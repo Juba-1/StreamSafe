@@ -62,4 +62,5 @@ TRT=1 TRT_CACHE=$TC python -m streamsafe.prepare --models $MD 2>&1 | grep -v "ti
 python -u tools/ui_live_drive.py; echo "DRIVE_EXIT $?"
 for f in $(ls -t $STREAMSAFE_DATA_DIR/reports/session_*.txt 2>/dev/null | head -1); do cp $f $R/; done
 cp $STREAMSAFE_DATA_DIR/webui.log $R/ 2>/dev/null
+if ls $R/viewers/v*.png >/dev/null 2>&1; then ffmpeg -hide_banner -loglevel error -pattern_type glob -i "$R/viewers/v*.png" -vf "scale=320:180,tile=6x8" -frames:v 1 -y $R/viewers_sheet.jpg; fi
 echo "== END $(date -u)"
