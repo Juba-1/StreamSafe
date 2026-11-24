@@ -182,11 +182,16 @@ def run(page: Page, app: App, out: Path, live: bool) -> None:
         page.locator("#step-body button.primary").click()
         check(wait_for(lambda: app.state()["setup"]["obs_set"], 15), "setup OBS step: the button sets OBS up")
     shot("setup_obs")
+    first = app.state()["lang"]
+    is_dir = lambda lg: page.evaluate("document.documentElement.dir") == ("ltr" if lg == "en" else "rtl")  # noqa: E731
+    other = "en" if first == "ar" else "ar"
     page.click("#lang")
-    check(wait_for(lambda: page.evaluate("document.documentElement.dir") == "ltr" and app.state()["lang"] == "en"), "language → English")
-    shot("english")
+    check(wait_for(lambda: app.state()["lang"] == other and is_dir(other)),
+          f"language button: {first} to {other} (app + screen)")  # fmt: skip
+    shot("language_" + other)
     page.click("#lang")
-    check(wait_for(lambda: page.evaluate("document.documentElement.dir") == "rtl" and app.state()["lang"] == "ar"), "language → Arabic")
+    check(wait_for(lambda: app.state()["lang"] == first and is_dir(first)),
+          f"language button: back to {first}")  # fmt: skip
 
     # --- protection on and off (needs the models) ------------------------------------------------------------
     page.click("[data-view=live]")
@@ -246,7 +251,9 @@ def main() -> int:
             page.screenshot(path=str(out / "stopped.png"))
         browser.close()
     failed = [w for ok, w in RESULTS if not ok]
-    (out / "results.json").write_text(json.dumps({"passed": len(RESULTS) - len(failed), "failed": failed}, ensure_ascii=False, indent=1))
+    (out / "results.json").write_text(
+        json.dumps({"passed": len(RESULTS) - len(failed), "failed": failed}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
     print(f"\n{len(RESULTS) - len(failed)} passed, {len(failed)} failed", flush=True)
     return 1 if failed else 0
 
