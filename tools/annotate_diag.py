@@ -11,7 +11,8 @@ import numpy as np
 def main() -> None:
     video, diag, out = sys.argv[1:4]
     every = float(sys.argv[4]) if len(sys.argv) > 4 else 2.0
-    data = json.load(open(diag))
+    with open(diag, encoding="utf-8") as f:
+        data = json.load(f)
     decisions = data.get("decisions", data) if isinstance(data, dict) else data
     by_frame = {int(d[0]): d for d in decisions if isinstance(d, list) and len(d) >= 4}
     frames = sorted(by_frame)
