@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -71,9 +72,14 @@ def main() -> int:
     pod_runtime()
     app = server.WebApp()
     c = app.ctrl
+    c.check_updates()  # the decision files (heads) through the app's own signed update channel
+    if c.update_wanted()[0]:
+        c.apply_update(lambda *a: None, threading.Event())  # data only
     app.do_platform({"platform": "custom", "rtmp_url": "rtmp://127.0.0.1:1935/live", "key": "abc123"})
     c.run_check()
     say(f"ready: models={c.models_problem() or 'ok'} blockers={c.blockers(app.key)}")
+    if c.blockers(app.key):
+        return 1
     results = {}
     t0 = time.monotonic()
     results["held_loaded_after_open_s"] = wait(lambda: app.state()["held"] == "ready", 900, 1.0)
