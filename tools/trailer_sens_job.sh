@@ -60,7 +60,8 @@ echo "== trailer at each sensitivity (realtime-like policy, offline speed)"
 for run in ${RUNS:-offline-30-1.0 realtime-30-1.0 realtime-30-1.3 realtime-30-1.6 realtime-60-1.0}; do
   IFS=- read mode fps k <<< "$run"
   THR_SCALE=$k timeout 1200 python -m streamsafe.cli --input "$TR" --output /workspace/o_$run.mp4 --mode $mode --size 1920x1080 --fps $fps \
-    --delay 2 --stats $R/stats_$run.json --no-report > $R/eng_$run.txt 2>&1 || echo "ENG_FAIL $run"
+    --delay 2 --stats $R/stats_$run.json --diag /workspace/diag_$run.json --no-report > $R/eng_$run.txt 2>&1 || echo "ENG_FAIL $run"
+  [ -f /workspace/diag_$run.json ] && python tools/annotate_diag.py "$TR" /workspace/diag_$run.json $R/scores_$run.jpg
 done
 for run in ${RUNS:-offline-30-1.0 realtime-30-1.0 realtime-30-1.3 realtime-30-1.6 realtime-60-1.0}; do  # every 2 s, like the window's preview
   ffmpeg -hide_banner -loglevel error -i /workspace/o_$run.mp4 -vf "fps=0.5,scale=320:180,tile=6x8" -frames:v 1 -q:v 4 -y $R/sheet_$run.jpg && echo "SHEET $run"
