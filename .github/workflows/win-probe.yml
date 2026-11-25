@@ -1,0 +1,13 @@
+name: win-probe
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: stdin read vs starting a process
+        run: python tools/probes/run_stdin_probe.py
+        timeout-minutes: 5

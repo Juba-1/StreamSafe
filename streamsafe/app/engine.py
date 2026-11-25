@@ -305,6 +305,29 @@ class StatusTracker:
         return COVERED if state.full else PROTECTED
 
 
+def detach_stdin():
+    """The window's standard input as a stream of its own, and the process's standard input set to NUL.
+
+    On Windows a thread waiting to read a pipe blocks every other use of that pipe - and starting a process
+    (the analyzer, an FFmpeg) hands the parent's standard input to the child, so it waits until the read ends:
+    with the stop / Start watcher reading standard input, the analyzer never started (25-26 Nov: "protection
+    getting ready" for 12 minutes, the engine log without a single STREAMSAFE_LOAD line). The watcher reads a
+    copy; children get NUL. Elsewhere: standard input as it is."""
+    if os.name != "nt":
+        return sys.stdin
+    import ctypes
+    import msvcrt
+
+    own = os.fdopen(os.dup(sys.stdin.fileno()), "r", encoding="utf-8", errors="replace")
+    nul = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(nul, 0)
+    os.close(nul)
+    ctypes.windll.kernel32.SetStdHandle(-10, msvcrt.get_osfhandle(0))  # STD_INPUT_HANDLE: what children inherit
+    with contextlib.suppress(Exception):
+        sys.stdin = open(os.devnull, encoding="utf-8")  # noqa: SIM115 - the process's own stdin stays open
+    return own
+
+
 HOLD_ENV = "STREAMSAFE_HOLD"  # the held engine: models load at once, the run waits for "go" on standard input
 GO = "go"
 
@@ -312,7 +335,7 @@ GO = "go"
 def wait_for_go(stream=None) -> bool:
     """In a held engine: wait for the window's Start. "go" -> True, and from then on the engine stops like any
     other (``stop_on_stdin_close``); "stop" or standard input closed -> False (the engine ends, nothing opened)."""
-    stream = sys.stdin if stream is None else stream
+    stream = detach_stdin() if stream is None else stream
     sys.stdout.write("HELD ready for start\n")  # one write: never inside another thread's line
     sys.stdout.flush()
     try:
@@ -335,7 +358,7 @@ def stop_on_stdin_close(stream=None, interrupt: Callable[[], None] | None = None
     Ctrl+C: outputs closed, report written."""
     import _thread
 
-    stream = sys.stdin if stream is None else stream
+    stream = detach_stdin() if stream is None else stream
     interrupt = interrupt or _thread.interrupt_main
 
     def watch() -> None:
