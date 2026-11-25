@@ -1,7 +1,6 @@
 #!/bin/bash
 # Load bench (GPU pod, through tools/pod_guard.sh): how long the protection takes to start under each runtime setting.
 #   RUN_NAME=load_r1 bash tools/pod_guard.sh tools/load_bench_job.sh
-#   RUN_NAME=demo_live_r1 [MINUTES=6] bash tools/demo_live_job.sh
 set -u
 RUN_NAME=${RUN_NAME:?}; SECS=${SECS:-60}
 ENG=$(cd "$(dirname "$0")/.." && pwd)
@@ -48,10 +47,13 @@ export BACKEND=onnx ONNX_DIR=/workspace/m/v1 TRT_CACHE=/workspace/trt HEAD_DIR=/
 TRT=1 python -m streamsafe.prepare --models $ONNX_DIR 2>&1 | grep -v "timing cache" | tail -2
 echo "== load bench: each configuration in a fresh process, twice"
 B() { local label=$1; shift; for i in 1 2; do env "$@" python tools/load_bench.py "$label#$i" 2>&1 | grep -E "LOADBENCH|Error|error" | tail -2 | tee -a $R/bench.txt; done; }
-B trt_prepared TRT=1 TRT_BUILD=0
-B cuda_exhaustive TRT=0
-B cuda_heuristic TRT=0 CUDNN_SEARCH=HEURISTIC
-B cuda_default TRT=0 CUDNN_SEARCH=DEFAULT
-B trt_not_prepared TRT=1 TRT_BUILD=0 TRT_CACHE=/workspace/trt_empty
-B trt_not_prepared_heuristic TRT=1 TRT_BUILD=0 TRT_CACHE=/workspace/trt_empty CUDNN_SEARCH=HEURISTIC
+for c in ${CONFIGS:-trt_prepared cuda}; do
+  case $c in
+    trt_prepared) B trt_prepared TRT=1 TRT_BUILD=0 ;;
+    trt_profile) env TRT=1 TRT_BUILD=0 PROFILE=1 python tools/load_bench.py trt_profile > $R/profile_trt.txt 2>&1; grep LOADBENCH $R/profile_trt.txt | tee -a $R/bench.txt ;;
+    cuda) B cuda TRT=0 ;;
+    cuda_heuristic) B cuda_heuristic TRT=0 CUDNN_SEARCH=HEURISTIC ;;
+    trt_not_prepared) B trt_not_prepared TRT=1 TRT_BUILD=0 TRT_CACHE=/workspace/trt_empty ;;
+  esac
+done
 echo "== DONE $(date -u)"

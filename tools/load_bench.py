@@ -3,6 +3,7 @@ timed. One configuration per process, so nothing is cached in memory between the
 Usage: python tools/load_bench.py LABEL   (the runtime comes from the environment: TRT, TRT_BUILD, CUDNN_SEARCH ...)"""
 
 import json
+import os
 import sys
 import time
 
@@ -22,7 +23,18 @@ def main() -> None:
     t_import = time.perf_counter() - t0
     cfg = Config.from_env(mode="realtime")
     t1 = time.perf_counter()
-    m = build_models(cfg)
+    if os.environ.get("PROFILE") == "1":  # where opening the models goes, function by function
+        import cProfile
+        import io
+        import pstats
+
+        prof = cProfile.Profile()
+        m = prof.runcall(build_models, cfg)
+        text = io.StringIO()
+        pstats.Stats(prof, stream=text).sort_stats("cumulative").print_stats(35)
+        print("PROFILE " + label + "\n" + text.getvalue(), flush=True)
+    else:
+        m = build_models(cfg)
     t_open = time.perf_counter() - t1
     w, h = ANALYSIS_SIZE
     blank = np.zeros((h, w, 3), np.uint8)
