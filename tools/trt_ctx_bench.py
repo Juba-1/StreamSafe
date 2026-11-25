@@ -43,10 +43,14 @@ def record(out: Path) -> None:
             "trt_ep_context_file_path": str(ctx_dir),
             "trt_ep_context_embed_mode": 0,
         }
-        ort.InferenceSession(item["model"], providers=[(TRT, opts), "CUDAExecutionProvider"])
-        item["ctx"] = sorted(str(p) for p in ctx_dir.rglob("*_ctx.onnx"))
+        before = set(ctx_dir.rglob("*"))
+        s = ort.InferenceSession(item["model"], providers=[(TRT, opts), "CUDAExecutionProvider"])
+        made = sorted(str(p) for p in set(ctx_dir.rglob("*")) - before)
+        item["made"] = made
+        item["ctx"] = [m for m in made if m.endswith(".onnx")]
+        item["dump_provider"] = s.get_providers()[0]
     (out / "seen.json").write_text(json.dumps(seen, indent=1))
-    print("RECORDED", json.dumps([(Path(s["model"]).name, s["ctx"]) for s in seen]), flush=True)
+    print("RECORDED", json.dumps([(Path(s["model"]).name, s["dump_provider"], s["made"]) for s in seen]), flush=True)
 
 
 def open_one(item: dict, mode: str) -> float:
@@ -70,6 +74,12 @@ def open_one(item: dict, mode: str) -> float:
 def timed(out: Path, mode: str) -> None:
     seen = json.loads((out / "seen.json").read_text())
     import onnxruntime  # noqa: F401  (import time is not what is measured)
+
+    from streamsafe.config import Config
+    from streamsafe.models.onnx_backend import checked_files, engines, trt_settings
+
+    cfg = Config.from_env(mode="realtime")
+    engines.expose_libraries(trt_settings(cfg, checked_files(cfg)).libs)  # as the engine does before TensorRT
 
     t = time.perf_counter()
     if mode.endswith("_parallel"):
