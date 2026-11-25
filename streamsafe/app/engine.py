@@ -313,7 +313,8 @@ def wait_for_go(stream=None) -> bool:
     """In a held engine: wait for the window's Start. "go" -> True, and from then on the engine stops like any
     other (``stop_on_stdin_close``); "stop" or standard input closed -> False (the engine ends, nothing opened)."""
     stream = sys.stdin if stream is None else stream
-    print("HELD ready for start", flush=True)
+    sys.stdout.write("HELD ready for start\n")  # one write: never inside another thread's line
+    sys.stdout.flush()
     try:
         while True:
             line = stream.readline()

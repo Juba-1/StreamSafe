@@ -28,6 +28,7 @@ import contextlib
 import json
 import re
 import socket
+import sys
 import threading
 from collections.abc import Callable
 
@@ -46,7 +47,9 @@ def status(event: str, **fields: object) -> None:
             _sink(line)
         else:
             with contextlib.suppress(OSError, ValueError):
-                print(line, flush=True)
+                # one write with its newline: a print() from another thread cannot land inside this line
+                sys.stdout.write(line + "\n")
+                sys.stdout.flush()
 
 
 def capture(to: Callable[[str], None] | None) -> None:

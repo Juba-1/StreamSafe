@@ -131,12 +131,12 @@ def _worker_main(
     analyzer = factory(cfg, output_scale)
     limit_threads()  # again: the models may have imported torch
     t1 = time.monotonic()
-    print(f"STREAMSAFE_LOAD models {t1 - t0:.1f} s", file=sys.stderr, flush=True)  # in the report: where a slow start went
+    _say(f"STREAMSAFE_LOAD models {t1 - t0:.1f} s")  # in the report: where a slow start went
     analyzer.warmup()
-    print(f"STREAMSAFE_LOAD warmup {time.monotonic() - t1:.1f} s", file=sys.stderr, flush=True)
+    _say(f"STREAMSAFE_LOAD warmup {time.monotonic() - t1:.1f} s")
     slow = getattr(getattr(analyzer, "headroom", None), "warning", lambda: "")()
     if slow:  # below the decision rate: said at start, not only in the final report
-        print(f"STREAMSAFE_SLOW {slow}", file=sys.stderr, flush=True)
+        _say(f"STREAMSAFE_SLOW {slow}")
     ready.set()
     w, h = frame_size
     shm = shared_memory.SharedMemory(name=shm_name)
@@ -171,6 +171,12 @@ def _worker_main(
         out.put((_END, stats, getattr(analyzer, "diag", [])))
         del ring
         shm.close()
+
+
+def _say(line: str) -> None:
+    """One line to the engine's log, in one write (the engine's own threads write to the same pipe)."""
+    sys.stderr.write(line + "\n")
+    sys.stderr.flush()
 
 
 def _peak_vram_gb() -> float:
