@@ -117,9 +117,13 @@ def _worker_main(
     out: Any,
 ) -> None:
     limit_threads()
+    t0 = time.monotonic()
     analyzer = factory(cfg, output_scale)
     limit_threads()  # again: the models may have imported torch
+    t1 = time.monotonic()
+    print(f"STREAMSAFE_LOAD models {t1 - t0:.1f} s", file=sys.stderr, flush=True)  # in the report: where a slow start went
     analyzer.warmup()
+    print(f"STREAMSAFE_LOAD warmup {time.monotonic() - t1:.1f} s", file=sys.stderr, flush=True)
     slow = getattr(getattr(analyzer, "headroom", None), "warning", lambda: "")()
     if slow:  # below the decision rate: said at start, not only in the final report
         print(f"STREAMSAFE_SLOW {slow}", file=sys.stderr, flush=True)

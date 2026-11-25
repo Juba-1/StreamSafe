@@ -136,6 +136,7 @@ class LinkState:
     sent: tuple = ()  # (width, height, fps, kbps) of what OBS sends, when FFmpeg said it
     platform: str = ""  # "" / connecting / connected / lost / failed
     platform2: str = ""  # the extra platform: the same words
+    protection: str = ""  # "" / loading / ready: the analyzer's models (until ready viewers get the slate)
     port: int = 0
     reason: str = ""  # the last platform / input problem, a word of io/link.py
     retry_s: float = 0.0
@@ -165,6 +166,8 @@ class LinkState:
             self.input = "disconnected"
         elif name == "input_failed":
             self.input, self.reason = "failed", str(event.get("reason", ""))
+        elif name in ("protection_loading", "protection_ready"):
+            self.protection = name.replace("protection_", "")
         elif name == "platform_connecting":
             self.platform = "connecting" if self.platform != "lost" else "lost"
         elif name == "platform_connected":

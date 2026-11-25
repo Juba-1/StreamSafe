@@ -252,6 +252,9 @@ class WebApp:
             "failed": (self.tr("lk_obs_failed", why=why), "bad"),
         }.get(lk.input, (self.tr("lk_obs_wait", server=server), "warn"))
         out = []
+        if lk.protection:
+            word, look = ("lk_prot_loading", "warn") if lk.protection == "loading" else ("lk_prot_ok", "ok")
+            out.append({"name": self.tr("lk_prot"), "text": self.tr(word), "look": look})
         if c.preview:
             out.append({"name": self.tr("preview"), "text": self.tr("lk_window"), "look": "idle"})
         elif s.output == cfg.OUTPUT_RTMP:

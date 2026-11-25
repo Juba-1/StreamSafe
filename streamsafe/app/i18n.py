@@ -338,6 +338,12 @@ TEXT: dict[str, tuple[str, str]] = {
     "lk_in_wait": ("الدخل: جاري الفتح...", "Input: opening..."),
     "lk_in_ok": ("✓ الصورة توصل", "✓ The picture is arriving"),
     "lk_in_failed": ("✗ الدخل ما انفتح: {why}", "✗ The input did not open: {why}"),
+    "lk_prot": ("الحماية", "Protection"),
+    "lk_prot_loading": (
+        "تتجهز… أول تشغيل على الجهاز ممكن ياخذ دقائق، والمشاهدين يشوفون شاشة الانتظار لين تجهز",
+        "Getting ready... the first start on a PC can take minutes; viewers see the waiting screen until then",
+    ),
+    "lk_prot_ok": ("✓ شغالة", "✓ Running"),
     "lk_plat_wait": ("المنصة: نتصل أول ما تجهز أول صورة محمية", "Platform: we connect as soon as the first protected picture is ready"),
     "lk_plat_connecting": ("المنصة: جاري الاتصال...", "Platform: connecting..."),
     "lk_plat_ok": ("✓ متصل بالمنصة: البث شغال", "✓ Connected to the platform: you are live"),

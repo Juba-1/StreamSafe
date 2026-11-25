@@ -8,6 +8,8 @@ Events (``event`` field):
   obs_connected                      OBS (or any sender) is sending picture
   obs_disconnected                   the sender went away; the listener is opened again at once
   input_failed         reason        the input could not be opened at all (port busy, no such device)
+  protection_loading                 the analyzer is loading its models; until it is ready viewers get the slate
+  protection_ready     seconds       the analyzer is ready: the protection runs (seconds: how long loading took)
   platform_connecting                the first protected frame is ready: connecting to the platform now
   platform_connected                 the platform is taking our stream
   platform_lost        reason, retry_s   the connection broke; a new one is tried after ``retry_s`` seconds

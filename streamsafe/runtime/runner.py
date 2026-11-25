@@ -25,6 +25,7 @@ import numpy as np
 
 from streamsafe.analysis.analyzer import Analyzer
 from streamsafe.config import Config
+from streamsafe.io import link
 from streamsafe.io.obs_link import ObsStateWriter
 from streamsafe.io.sinks import FrameSink, takes_audio
 from streamsafe.io.sources import FrameSource
@@ -256,6 +257,9 @@ def _run_realtime(
             capture_done.set()
 
     def receive() -> None:
+        while not worker.ready.wait(0.5):
+            if worker.stopping.is_set() or worker.failed is not None:
+                return
         while True:
             failed = 0
             for decision in worker.current.results():
@@ -287,6 +291,8 @@ def _run_realtime(
     try:
         try:
             while True:
+                if worker.failed is not None:  # the models never loaded: end the run and say why
+                    raise worker.failed
                 with lock:
                     item = frames.pop(v, None)
                     waiting, gone = len(frames), v < n_captured
@@ -395,11 +401,29 @@ class _Workers:
     def __init__(self, make: Callable[[], AnalyzerWorker]) -> None:
         self._make = make
         self.stopping = threading.Event()
+        self.ready = threading.Event()  # the first analyzer has loaded its models
+        self.failed: BaseException | None = None  # the first analyzer could not load: the run ends with this
         self._last_restart = -1e9
         self._lock = threading.Lock()
-        self._accepting = True
+        self._accepting = False
         self.current = make()
-        self.current.start()
+        # the models load while the stream already runs: viewers get the slate (no decisions yet) and the platform
+        # is connected at once, instead of a window stuck on "starting" while a first load takes minutes
+        threading.Thread(target=self._first_start, name="analyzer-load", daemon=True).start()
+
+    def _first_start(self) -> None:
+        t0 = time.monotonic()
+        link.status("protection_loading")
+        try:
+            self.current.start()
+        except BaseException as exc:
+            if not self.stopping.is_set():
+                self.failed = exc
+            return
+        with self._lock:
+            self._accepting = not self.stopping.is_set()
+        link.status("protection_ready", seconds=round(time.monotonic() - t0, 1))
+        self.ready.set()
 
     def submit(self, frame_id: int, frame: np.ndarray, cut: bool) -> None:
         with self._lock:  # never write into a ring that is being released
