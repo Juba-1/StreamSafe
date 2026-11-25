@@ -186,8 +186,11 @@ def main(argv: list[str] | None = None) -> int:
             return NO_HEADS_EXIT
         rest = resolve_env_outputs(rest, os.environ)
         held = os.environ.get(engine.HOLD_ENV) == "1"  # loaded ahead, waiting for the window's Start
+        # first, before any process starts: the window's commands come on a copy of standard input, children
+        # get NUL (on Windows a child inheriting a pipe this process reads hangs at its start: engine.detach_stdin)
+        commands = engine.detach_stdin()
         if os.environ.get(engine.STOP_ENV) == "1" and not held:
-            engine.stop_on_stdin_close()
+            engine.stop_on_stdin_close(commands)
         from streamsafe import cli
 
         gpu_checked = False
@@ -218,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
         except cli.Refused as exc:
             print(str(exc), flush=True)
             return exc.code
-        return cli.main(rest, before_outputs=start_checks, hold=engine.wait_for_go)
+        return cli.main(rest, before_outputs=start_checks, hold=lambda: engine.wait_for_go(commands))
     elif cmd == "link-test":  # "Test connection": a few seconds of the black slate to the platform
         from streamsafe.app import linktest
 
