@@ -66,7 +66,9 @@ class RiskPolicy:
             if person.put_off:  # not seen this time: covered, and this decision never counts toward a release
                 if track.risk.safe_run:
                     track.risk.safe_since += since_last
-                person.risky = True
+                # "light" (the default): someone the eye skipped this time keeps their last verdict (a man stays
+                # uncovered); someone it has never looked at is not covered yet. Stricter settings cover them.
+                person.risky = (track.risk.risky if track.risk.n_obs else False) if self.light else True
                 continue
             if self.cfg.handoff and track.risk.n_obs == 0:
                 self._handoff(person, track, tracker, present)

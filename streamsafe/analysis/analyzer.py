@@ -177,6 +177,8 @@ class Analyzer:
             st["eye_put_off"].append(looks.put_off)
             st["eye_early"].append(looks.early)
         waiting = [people[j] for j in looks.waiting]  # not seen and not tracked yet: covered, outside the tracker
+        if self.policy.light:  # "light" (the default): nobody is covered before the eye has looked at them
+            waiting = []
         people = [p for p in people if p.tid >= -1]  # waiting ids are below -1
         timings["eye"], clock = self._lap(clock)
 
