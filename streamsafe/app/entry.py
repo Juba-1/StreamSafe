@@ -185,25 +185,40 @@ def main(argv: list[str] | None = None) -> int:
             print(f"HEADS_{why.split()[0].upper()} no usable risk heads ({why}). Nothing was streamed.", flush=True)
             return NO_HEADS_EXIT
         rest = resolve_env_outputs(rest, os.environ)
-        if os.environ.get(engine.STOP_ENV) == "1":
+        held = os.environ.get(engine.HOLD_ENV) == "1"  # loaded ahead, waiting for the window's Start
+        if os.environ.get(engine.STOP_ENV) == "1" and not held:
             engine.stop_on_stdin_close()
         from streamsafe import cli
 
-        def start_checks(outputs: list[str]) -> None:
-            """Run once the input is open (OBS can already connect) and before any output: the slower checks."""
-            if product and os.environ.get("STREAMSAFE_SKIP_GPU_CHECK") != "1":
+        gpu_checked = False
+
+        def gpu_check() -> None:
+            nonlocal gpu_checked
+            if product and not gpu_checked and os.environ.get("STREAMSAFE_SKIP_GPU_CHECK") != "1":
                 from streamsafe import syscheck
 
-                gpu_check, _ = syscheck.check_gpu(syscheck.Probes())
-                if gpu_check.status == syscheck.FAIL:  # never load the models on a card that cannot hold them: the PC can freeze
-                    raise cli.Refused(WEAK_GPU_EXIT, "weak_gpu", f"WEAK_GPU {gpu_check.detail}. Nothing was streamed.\n{gpu_check.fix_ar}")
+                result, _ = syscheck.check_gpu(syscheck.Probes())
+                if result.status == syscheck.FAIL:  # never load the models on a card that cannot hold them: the PC can freeze
+                    raise cli.Refused(WEAK_GPU_EXIT, "weak_gpu", f"WEAK_GPU {result.detail}. Nothing was streamed.\n{result.fix_ar}")
+            gpu_checked = True
+
+        def start_checks(outputs: list[str]) -> None:
+            """Run once the input is open (OBS can already connect) and before any output: the slower checks."""
+            gpu_check()
             if product:
                 try:
                     encoders.choose_into(os.environ, ["--output", *outputs[:1]])
                 except SystemExit as exc:
                     raise cli.Refused(USAGE_EXIT, "no_encoder", str(exc)) from None
 
-        return cli.main(rest, before_outputs=start_checks)
+        if not held:
+            return cli.main(rest, before_outputs=start_checks)
+        try:
+            gpu_check()  # before the models load, as in a normal start
+        except cli.Refused as exc:
+            print(str(exc), flush=True)
+            return exc.code
+        return cli.main(rest, before_outputs=start_checks, hold=engine.wait_for_go)
     elif cmd == "link-test":  # "Test connection": a few seconds of the black slate to the platform
         from streamsafe.app import linktest
 

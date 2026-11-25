@@ -33,6 +33,7 @@ from streamsafe.app import controller, engine, hotkey, i18n, ingest, modelpack, 
 from streamsafe.app import settings as cfg
 
 STATIC = Path(__file__).with_name("static")
+PREWARM_EVERY_S = 2.0  # how often an idle window makes sure an engine is loaded and waiting (``Controller.prewarm``)
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml", ".woff2": "font/woff2"}
 STATUS = {  # engine status -> (i18n label, i18n hint, look)
     engine.STOPPED: ("st_stopped", "st_hint_stopped", "idle"),
@@ -73,6 +74,7 @@ class WebApp:
         self.lock = threading.Lock()
         self._hotkey: hotkey.Hotkey | None = None
         self._announced = False
+        self._prewarm_at = 0.0
         self.arm_panic_key()
         threading.Thread(target=self._first_checks, name="first-checks", daemon=True).start()
 
@@ -165,11 +167,15 @@ class WebApp:
         data_new, app_new = c.update_wanted()
         pf = c.preview_file()
         r = c.check_result
+        if not running and time.monotonic() - self._prewarm_at > PREWARM_EVERY_S:
+            self._prewarm_at = time.monotonic()
+            self.safe("prewarm", lambda: c.prewarm(self.key), None)
         return {
             "lang": self.lang,
             "version": updates.current_version(),
             "status": {"key": status, "label": self.tr(label), "hint": self.tr(hint), "look": look},
             "running": running,
+            "held": "" if running else ("ready" if c.held.ready else "loading" if c.held.loading else ""),
             "preview_mode": c.preview,
             "preview_at": pf.stat().st_mtime if running and pf.is_file() else 0,
             "link": self.safe("link", self.link_view, None) if running or lk.stopped else None,
@@ -602,6 +608,7 @@ class WebApp:
         self.ctrl.set_panic(False)
         if self.ctrl.engine.running:
             self.ctrl.stop()
+        self.ctrl.close()
 
 
 # --- the local server ----------------------------------------------------------------------------------------

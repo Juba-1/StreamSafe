@@ -12,7 +12,7 @@ const W = {
     pics_empty: "ما أضفت صور للحين. اضغط «أضف صورة» وأنت فاتح الشي اللي تبيه يتغطى في اللعبة.",
     pic_on_all: "شغّل الكل", pic_off_all: "طفّ الكل", pic_area: "مكانها فقط", pic_screen: "الشاشة كاملة", pic_del: "احذف", nav_settings: "الإعدادات", nav_check: "الفحص",
     viewers_see: "هذا اللي يشوفه جمهورك", trial: "جرّب بدون بث", start: "ابدأ الحماية والبث", stop: "أوقف", stopping: "يوقف…",
-    starting: "يجهّز…", panic: "غطِّ الكل", panic_off: "ارجع للعرض", panic_on_title: "البث مغطّى بالكامل",
+    starting: "يجهّز…", held: "الحماية", held_ready: "✓ جاهزة، البث يبدأ فوراً", held_loading: "تتجهز في الخلفية…", panic: "غطِّ الكل", panic_off: "ارجع للعرض", panic_on_title: "البث مغطّى بالكامل",
     sens: "قوة التغطية", live_change: "تتغير وأنت تبث", s_light: "خفيفة", s_mid: "متوازنة", s_high: "عالية",
     s_light_t: "تغطي الواضح جداً فقط. أقل تغطية بالغلط، وتناسب اللي يتجنب المشاهد بنفسه.",
     s_mid_t: "الوضع المقترح: يغطي الملابس الكاشفة ويترك العادي والرجال.",
@@ -63,7 +63,7 @@ const W = {
     pics_empty: "No pictures yet. Press “Add picture” while the thing to cover is open in the game.",
     pic_on_all: "All on", pic_off_all: "All off", pic_area: "Its place only", pic_screen: "Whole screen", pic_del: "Delete", nav_settings: "Settings", nav_check: "Check",
     viewers_see: "What your viewers see", trial: "Try without streaming", start: "Start protection & stream", stop: "Stop", stopping: "Stopping…",
-    starting: "Starting…", panic: "Cover everything", panic_off: "Back to stream", panic_on_title: "Stream fully covered",
+    starting: "Starting…", held: "Protection", held_ready: "✓ Ready, the stream starts at once", held_loading: "Getting ready in the background…", panic: "Cover everything", panic_off: "Back to stream", panic_on_title: "Stream fully covered",
     sens: "Cover strength", live_change: "Changes while live", s_light: "Light", s_mid: "Balanced", s_high: "High",
     s_light_t: "Covers only the obvious. Fewest wrong covers; for streamers who avoid scenes themselves.",
     s_mid_t: "Recommended: covers revealing outfits, leaves normal ones.",
@@ -238,6 +238,7 @@ function paintLive() {
   } else {
     row(w("obs"), S.setup.obs_set ? "✓" : "—", S.setup.obs_set ? "ok" : "idle");
     row(s.platforms.find((p) => p.id === s.settings.platform)?.name || "—", s.setup.key_ok ? "✓" : "—", s.setup.key_ok ? "ok" : "idle");
+    if (s.held) row(w("held"), w(s.held === "ready" ? "held_ready" : "held_loading"), s.held === "ready" ? "ok" : "warn");
   }
   if (!editing) {
     rects.cam = s.settings.zones.map((z) => [...z]);

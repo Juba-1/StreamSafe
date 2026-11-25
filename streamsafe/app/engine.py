@@ -305,6 +305,29 @@ class StatusTracker:
         return COVERED if state.full else PROTECTED
 
 
+HOLD_ENV = "STREAMSAFE_HOLD"  # the held engine: models load at once, the run waits for "go" on standard input
+GO = "go"
+
+
+def wait_for_go(stream=None) -> bool:
+    """In a held engine: wait for the window's Start. "go" -> True, and from then on the engine stops like any
+    other (``stop_on_stdin_close``); "stop" or standard input closed -> False (the engine ends, nothing opened)."""
+    stream = sys.stdin if stream is None else stream
+    print("HELD ready for start", flush=True)
+    try:
+        while True:
+            line = stream.readline()
+            if not line or line.strip().lower() == "stop":
+                return False
+            if line.strip().lower() == GO:
+                break
+    except (OSError, ValueError):
+        return False
+    if os.environ.get(STOP_ENV) == "1":
+        stop_on_stdin_close(stream)
+    return True
+
+
 def stop_on_stdin_close(stream=None, interrupt: Callable[[], None] | None = None) -> threading.Thread:
     """In the engine process: end the run cleanly when standard input closes or says "stop" (the window's Stop
     button, or the window itself gone). The main thread gets a KeyboardInterrupt, which the engine handles like
@@ -351,7 +374,7 @@ class EngineProcess:
     """One child process whose output lines are handed to ``on_line`` (already redacted)."""
 
     def __init__(self, on_line: Callable[[str], None], redactor: Redactor | None = None) -> None:
-        self._on_line = on_line
+        self.on_line = on_line  # may be changed while it runs (a held engine handed to the window: ``Controller``)
         self._redactor = redactor or Redactor()
         self._proc: subprocess.Popen | None = None
         self._reader: threading.Thread | None = None
@@ -403,12 +426,24 @@ class EngineProcess:
                         with contextlib.suppress(OSError, ValueError):
                             log.write(f"{time.strftime('%H:%M:%S')} {clean}\n")
                             log.flush()
-                    self._on_line(clean)
+                    self.on_line(clean)
         finally:
             if log is not None:
                 with contextlib.suppress(OSError, ValueError):
                     log.write(f"{time.strftime('%H:%M:%S')} [engine ended, exit {proc.poll()}]\n")
                     log.close()
+
+    def send(self, line: str) -> bool:
+        """One line to the engine's standard input (the held engine's "go"). False when it could not be sent."""
+        proc = self._proc
+        if proc is None or proc.poll() is not None or proc.stdin is None:
+            return False
+        try:
+            proc.stdin.write(line + "\n")
+            proc.stdin.flush()
+        except (OSError, ValueError):
+            return False
+        return True
 
     @property
     def running(self) -> bool:

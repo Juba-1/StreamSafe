@@ -38,7 +38,9 @@ class _SlowWorker:
     def __init__(self, load_s: float, fail: bool = False) -> None:
         self.load_s, self.fail, self.got = load_s, fail, []
 
-    def start(self) -> None:
+    def launch(self) -> None: ...
+
+    def wait_ready(self) -> None:
         import time as _t
 
         _t.sleep(self.load_s)

@@ -56,7 +56,15 @@ class AnalyzerWorker:
         self.diag: list = []
 
     def start(self) -> None:
+        self.launch()
+        self.wait_ready()
+
+    def launch(self) -> None:
+        """Start the analyzer process (returns at once; it then loads its models)."""
         self._proc.start()
+
+    def wait_ready(self) -> None:
+        """Wait until the models are loaded. Raises when the process died or never became ready."""
         deadline = time.monotonic() + READY_TIMEOUT_S
         while not self._ready.wait(1.0):
             if not self._proc.is_alive():
@@ -93,6 +101,8 @@ class AnalyzerWorker:
 
     def stop(self, timeout: float = 30.0) -> None:
         self._done.set()
+        if self._proc.pid is None:  # never launched (a run that ended while its analyzer waited to load)
+            return
         self._proc.join(timeout=timeout)
         if self._proc.is_alive():
             self._proc.terminate()
@@ -143,7 +153,7 @@ def _worker_main(
             if fid < last + step:
                 if parent is not None and not parent.is_alive():
                     break  # the engine was killed (Task Manager): free the GPU instead of lingering
-                time.sleep(0.001)
+                time.sleep(0.001 if fid >= 0 else 0.05)  # no frame yet (a held engine waiting for Start): idle
                 continue
             slot = fid % N_SLOTS
             if slot_fid[slot] != fid:

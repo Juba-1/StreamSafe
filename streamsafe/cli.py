@@ -28,7 +28,7 @@ from streamsafe.config import Config
 from streamsafe.io import link
 from streamsafe.io.sinks import BestEffort, MultiSink, PlatformRefused, open_sink
 from streamsafe.io.sources import open_source
-from streamsafe.runtime.runner import AnalyzerFactory, run
+from streamsafe.runtime.runner import AnalyzerFactory, default_analyzer, preload, run
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -90,10 +90,13 @@ def main(
     argv: list[str] | None = None,
     factory: AnalyzerFactory | None = None,
     before_outputs: Callable[[list[str]], None] | None = None,
+    hold: Callable[[], bool] | None = None,
 ) -> int:
     """``factory``: another analyzer than the product's (tests, ``selftest-stream``). ``before_outputs``: called
     with the output specs once the input is open and before any output is - the installed program does its slower
-    start checks there (graphics card, encoder), so the SRT listener is already up while they run."""
+    start checks there (graphics card, encoder), so the SRT listener is already up while they run.
+    ``hold``: the held engine (``app/engine.py``): the models load first, then ``hold()`` waits for the window's
+    Start - True: the run goes on as any other; False: the engine ends at once, nothing opened, no report."""
     args = parse_args(argv)
     cfg = config_from_args(args)
     fps = input_fps(args.input, args.fps)
@@ -103,6 +106,14 @@ def main(
         os.environ["VIDEO_KBPS"] = str(args.bitrate)
     size = tuple(int(v) for v in args.size.lower().split("x")) if args.size else None
     secrets = [link.Secrets(spec) for spec in (*args.output, *args.extra_output)]
+    workers = None
+    if hold is not None:
+        if size is None or cfg.runtime.mode != "realtime":
+            raise SystemExit("a held engine needs --size and the realtime mode")
+        workers = preload(cfg, size, factory or default_analyzer)  # type: ignore[arg-type]
+        if not hold():
+            workers.shutdown(None)
+            return 0
     source, sink, report = None, None, None
     code, reason, detail = 0, "", ""
     try:
@@ -119,9 +130,12 @@ def main(
                 extra = open_sink(spec, source.size, cfg.runtime.fps, audio=cfg.output.audio, tag=tag, crop=crop)
                 sinks.append(BestEffort(extra, tag))
             sink = MultiSink(sinks) if len(sinks) > 1 else (sinks[0] if sinks else None)
-            report = run(cfg, source, sink, factory) if factory is not None else run(cfg, source, sink)
+            report = run(cfg, source, sink, factory or default_analyzer, workers=workers)
+            workers = None  # the run owns it from here
             failed = False
         finally:
+            if workers is not None:  # held, then the input or an output failed before the run took it
+                workers.shutdown(None)
             print("STOP_PHASE closing input and outputs", flush=True)
             for part in (source, sink):
                 try:

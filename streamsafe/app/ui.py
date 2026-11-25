@@ -1461,6 +1461,7 @@ class App(tk.Tk):
         if self._hotkey is not None:
             self._hotkey.stop()
         self.ctrl.set_panic(False)
+        self.ctrl.close()
         self._cancel.set()
         self.destroy()
 

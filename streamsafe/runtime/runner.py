@@ -141,11 +141,14 @@ def run(
     sink: FrameSink | None,
     factory: AnalyzerFactory = default_analyzer,
     translate_factory: Any = None,
+    workers: _Workers | None = None,
 ) -> dict[str, Any]:
+    """``workers``: an analyzer already loading or loaded for this run (``preload``, the held engine); its frame
+    size must be this source's."""
     limit_threads()
     mode = cfg.runtime.mode
     if mode == "realtime":
-        return _run_realtime(cfg, source, sink, factory, translate_factory)
+        return _run_realtime(cfg, source, sink, factory, translate_factory, workers)
     if mode == "offline":
         return _run_offline(cfg, source, sink, factory)
     raise ValueError(f"unknown mode: {mode!r} (realtime | offline)")
@@ -208,12 +211,27 @@ RESTART_AFTER_FAILS = 30  # consecutive failed decisions (3 s at 10/s) -> a new 
 RESTART_BACKOFF_S = 10.0
 
 
+def preload(cfg: Config, size: tuple[int, int], factory: AnalyzerFactory = default_analyzer) -> _Workers:
+    """Start loading the analyzer for a run whose frames will be ``size``, before its input is open (the held
+    engine: the models are ready by the time the streamer presses Start)."""
+    full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
+    return _Workers(lambda: AnalyzerWorker(cfg, factory, size[0] / ANALYSIS_SIZE[0], size if full_res else ANALYSIS_SIZE), tuple(size))
+
+
 def _run_realtime(
-    cfg: Config, source: FrameSource, sink: FrameSink | None, factory: AnalyzerFactory, translate_factory: Any = None
+    cfg: Config,
+    source: FrameSource,
+    sink: FrameSink | None,
+    factory: AnalyzerFactory,
+    translate_factory: Any = None,
+    workers: _Workers | None = None,
 ) -> dict[str, Any]:
     rt = cfg.runtime
-    full_res = cfg.eye.full_res_crops  # the worker gets native frames and cuts eye crops from them
-    worker = _Workers(lambda: AnalyzerWorker(cfg, factory, _output_scale(source), source.size if full_res else ANALYSIS_SIZE))
+    full_res = cfg.eye.full_res_crops
+    if workers is not None and tuple(source.size) != tuple(workers.size):
+        workers.shutdown(None)  # loaded for another frame size: not usable, a fresh one loads below
+        workers = None
+    worker = workers or preload(cfg, source.size, factory)
     gate = OutputGate(cfg.render, source.size, keep_log=bool(cfg.output.diag_out), scene=cfg.scene, fps=rt.fps, brand=cfg.brand)
     tr = start_translation(cfg, source.size, translate_factory)  # None unless the Arabic text translation is on and ready to load
     frames: dict[int, tuple[float, Any, int]] = {}  # frame id -> (capture time, frame, its number in the source)
@@ -398,8 +416,9 @@ class _Workers:
     """The current analyzer process, replaced when it dies or keeps failing. ``submit`` always goes to the
     current one; while a replacement loads, frames get no decisions and the gate shows the slate."""
 
-    def __init__(self, make: Callable[[], AnalyzerWorker]) -> None:
+    def __init__(self, make: Callable[[], AnalyzerWorker], size: tuple[int, int] = (0, 0)) -> None:
         self._make = make
+        self.size = size  # the frame size of the run it was loaded for
         self.stopping = threading.Event()
         self.ready = threading.Event()  # the first analyzer has loaded its models
         self.failed: BaseException | None = None  # the first analyzer could not load: the run ends with this
@@ -415,7 +434,11 @@ class _Workers:
         t0 = time.monotonic()
         link.status("protection_loading")
         try:
-            self.current.start()
+            with self._lock:  # never launched after a shutdown began (it would load models nobody uses)
+                if self.stopping.is_set():
+                    return
+                self.current.launch()
+            self.current.wait_ready()
         except BaseException as exc:
             if not self.stopping.is_set():
                 self.failed = exc
@@ -430,13 +453,15 @@ class _Workers:
             if self._accepting:
                 self.current.submit(frame_id, frame, cut)
 
-    def shutdown(self, receiver: threading.Thread) -> None:
-        self.stopping.set()
+    def shutdown(self, receiver: threading.Thread | None) -> None:
+        with self._lock:
+            self.stopping.set()
         stopped = self.current
         # the final stats come right after the analyzer's loop ends; its process exit (freeing the GPU models) can
         # take long on a busy card, and nothing waits for that: after a short grace it is ended
         stopped.signal_stop()
-        receiver.join(timeout=10)
+        if receiver is not None:
+            receiver.join(timeout=10)
         stopped.stop(timeout=3.0)
         with self._lock:
             self._accepting = False

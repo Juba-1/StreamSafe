@@ -18,9 +18,10 @@ from pathlib import Path
 
 from streamsafe import session_report
 from streamsafe.app import engine, fetch, heads, ingest, keystore, modelpack, nvidia_pack, paths, pictures, release, updates
+from streamsafe.app import held as held_mod
 from streamsafe.app import license as lic
 from streamsafe.app import settings as settings_mod
-from streamsafe.app.settings import INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, Settings
+from streamsafe.app.settings import INPUT_FILE, INPUT_SRT, OUTPUT_RECORD, OUTPUT_RTMP, OUTPUT_WINDOW, Settings
 from streamsafe.branding import PRODUCT_NAME
 from streamsafe.io import link
 from streamsafe.translate import pack as translate_pack
@@ -70,6 +71,8 @@ class Controller:
         kf = paths.key_file(self.env)
         self.keys2 = keystore.KeyStore(kf.with_name(kf.stem + "_2" + kf.suffix), guard)  # the extra platform's key
         self.engine = engine.EngineProcess(self._engine_line, engine.Redactor())
+        self.held = held_mod.Held()  # an engine loaded ahead, waiting for Start
+        self._starting = threading.Lock()  # a start and the prewarm never overlap (no second engine beside a run)
         self.tracker = engine.StatusTracker()
         self.check_result = CheckResult()
         self.license_status = lic.Status(True) if not release.LICENSE_REQUIRED else lic.Status(False, "no_license")
@@ -530,18 +533,9 @@ class Controller:
         self.save_settings()
         self.write_control()
 
-    def start(self, key: str, preview: bool = False) -> None:
-        """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start.
-        ``preview``: the protected picture goes to a window on this PC only, nothing to the platform."""
-        if release.LICENSE_REQUIRED:
-            self.check_license()  # every start asks Dodo (a lapsed subscription does not start)
+    def _launch(self, key: str, preview: bool) -> tuple[list[str], dict[str, str], tuple[str, ...]]:
+        """What a start runs: (command, environment, secrets to blank out of its lines)."""
         s = replace(self.settings, output=OUTPUT_WINDOW) if preview else self.settings
-        why = self.blockers(key, s)
-        if why:
-            raise RuntimeError(why[0])
-        self.license_stopped = False
-        self.preview = preview
-        self.free_port()
         target = self.target(key) if s.output == OUTPUT_RTMP else ingest.Target("", "")
         url = target.url
         t2 = self.target2(self.key2) if s.output == OUTPUT_RTMP and s.platform2 else ingest.Target("", "")
@@ -556,23 +550,74 @@ class Controller:
         )
         env["COVER_MODE"] = s.cover_mode
         env["THR_SCALE"] = str(s.sens_scale)
-        self.set_panic(False)  # a panic left on by an earlier run starts this one uncovered only if pressed again
         env["CONTROL_FILE"] = str(self.control_file())
         env["PREVIEW_FILE"] = str(self.preview_file())
+        record = self.record_file() if s.output == OUTPUT_RECORD else ""
+        cmd = engine.exe_command(engine.run_args(s, paths.reports_dir(self.env), record, fast=self.use_nvidia))
+        secrets = tuple(x for x in (key, target.key, url, self.key2, t2.key, t2.url) if x)
+        return cmd, env, secrets
+
+    def start(self, key: str, preview: bool = False) -> None:
+        """Start the engine. Raises RuntimeError with the blocking i18n key when it must not start.
+        ``preview``: the protected picture goes to a window on this PC only, nothing to the platform."""
+        with self._starting:
+            self._start(key, preview)
+
+    def _start(self, key: str, preview: bool) -> None:
+        if release.LICENSE_REQUIRED:
+            self.check_license()  # every start asks Dodo (a lapsed subscription does not start)
+        s = replace(self.settings, output=OUTPUT_WINDOW) if preview else self.settings
+        why = self.blockers(key, s)
+        if why:
+            raise RuntimeError(why[0])
+        self.license_stopped = False
+        self.preview = preview
+        self.free_port()
+        cmd, env, secrets = self._launch(key, preview)
+        self.set_panic(False)  # a panic left on by an earlier run starts this one uncovered only if pressed again
         state = paths.obs_state_file(self.env)
         state.unlink(missing_ok=True)  # a line left by an earlier run must not look like this run's
         state.parent.mkdir(parents=True, exist_ok=True)
-        self.engine.redactor_secrets(*(x for x in (key, target.key, url, self.key2, t2.key, t2.url) if x))
         self.tracker.reset()
         self.last_exit = None
         self._engine_lines = []
         self.link = engine.LinkState()
         self._report_line, self._closed_out = "", False
         self._started_at = time.monotonic()
-        record = self.record_file() if s.output == OUTPUT_RECORD else ""
-        self.engine.start(
-            engine.exe_command(engine.run_args(s, paths.reports_dir(self.env), record, fast=self.use_nvidia)), env, self._new_log()
-        )
+        taken = None if preview else self.held.take(cmd, env)
+        if taken is not None:  # loaded ahead: its lines so far go into this run's, then it is told to go
+            held, lines = taken
+            held.on_line = self._engine_line
+            for line in lines:
+                self._engine_line(line)
+            if held.send(engine.GO):
+                self.engine = held
+                return
+            held.stop(wait_s=5)
+            self.tracker.reset()
+            self._engine_lines, self.link = [], engine.LinkState()
+        self.engine = engine.EngineProcess(self._engine_line, engine.Redactor(*secrets))
+        self.engine.start(cmd, env, self._new_log())
+
+    def prewarm(self, key: str) -> None:
+        """Keep an engine loaded and waiting for Start (``held.Held``), matching what Start would run now.
+        Called often (the window's tick): does nothing while a run is on or nothing changed."""
+        if not self._starting.acquire(blocking=False):
+            return  # a start is going on
+        try:
+            s = self.settings
+            if self.engine.running or s.output != OUTPUT_RTMP or s.input == INPUT_FILE or self.blockers(key, s):
+                if not self.engine.running:
+                    self.held.drop()  # not startable now (key, models, licence ...): nothing loaded for nothing
+                return
+            try:
+                cmd, env, secrets = self._launch(key, preview=False)
+            except Exception as exc:  # never break the window's tick
+                self.log(f"prewarm skipped: {exc!r:.200}")
+                return
+            self.held.want(cmd, env, secrets, self._new_log)
+        finally:
+            self._starting.release()
 
     def status(self) -> str:
         running = self.engine.running
@@ -635,6 +680,10 @@ class Controller:
     def stop(self) -> None:
         self.engine.stop()
         self.close_out()
+
+    def close(self) -> None:
+        """The window is closing: end a held engine (a running one is stopped by ``stop``)."""
+        self.held.drop(wait=True)
 
     def last_report(self) -> Path | None:
         return engine.last_report(paths.reports_dir(self.env))
