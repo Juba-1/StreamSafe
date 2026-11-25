@@ -182,3 +182,25 @@ def test_speed_bench_measures_every_batch_size(tmp_path):
     assert out["device"] == "cpu" and set(out["batch"]) == {1, 2, 4}
     assert all({"first_ms", "p50", "p95", "per_item"} <= set(row) for row in out["batch"].values())
     assert "switch_extra_ms" in out and "bound_p50" not in out["batch"][1], "I/O binding is a GPU measurement"
+
+
+def test_a_file_is_hashed_once_until_it_changes(tmp_path, monkeypatch):
+    """Model and engine files are hashed at the first start only; a changed file (other size or time) is
+    hashed again, so a damaged or swapped file is still caught."""
+    import os
+
+    from streamsafe.models import onnx_backend as ob
+
+    f = tmp_path / "eye.onnx"
+    f.write_bytes(b"a" * 1000)
+    calls = []
+    real = ob.sha256
+    monkeypatch.setattr(ob, "sha256", lambda p: calls.append(p) or real(p))
+    first = ob.sha256_known(f)
+    assert ob.sha256_known(f) == first == real(f) and len(calls) == 1
+    st = f.stat()
+    f.write_bytes(b"b" * 1000)  # same size, new content: the write moves the time
+    os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))
+    assert ob.sha256_known(f) == real(f) != first and len(calls) == 2
+    (tmp_path / ob.STAMPS).write_text("not json")
+    assert ob.sha256_known(f) == real(f) and len(calls) == 3  # a broken record: hash again

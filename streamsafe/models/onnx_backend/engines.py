@@ -162,10 +162,12 @@ def folder(cache: str | Path, model: str, key: dict) -> Path:
 
 
 def listing(path: Path) -> dict[str, tuple[int, int]]:
-    """name -> (size, time written) of every file in an engine folder except the seal."""
+    """name -> (size, time written) of every file in an engine folder except the seal and the kept digests."""
+    from streamsafe.models.onnx_backend import STAMPS
+
     out = {}
     for p in sorted(path.iterdir()):
-        if p.name != SEAL:
+        if p.name not in (SEAL, STAMPS, STAMPS + ".tmp"):
             st = p.stat()
             out[p.name] = (st.st_size, st.st_mtime_ns)
     return out
@@ -173,8 +175,9 @@ def listing(path: Path) -> dict[str, tuple[int, int]]:
 
 def check(path: Path, key: dict, quick: bool = False) -> str:
     """ "" when ``path`` holds a complete engine built for exactly ``key``, otherwise why it must not be loaded.
-    ``quick``: sizes only, no sha256 (the system checker; the engine itself always hashes)."""
-    from streamsafe.models.onnx_backend import sha256
+    ``quick``: sizes only, no sha256 (the system checker); otherwise every file's sha256, re-hashed only when the
+    file changed since it was last hashed (``sha256_known``)."""
+    from streamsafe.models.onnx_backend import sha256_known
 
     if not path.is_dir():
         return "not built yet"
@@ -194,7 +197,7 @@ def check(path: Path, key: dict, quick: bool = False) -> str:
     if set(present) != set(files) or not any(name.endswith(".engine") for name in files):
         return "the engine folder does not hold the files that were sealed"
     for name, (size, digest) in files.items():
-        if present[name][0] != size or (not quick and sha256(path / name) != digest):
+        if present[name][0] != size or (not quick and sha256_known(path / name) != digest):
             return f"{name} is damaged (size / sha256 mismatch)"
     return ""
 

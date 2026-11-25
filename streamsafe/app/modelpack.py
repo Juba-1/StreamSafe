@@ -28,6 +28,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from streamsafe.app import fetch, unpack
+from streamsafe.models.onnx_backend import STAMPS
 
 MANIFEST = "manifest.json"
 HEADS = "heads"  # a pack made by an older tool may hold the heads: they are skipped, ``heads.py`` owns them
@@ -94,7 +95,8 @@ def verify(folder: Path) -> dict:
 
     try:
         files = checked_files(Config.from_env({}, onnx_dir=str(folder)))
-        present = {p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file()} - {MANIFEST}
+        kept = (MANIFEST, STAMPS, STAMPS + ".tmp")  # the digests kept by the check itself are not part of the pack
+        present = {p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file() and p.name not in kept}
         unlisted = sorted(present - set(files))
         if unlisted:
             raise PackError(f"files that the manifest does not list: {', '.join(unlisted)}")
@@ -210,7 +212,7 @@ def install_folder(source: Path, models: Path, progress: Progress | None = None,
         names = [
             check_name(p.relative_to(source).as_posix())
             for p in sorted(source.rglob("*"))
-            if p.is_file() and not {"trt_cache", HEADS} & set(p.relative_to(source).parts[:-1])
+            if p.is_file() and p.name != STAMPS and not {"trt_cache", HEADS} & set(p.relative_to(source).parts[:-1])
         ]
         total = sum((source / n).stat().st_size for n in names)
     except OSError as exc:

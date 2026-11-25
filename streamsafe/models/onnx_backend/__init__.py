@@ -4,6 +4,11 @@ or the CPU.
 
 Before anything is loaded, every file is checked against ``manifest.json`` (sha256): a damaged or swapped model
 file stops the engine at start (fail closed), it never runs with unknown weights.
+
+Hashing gigabytes at every start cost 10-20 s (load bench 25 Nov, runs/load_bench_r2): ``sha256_known`` hashes a
+file once and keeps the result with the file's size and modification time (``STAMPS`` in the same folder); a later
+start that finds the same size and time takes the kept digest. Any change to the file (an update, a damaged
+download, a swap) changes its time or size, and it is hashed again.
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ def verify(folder: Path, pins: dict[str, str]) -> dict:
         raise ValueError(f"model folder {folder} lacks {missing}")
     for name, meta in files.items():
         path = folder / name
-        if not path.exists() or path.stat().st_size != meta["bytes"] or sha256(path) != meta["sha256"]:
+        if not path.exists() or path.stat().st_size != meta["bytes"] or sha256_known(path) != meta["sha256"]:
             raise ValueError(f"model file {path} is missing or damaged (size / sha256 mismatch)")
         repo = meta.get("repo")
         if repo in pins and meta.get("revision") != pins[repo]:
@@ -48,6 +53,34 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+STAMPS = ".sha256_stamps.json"
+
+
+def sha256_known(path: Path) -> str:
+    """sha256 of ``path``, hashed only when its size or modification time differs from the last time."""
+    st = path.stat()
+    stamp = [st.st_size, st.st_mtime_ns]
+    book = path.parent / STAMPS
+    try:
+        known = json.loads(book.read_text())
+    except (OSError, ValueError):
+        known = {}
+    entry = known.get(path.name) if isinstance(known, dict) else None
+    if isinstance(entry, list) and len(entry) == 3 and entry[:2] == stamp:
+        return str(entry[2])
+    digest = sha256(path)
+    if not isinstance(known, dict):
+        known = {}
+    known[path.name] = [*stamp, digest]
+    tmp = book.with_name(book.name + ".tmp")
+    try:  # a folder that cannot be written only means hashing again next time
+        tmp.write_text(json.dumps(known))
+        tmp.replace(book)
+    except OSError:
+        pass
+    return digest
 
 
 def checked_files(cfg: Config) -> dict:

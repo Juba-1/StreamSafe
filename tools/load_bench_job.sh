@@ -52,6 +52,11 @@ for c in ${CONFIGS:-trt_prepared cuda}; do
     trt_prepared) B trt_prepared TRT=1 TRT_BUILD=0 ;;
     trt_profile) env TRT=1 TRT_BUILD=0 PROFILE=1 python tools/load_bench.py trt_profile > $R/profile_trt.txt 2>&1; grep LOADBENCH $R/profile_trt.txt | tee -a $R/bench.txt ;;
     cuda) B cuda TRT=0 ;;
+    trt_ctx)
+      TRT=1 TRT_BUILD=0 python tools/trt_ctx_bench.py record /workspace/ctx 2>&1 | grep -E "RECORDED|Error|error" | tail -3 | tee -a $R/bench.txt
+      for mode in normal ctx normal_parallel ctx_parallel normal ctx; do
+        TRT=1 python tools/trt_ctx_bench.py time /workspace/ctx $mode 2>&1 | grep -E "CTXBENCH|Error|error" | tail -2 | tee -a $R/bench.txt
+      done ;;
     cuda_heuristic) B cuda_heuristic TRT=0 CUDNN_SEARCH=HEURISTIC ;;
     trt_not_prepared) B trt_not_prepared TRT=1 TRT_BUILD=0 TRT_CACHE=/workspace/trt_empty ;;
   esac
