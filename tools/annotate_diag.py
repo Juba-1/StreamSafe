@@ -16,6 +16,11 @@ def main() -> None:
     decisions = data.get("dec", data) if isinstance(data, dict) else data
     by_frame = {int(d[0]): d for d in decisions if isinstance(d, list) and len(d) >= 4}
     frames = sorted(by_frame)
+    # the boxes are in the analysis frame's pixels: find its width from the largest box edge seen
+    far = max((b[1][2] for d in by_frame.values() for b in d[1]), default=1920)
+    width = next((w for w in (640, 960, 1280, 1600, 1920) if far <= w + 2), 1920)
+    k = 1920 / width
+    print("analysis width", width, "scale", k)
     cap = cv2.VideoCapture(video)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     tiles, t, n = [], 0.0, int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -31,7 +36,7 @@ def main() -> None:
         if near is not None and abs(near - idx) <= 6:
             _, dets, _, thr = by_frame[near][:4]
             for _tid, box, p, risky, _stale in dets:
-                x0, y0, x1, y1 = map(int, box)
+                x0, y0, x1, y1 = (int(v * k) for v in box)
                 col = (40, 40, 255) if risky else (60, 220, 60)
                 cv2.rectangle(im, (x0, y0), (x1, y1), col, 4)
                 cv2.putText(im, f"{p:.2f}", (x0 + 4, max(30, y0 + 40)), cv2.FONT_HERSHEY_SIMPLEX, 1.4, col, 4)
