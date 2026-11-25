@@ -176,18 +176,20 @@ def test_risk_score_only_far_people_need_a_near_certain_reading():
 
 
 def test_risk_score_only_modest_close_up_stays_uncovered_at_balanced():
-    """Lucia's modest close-up read 0.33-0.34: covered at "high" (thr 0.30), not at balanced (thr ~0.45)."""
+    """Lucia's modest close-up read 0.33-0.34 (covered on 25 Nov at the old default): balanced and light leave
+    it; a clearer 0.6 is covered at every strength."""
     from streamsafe import sensitivity as sv
 
     emb = np.zeros(8, np.float32)
     emb[0] = 1
     base = 0.2308
-    for k, covered in ((sv.HIGH, True), (sv.BALANCED, False), (sv.LIGHT, False)):
+    cases = [(k, 0.34, False) for k in (sv.BALANCED, sv.LIGHT)] + [(k, 0.6, True) for _, k in sv.LEVELS]
+    for k, p, covered in cases:
         tr, thr = Tracker(), base * k
-        policy = RiskPolicy(RiskConfig(), thr, lambda e: np.full(len(e), 0.34))
+        policy = RiskPolicy(RiskConfig(), thr, lambda e, p=p: np.full(len(e), p))
         policy.light = k >= sv.SCORE_ONLY_K
-        out = _run_thr(policy, tr, emb, 0.34, 10, thr)
-        assert out[-1] is covered, k
+        out = _run_thr(policy, tr, emb, p, 10, thr)
+        assert out[-1] is covered, (k, p)
 
 
 def _run_thr(policy, tr, emb, p, steps, thr):

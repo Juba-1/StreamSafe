@@ -41,7 +41,7 @@ HISTORY = 5
 TINY_H = 20  # people shorter than this use a lower threshold
 # score-only strengths (balanced, light): someone small and far away needs a near-certain reading. The eye misreads
 # small crops: far-away men on bikes read 0.83-0.89 on the trailer (runs/trailer_scores_r3), clear swimwear 0.9+
-FAR_H = 100  # analysis px (of 540): shorter than this counts as far away
+FAR_H = 150  # analysis px (of 540; as RiskConfig.young_min_h): shorter than this counts as far away
 FAR_THR = 0.9
 S_CAP_LIGHT = 4.0  # score-only: a lower cap, so a cover ends sooner once the readings drop
 MAX_WAITED = 30  # decisions of waiting that count at the look (0.85 ** 30 < 0.01: more changes nothing)
