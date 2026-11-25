@@ -208,15 +208,26 @@ def test_controller_writes_the_live_control(tmp_path):
     }
 
 
-def test_old_default_sensitivity_moves_to_the_lighter_default(tmp_path):
+def test_saved_strength_moves_to_the_same_level(tmp_path):
     import json as _json
 
+    from streamsafe import sensitivity as sv
     from streamsafe.app import settings as st
 
     f = tmp_path / "s.json"
-    f.write_text(_json.dumps({"sens_scale": 1.0}))
-    assert st.load(f).sens_scale == st.SENS_DEFAULT == 1.3  # the old default
-    f.write_text(_json.dumps({"sens_scale": 0.8}))
-    assert st.load(f).sens_scale == 0.8  # a streamer's own choice stays
-    f.write_text(_json.dumps({"sens_scale": 1.0, "sens_v": st.SENS_VERSION}))
-    assert st.load(f).sens_scale == 1.0  # chosen after the change: stays
+    for old, now in ((1.7, sv.LIGHT), (1.4, sv.BALANCED), (1.3, sv.BALANCED), (1.0, sv.HIGH), (0.8, sv.HIGH)):
+        f.write_text(_json.dumps({"sens_scale": old}))
+        assert st.load(f).sens_scale == now, old
+    f.write_text(_json.dumps({"sens_scale": 2.2, "sens_v": st.SENS_VERSION}))
+    assert st.load(f).sens_scale == 2.2  # chosen with today's levels: stays
+    f.write_text(_json.dumps({"sens_scale": 9, "sens_v": st.SENS_VERSION}))
+    assert st.load(f).sens_scale == sv.K_MAX
+    assert st.Settings().sens_scale == sv.DEFAULT == sv.BALANCED
+
+
+def test_strength_levels_are_ordered_and_named():
+    from streamsafe import sensitivity as sv
+
+    assert sv.K_MIN <= sv.HIGH < sv.SCORE_ONLY_K <= sv.BALANCED < sv.LIGHT <= sv.K_MAX
+    assert [sv.level(k) for _, k in sv.LEVELS] == ["s_light", "s_mid", "s_high"]
+    assert sv.level(2.0) == "s_mid" and sv.level(1.0) == "s_high" and sv.level(2.6) == "s_light"

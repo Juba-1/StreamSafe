@@ -28,6 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from streamsafe import sensitivity
 from streamsafe.app import controller, engine, hotkey, i18n, ingest, modelpack, obs_setup, passkey, plan, preflight, release, updates
 from streamsafe.app import settings as cfg
 
@@ -196,6 +197,7 @@ class WebApp:
                 "has_key2": bool(c.key2),
                 "remember": s.remember_key,
                 "sens": s.sens_scale,
+                "sens_levels": sensitivity.LEVELS,
                 "everyone": s.dress_everyone,
                 "cover_mode": s.cover_mode,
                 "panic_button": s.panic_button,
@@ -425,7 +427,7 @@ class WebApp:
         self.ctrl.set_panic(bool(a.get("on", not self.ctrl.panic)))
 
     def do_sens(self, a: dict) -> None:
-        self.ctrl.set_sensitivity(min(cfg.SENS_MAX, max(cfg.SENS_MIN, float(a.get("k", cfg.SENS_DEFAULT)))))
+        self.ctrl.set_sensitivity(sensitivity.clamp(a.get("k", sensitivity.DEFAULT)))
 
     def do_everyone(self, a: dict) -> None:
         self.ctrl.set_everyone(bool(a.get("on")))

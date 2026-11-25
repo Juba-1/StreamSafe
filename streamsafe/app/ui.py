@@ -24,6 +24,7 @@ from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from streamsafe import sensitivity
 from streamsafe.app import (
     build_info,
     controller,
@@ -1165,7 +1166,7 @@ class App(tk.Tk):
 
     def show_sens(self) -> None:
         k = float(self.sens.get())
-        self.sens_word.configure(text=self.tr("sens_light" if k >= 1.3 else "sens_mid" if k >= 0.9 else "sens_high"))
+        self.sens_word.configure(text=self.tr(sensitivity.level(k).replace("s_", "sens_")))
 
     def on_zones(self) -> None:
         """The streamer marks the webcam (or any part of the picture) where people are never dressed."""

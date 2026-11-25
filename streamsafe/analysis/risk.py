@@ -10,6 +10,8 @@ Rules (thresholds scale with the operating threshold through ``scale = thr / 0.4
     risky (max p < fast_clear_k * thr)
   * HANDOFF: a new track where a covered track was lost moments ago (same place) inherits its risk state
   * RELEASE otherwise only after 3 clearly-safe decisions AND release_s seconds
+Score-only strengths (balanced, light; ``RiskPolicy.light``): the score alone decides - no lower bar for tiny
+people, no stricter first look, half the release time, a lower evidence cap - and far-away people need FAR_THR.
 Eye-skipped (stale) readings repeat the last evidence; the release clock keeps running.
 A person whose look the eye budget put off (``analysis/eye_schedule.py``) is covered and nothing else happens:
 no evidence, no observation counted, and the release clock stands still. When the look comes, evidence for
@@ -37,6 +39,11 @@ FIRST_LOOKS = 3
 OVERLAP_IOU = 0.15
 HISTORY = 5
 TINY_H = 20  # people shorter than this use a lower threshold
+# score-only strengths (balanced, light): someone small and far away needs a near-certain reading. The eye misreads
+# small crops: far-away men on bikes read 0.83-0.89 on the trailer (runs/trailer_scores_r3), clear swimwear 0.9+
+FAR_H = 100  # analysis px (of 540): shorter than this counts as far away
+FAR_THR = 0.9
+S_CAP_LIGHT = 4.0  # score-only: a lower cap, so a cover ends sooner once the readings drop
 MAX_WAITED = 30  # decisions of waiting that count at the look (0.85 ** 30 < 0.01: more changes nothing)
 HANDOFF_MIN_P = 0.25  # x thr: below this a new track does not inherit a lost cover (run 50: palm trees, backs);
 # above it a lost cover lingers ~release_s on whoever is at that place (golden rule: a moment too long, never too short)
@@ -108,6 +115,13 @@ class RiskPolicy:
             r.history = [*r.history, person.p][-HISTORY:]
             r.max_p = max(r.max_p, person.p)
 
+    def _bar(self, height: int, thr: float) -> float:
+        """The score this person must read: score-only asks far-away people for near certainty; the careful
+        rules ask tiny people for less (they are hard to read and rarely shown long)."""
+        if self.light:
+            return max(thr, FAR_THR) if height < FAR_H else thr
+        return thr if height >= TINY_H else min(thr, 0.2 * self.scale)
+
     def _decide(self, person: Person, track: Track, people: list[Person], tracker: Tracker, thr: float, now: float) -> bool:
         cfg, scale, r = self.cfg, self.scale, track.risk
         p_track = float(self.prisk(track.unit_emb[None])[0])
@@ -120,14 +134,16 @@ class RiskPolicy:
         # "light" sensitivity (the streamer's slider): only the score decides - no lower bar for tiny people, no
         # early first-look cover, a shorter hold. Measured 23 Nov: a quarter of covers came from these rules
         light = self.light
-        th = thr if light or person.height >= TINY_H else min(thr, 0.2 * scale)
+        th = self._bar(person.height, thr)
+        hard = max(HARD, th)
+        cap = S_CAP_LIGHT if light else S_CAP
 
         gain = weight * (_logit(p) - _logit(th))
         # an uncovered person who waited for this look: the decisions they waited count with the reading they
         # get now, as they would have with a look in time. Only toward covering - a low reading counts once
         looks = 1 + min(person.waited, MAX_WAITED) if gain > 0 and not r.risky else 1
         for _ in range(looks):
-            r.evidence = min(S_CAP, DECAY * r.evidence + gain)
+            r.evidence = min(cap, DECAY * r.evidence + gain)
         r.safe_run = r.safe_run + 1 if r.evidence < S_SAFE else 0
         if r.safe_run == 1:
             r.safe_since = now
@@ -149,7 +165,7 @@ class RiskPolicy:
         if fast_clear and r.risky:
             r.risky = False
             r.evidence = min(r.evidence, 0)
-        elif r.evidence >= S_COVER or person.p >= HARD or (r.n_obs <= FIRST_LOOKS and p >= first_look):
+        elif r.evidence >= S_COVER or person.p >= hard or (r.n_obs <= FIRST_LOOKS and p >= first_look):
             r.risky = True
             r.safe_run = 0
         elif r.risky and r.safe_run >= SAFE_RUN_RELEASE and now - r.safe_since >= cfg.release_s * (0.5 if light else 1.0):

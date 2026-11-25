@@ -9,16 +9,16 @@ import os
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
+from streamsafe import sensitivity
+
 INPUT_CAMERA, INPUT_SRT, INPUT_FILE = "camera", "srt", "file"
 RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "1440p": (2560, 1440), "2160p": (3840, 2160)}
 FPS_CHOICES = (30, 60)
 OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD = "window", "rtmp", "record"
 COVER_PEOPLE, COVER_SCREEN = "people", "screen"
-# the sensitivity slider (a threshold scale; higher = fewer covers). Measured 24 Nov on 183 held-out GTA 6 crops
-# (Ali's labels): 1.4 caught only 1-2 of 28 borderline revealing women, so 1.0 is the default and 1.5 the light end
-SENS_MIN, SENS_MAX, SENS_DEFAULT = 0.7, 2.0, 1.3
-OLD_DEFAULTS = (1.4, 1.0)  # the defaults until 3.0.0.37 and until 3.0.0.43: such saved settings move to the new default
-SENS_VERSION = 2  # bumped when the default moves; settings saved before it get the new default once
+# the cover strength (a threshold scale; higher = fewer covers): the levels live in streamsafe/sensitivity.py
+SENS_MIN, SENS_MAX, SENS_DEFAULT = sensitivity.K_MIN, sensitivity.K_MAX, sensitivity.DEFAULT
+SENS_VERSION = 3  # bumped when the levels move; a strength saved before it moves to the same level once
 DEFAULT_CAMERA = "OBS Virtual Camera"
 
 
@@ -113,8 +113,8 @@ def load(path: Path) -> Settings:
     if s.output not in (OUTPUT_WINDOW, OUTPUT_RTMP, OUTPUT_RECORD):
         s.output = OUTPUT_RTMP
     try:
-        old = isinstance(raw, dict) and raw.get("sens_v", 0) < SENS_VERSION and float(s.sens_scale) in OLD_DEFAULTS
-        s.sens_scale = SENS_DEFAULT if old else min(SENS_MAX, max(SENS_MIN, float(s.sens_scale)))
+        old = isinstance(raw, dict) and raw.get("sens_v", 0) < SENS_VERSION
+        s.sens_scale = sensitivity.from_old(s.sens_scale) if old else sensitivity.clamp(s.sens_scale)
     except (TypeError, ValueError):
         s.sens_scale = SENS_DEFAULT
     s.sens_v = SENS_VERSION

@@ -20,6 +20,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
+from streamsafe import sensitivity
 from streamsafe.app import engine as eng_mod
 from streamsafe.app import runtime_select
 from streamsafe.app.webui import server
@@ -158,7 +159,7 @@ def main() -> int:
             say(f"heads update failed: {type(exc).__name__}: {exc}")
     app.do_platform({"platform": "kick", "key": os.environ["STREAM_URL"].strip()})
     s = c.settings
-    s.follow_obs, s.sens_scale, s.dress_everyone, s.cover_mode, s.zones, s.covers = False, 1.3, False, "people", [], []
+    s.follow_obs, s.sens_scale, s.dress_everyone, s.cover_mode, s.zones, s.covers = False, sensitivity.DEFAULT, False, "people", [], []
     c.save_settings()
     c.run_check()
     say(f"ready: platform={s.platform} key={'yes' if app.key else 'NO'} models={c.models_problem() or 'ok'}")
@@ -217,7 +218,9 @@ def main() -> int:
 
         # --- part 2: the trailer once, default settings, nothing touched -------------------------------------
         s = c.settings
-        defaults = s.sens_scale == 1.3 and not s.dress_everyone and s.cover_mode == "people" and not s.zones and not s.covers
+        defaults = (
+            s.sens_scale == sensitivity.DEFAULT and not s.dress_everyone and s.cover_mode == "people" and not s.zones and not s.covers
+        )
         say(f"before the trailer: sens={s.sens_scale} everyone={s.dress_everyone} mode={s.cover_mode} zones={s.zones} "
             f"covers={s.covers} pictures={len(c.pictures.items)} -> {'DEFAULTS' if defaults else 'NOT DEFAULT'}")  # fmt: skip
         caption("الحين التريلر مرة وحدة، بالإعداد الطبيعي، بدون لمس أي زر")

@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 import cv2
 import numpy as np
 
+from streamsafe import sensitivity
 from streamsafe.analysis import body_rule, headroom
 from streamsafe.analysis.eye_schedule import EyeScheduler
 from streamsafe.analysis.hud_thread import HudThread
@@ -32,7 +33,6 @@ from streamsafe.runtime.control import LiveControl
 from streamsafe.runtime.threads import usable_cpus
 from streamsafe.types import ANALYSIS_SIZE, Decision, Layer, Person
 
-LIGHT_K = 1.3  # the slider's "light" end: only the score decides (risk.RiskPolicy.light)
 SWIM_SHIFT = 0.05  # beach / pool scenes lower the threshold by up to this (x score scale)
 SCENE_EVERY_S = 1.0  # scene model period when only the beach prior needs it (and on every cut)
 MIN_W = 12
@@ -61,7 +61,7 @@ class Analyzer:
         self.tracker = Tracker()
         self.eyes = EyeScheduler(cfg.eye)
         self.policy = RiskPolicy(cfg.risk, self.thr, models.eye.prisk)
-        self.policy.light = self._k >= LIGHT_K
+        self.policy.light = self._k >= sensitivity.SCORE_ONLY_K
         self.garments = GarmentBuilder(cfg.garment, output_scale)
         self.p_swim = 0.0
         self.latch = SceneLatch(cfg.scene)
@@ -108,15 +108,14 @@ class Analyzer:
         self.thr = min(0.95, self._base_thr * k)
         self.scale = self.thr / 0.40
         self.policy.base_thr, self.policy.scale = self.thr, self.thr / 0.40
-        self.policy.light = k >= LIGHT_K
+        self.policy.light = k >= sensitivity.SCORE_ONLY_K
 
     def __call__(self, frame_id: int, frame: np.ndarray, cut: bool, now: float | None = None) -> Decision:
-        live = self.live.get()
-        k = live.thr_scale
-        if k and k != self._k:
-            self.set_sensitivity(k)
         """``frame``: BGR, any size (resized to the analysis size; with ``full_res_crops`` a larger frame
         also supplies the eye crops)."""
+        k = self.live.get().thr_scale
+        if k and k != self._k:
+            self.set_sensitivity(k)
         t0 = self.clock()
         timings: dict[str, float] = {}
         im = frame if frame.shape[1::-1] == ANALYSIS_SIZE else cv2.resize(frame, ANALYSIS_SIZE, interpolation=cv2.INTER_AREA)

@@ -150,6 +150,56 @@ def _run(policy, tr, emb, p, steps, start=0, x=100):
     return out
 
 
+def test_risk_score_only_far_people_need_a_near_certain_reading():
+    """Balanced and light: a small far-away person reading 0.86 (the trailer's men on bikes) stays uncovered,
+    one reading 0.95 (clear swimwear) is covered; at "high" the same 0.86 is covered."""
+    from streamsafe.analysis.risk import FAR_H
+
+    emb = np.zeros(8, np.float32)
+    emb[0] = 1
+
+    def far(p):
+        h = FAR_H - 20
+        mask = np.zeros((540, 960), bool)
+        mask[100 : 100 + h, 100:130] = True
+        return Person(box=(100, 100, 130, 100 + h), mask=mask, emb=emb, p=p)
+
+    for light, p, covered in ((True, 0.86, False), (True, 0.95, True), (False, 0.86, True)):
+        tr = Tracker()
+        policy = RiskPolicy(RiskConfig(), 0.45, lambda e, p=p: np.full(len(e), p))
+        policy.light = light
+        for i in range(6):
+            people = [far(p)]
+            tr.assign(people, cut=False)
+            policy.update(people, tr, 0.45, now=i / 10)
+        assert people[0].risky is covered, (light, p)
+
+
+def test_risk_score_only_modest_close_up_stays_uncovered_at_balanced():
+    """Lucia's modest close-up read 0.33-0.34: covered at "high" (thr 0.30), not at balanced (thr ~0.45)."""
+    from streamsafe import sensitivity as sv
+
+    emb = np.zeros(8, np.float32)
+    emb[0] = 1
+    base = 0.2308
+    for k, covered in ((sv.HIGH, True), (sv.BALANCED, False), (sv.LIGHT, False)):
+        tr, thr = Tracker(), base * k
+        policy = RiskPolicy(RiskConfig(), thr, lambda e: np.full(len(e), 0.34))
+        policy.light = k >= sv.SCORE_ONLY_K
+        out = _run_thr(policy, tr, emb, 0.34, 10, thr)
+        assert out[-1] is covered, k
+
+
+def _run_thr(policy, tr, emb, p, steps, thr):
+    out = []
+    for i in range(steps):
+        people = [_person(100, p, emb)]
+        tr.assign(people, cut=False)
+        policy.update(people, tr, thr, now=i / 10)
+        out.append(people[0].risky)
+    return out
+
+
 def test_risk_fast_clear_only_for_marginal_covers():
     """Two very low readings release a person who was only marginally risky, never one who read clearly
     risky (a bent-over or half-off-screen pose reads low: the golden rule keeps the cover)."""

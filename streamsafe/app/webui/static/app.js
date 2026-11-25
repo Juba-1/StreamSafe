@@ -106,7 +106,6 @@ const W = {
   },
 };
 
-const SENS = [["s_light", 1.7], ["s_mid", 1.3], ["s_high", 1.0]];  // balanced = the default (settings.SENS_DEFAULT)
 let S = null; // last state
 let lang = "ar";
 let view = "live";
@@ -213,6 +212,7 @@ function paintLive() {
   m.className = "msg " + (s.message.kind || "");
   // sensitivity
   const k = s.settings.sens;
+  const SENS = s.settings.sens_levels;  // [[word key, k], ...] from streamsafe/sensitivity.py
   const pick = SENS.reduce((a, b) => (Math.abs(b[1] - k) < Math.abs(a[1] - k) ? b : a));
   const seg = $("sens");
   if (!seg.childElementCount) {
