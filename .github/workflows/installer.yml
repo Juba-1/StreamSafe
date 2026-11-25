@@ -41,6 +41,9 @@ jobs:
           cache: pip
       - name: install build tools
         run: pip install -e ".[translate]" onnxruntime-directml "pyinstaller>=6.10,<7"
+      - name: "probe: starting a process while a thread reads standard input (engine.detach_stdin)"
+        timeout-minutes: 4
+        run: python tools/probes/run_stdin_probe.py
       - name: "build facts: version, expiry date (default +30 days), exe version resources"
         id: meta
         shell: pwsh
