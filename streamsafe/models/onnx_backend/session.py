@@ -93,6 +93,16 @@ def providers() -> list[str]:
     return [PROVIDERS[k] for k in ORDER if PROVIDERS[k] in available]
 
 
+def with_options(chosen: list[str]) -> list:
+    """Provider list with per-provider options. CUDA: how cuDNN picks its convolution kernels.
+    ``CUDNN_SEARCH`` = EXHAUSTIVE (ONNX Runtime's default: every kernel is timed at each new input shape),
+    HEURISTIC or DEFAULT (no timing). Set for the load benchmark (tools/load_bench.py)."""
+    search = os.environ.get("CUDNN_SEARCH", "").strip().upper()
+    if search not in ("EXHAUSTIVE", "HEURISTIC", "DEFAULT"):
+        return chosen
+    return [(p, {"cudnn_conv_algo_search": search}) if p == PROVIDERS["cuda"] else p for p in chosen]
+
+
 def trt_options(trt: Trt, shapes: Shapes | None = None) -> dict:
     """The TensorRT build options of one model: everything here changes the engine, so all of it is part of the
     engine key (``engines.engine_key``). The cache folder is added per session (``_trt_session``).
@@ -135,7 +145,7 @@ def open_session(path: str | Path, allow_cpu: bool = False, trt: Trt | None = No
                 raise EngineError(f"{path.name}: {note}")
             note = f"TensorRT not used ({note}); running on CUDA"
     if session is None:
-        session = ort.InferenceSession(str(path), sess_options=opts, providers=chosen)
+        session = ort.InferenceSession(str(path), sess_options=opts, providers=with_options(chosen))
     device = device_of(session)
     if device == "cpu" and not allow_cpu:  # the GPU provider failed to initialise for this model
         raise RuntimeError(f"{path.name} could not start on the GPU ({chosen[0]})")
